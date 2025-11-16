@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String
+  role       UserRole
+  isActive   Boolean   @default(true)
+  lastLogin  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([email])
+  @@index([role])
+}
+
+model Employee {
+  id               String           @id @default(uuid())
+  employeeNumber   String           @unique
+  firstName        String
+  lastName         String
+  email            String           @unique
+  departmentId     String?
+  roleId           String?
+  managerId        String?
+  hireDate         DateTime
+  salary           Decimal          @db.Decimal(10, 2)
+  status           EmployeeStatus   @default(active)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  department       Department?      @relation(fields: [departmentId], references: [id])
+  role             Role?            @relation(fields: [roleId], references: [id])
+  manager          Employee?        @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates     Employee[]       @relation("EmployeeManager")
+  managedDepartments Department[]   @relation("DepartmentManager")
+  approvedLeaves   LeaveRequest[]   @relation("LeaveApprover")
+  conductedReviews PerformanceReview[] @relation("PerformanceReviewer")
+  attendance       Attendance[]
+  leaveRequests    LeaveRequest[]
+  payrollRecords   PayrollRecord[]
+  performanceReviews PerformanceReview[]
+  documents        Document[]
+
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([status])
+}
+
+model Department {
+  id                  String       @id @default(uuid())
+  name                String       @unique
+  description         String?
+  managerId           String?
+  parentDepartmentId  String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  manager             Employee?    @relation("DepartmentManager", fields: [managerId], references: [id])
+  parentDepartment    Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  subDepartments      Department[] @relation("DepartmentHierarchy")
+  employees           Employee[]
+
+  @@index([managerId])
+  @@index([parentDepartmentId])
+}
+
+model Role {
+  id           String    @id @default(uuid())
+  name         String    @unique
+  description  String?
+  permissions  Json
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  employees    Employee[]
+}
+
+model Attendance {
+  id              String            @id @default(uuid())
+  employeeId      String
+  checkIn         DateTime
+  checkOut        DateTime?
+  workHours       Decimal?          @db.Decimal(4, 2)
+  overtimeHours   Decimal?          @db.Decimal(4, 2) @default(0)
+  status          AttendanceStatus  @default(present)
+  createdAt       DateTime          @default(now())
+
+  employee        Employee          @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@index([checkIn])
+}
+
+model LeaveRequest {
+  id           String        @id @default(uuid())
+  employeeId   String
+  approverId   String?
+  leaveType    LeaveType
+  startDate    DateTime
+  endDate      DateTime
+  daysRequested Int
+  status       LeaveStatus   @default(pending)
+  reason       String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  approver     Employee?     @relation("LeaveApprover", fields: [approverId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model PayrollRecord {
+  id          String          @id @default(uuid())
+  employeeId  String
+  payPeriod   String
+  baseSalary  Decimal         @db.Decimal(10, 2)
+  allowances  Decimal         @db.Decimal(10, 2) @default(0)
+  deductions  Decimal         @db.Decimal(10, 2) @default(0)
+  netSalary   Decimal         @db.Decimal(10, 2)
+  status      PayrollStatus   @default(draft)
+  processedAt DateTime?
+  createdAt   DateTime        @default(now())
+
+  employee    Employee        @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+model PerformanceReview {
+  id           String    @id @default(uuid())
+  employeeId   String
+  reviewerId   String
+  reviewPeriod String
+  goals        Json
+  ratings      Json
+  comments     String?
+  status       ReviewStatus @default(draft)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  reviewer     Employee  @relation("PerformanceReviewer", fields: [reviewerId], references: [id])
+
+  @@index([employeeId])
+  @@index([reviewerId])
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  employeeId  String
+  fileName    String
+  fileType    String
+  filePath    String
+  version     Int       @default(1)
+  metadata    Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@index([fileName])
+}
+
+enum UserRole {
+  super_admin
+  hr_admin
+  manager
+  employee
+}
+
+enum EmployeeStatus {
+  active
+  inactive
+  terminated
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  half_day
+}
+
+enum LeaveType {
+  annual
+  sick
+  personal
+  maternity
+  paternity
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+enum PayrollStatus {
+  draft
+  processed
+  paid
+}
+
+enum ReviewStatus {
+  draft
+  submitted
+  approved
+}
