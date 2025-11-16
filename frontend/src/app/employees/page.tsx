@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { EmployeeCard, EmployeeForm } from '@/components/hrm/EmployeeComponents'
+import EmployeeDetailsModal from '@/components/hrm/EmployeeDetailsModal'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/FormComponents'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/ToastProvider'
-
-import { PlusIcon, FunnelIcon, UsersIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, FunnelIcon, UsersIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 interface Employee {
   id: string
@@ -77,10 +77,11 @@ export default function EmployeesPage() {
   ])
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingEmployee, setEditingEmployee] = useState<Employee | undefined>()
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
+  const [viewingEmployee, setViewingEmployee] = useState<Employee | undefined>()
   const [pendingDelete, setPendingDelete] = useState<Employee | null>(null)
-  const { addToast } = useToast()
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [searchTerm, setSearchTerm] = useState('')
 
   const departments = [
     { id: '1', name: 'Engineering' },
@@ -103,7 +104,7 @@ export default function EmployeesPage() {
   )
 
   const handleCreateEmployee = () => {
-    setEditingEmployee(undefined)
+    setEditingEmployee(null)
     setIsModalOpen(true)
   }
 
@@ -113,7 +114,11 @@ export default function EmployeesPage() {
   }
 
   const handleViewEmployee = (employee: Employee) => {
-    console.log('View employee:', employee)
+    setViewingEmployee(employee)
+  }
+
+  const handleCloseModal = () => {
+    setViewingEmployee(undefined)
   }
 
   const handleDeleteEmployee = (employee: Employee) => {
@@ -123,11 +128,6 @@ export default function EmployeesPage() {
   const confirmDelete = () => {
     if (!pendingDelete) return
     setEmployees(prev => prev.filter(emp => emp.id !== pendingDelete.id))
-    addToast({
-      title: 'Employee removed',
-      description: `${pendingDelete.firstName} ${pendingDelete.lastName} has been deleted.`,
-      type: 'success',
-    })
     setPendingDelete(null)
   }
 
@@ -136,11 +136,6 @@ export default function EmployeesPage() {
       setEmployees(prev => prev.map(emp => 
         emp.id === editingEmployee.id ? { ...emp, ...data } : emp
       ))
-      addToast({
-        title: 'Employee updated',
-        description: `${data.firstName || editingEmployee.firstName} ${data.lastName || editingEmployee.lastName} saved successfully.`,
-        type: 'success',
-      })
     } else {
       const newEmployee: Employee = {
         id: Date.now().toString(),
@@ -155,11 +150,6 @@ export default function EmployeesPage() {
         status: data.status || 'active'
       }
       setEmployees(prev => [...prev, newEmployee])
-      addToast({
-        title: 'Employee added',
-        description: `${newEmployee.firstName} ${newEmployee.lastName} has been created.`,
-        type: 'success',
-      })
     }
     setIsModalOpen(false)
   }
@@ -257,6 +247,14 @@ export default function EmployeesPage() {
           roles={roles}
         />
       </Modal>
+
+      {viewingEmployee && (
+        <EmployeeDetailsModal
+          isOpen={!!viewingEmployee}
+          onClose={handleCloseModal}
+          employee={viewingEmployee}
+        />
+      )}
 
       <ConfirmDialog
         open={!!pendingDelete}

@@ -5,7 +5,7 @@ import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
 import { Button } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 
-interface Employee {
+export interface Employee {
   id: string
   employeeNumber: string
   firstName: string

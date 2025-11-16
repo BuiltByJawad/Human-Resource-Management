@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -45,41 +45,58 @@ const navigation = [
 ]
 
 export default function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebarCollapsed') === 'true'
+    }
+    return false
+  })
   const pathname = usePathname()
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', isCollapsed.toString())
+  }, [isCollapsed])
 
   const sidebarWidth = isCollapsed ? 'w-20' : 'w-72'
 
-  const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
+  const renderExpandedNavItem = (item: (typeof navigation)[number]['items'][number]) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-
     return (
       <Link
         key={item.name}
         href={item.href}
-        className={`flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium transition-all ${
+        className={`flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium transition-all w-full ${
           isActive
             ? 'bg-white text-blue-600 shadow-sm'
             : 'text-slate-300 hover:bg-white/10 hover:text-white'
-        } ${isCollapsed ? 'justify-center' : ''}`}
+        }`}
       >
         <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-        <span
-          className={`transition-all duration-200 whitespace-nowrap ${
-            isCollapsed
-              ? 'opacity-0 max-w-0 overflow-hidden translate-x-1'
-              : 'opacity-100 max-w-[180px] translate-x-0'
-          }`}
-        >
+        <span className="whitespace-nowrap">
           {item.name}
         </span>
       </Link>
     )
   }
 
+  const renderCollapsedNavItem = (item: (typeof navigation)[number]['items'][number]) => {
+    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+    return (
+      <Link
+        key={item.name}
+        href={item.href}
+        className="flex items-center justify-center w-12 h-10 mx-auto rounded-2xl text-slate-300 hover:bg-white/10 hover:text-white"
+      >
+        <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+        <span className="sr-only">{item.name}</span>
+      </Link>
+    )
+  }
+
   return (
     <aside
-      className={`hidden md:flex relative ${sidebarWidth} bg-slate-900/95 text-white min-h-screen transition-all duration-300 flex-col border-r border-slate-800/60 shadow-xl`}
+      className={`hidden md:flex relative ${sidebarWidth} bg-slate-900/95 text-white min-h-screen transition-all duration-300 flex-col border-r border-slate-800/60 shadow-xl z-20`}
     >
       <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
         <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center w-full' : ''}`}>
@@ -117,7 +134,12 @@ export default function Sidebar() {
             {!isCollapsed && (
               <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">{section.label}</p>
             )}
-            <div className="space-y-2">{section.items.map(renderNavItem)}</div>
+            <div className="space-y-2">
+              {isCollapsed 
+                ? section.items.map(renderCollapsedNavItem)
+                : section.items.map(renderExpandedNavItem)
+              }
+            </div>
           </div>
         ))}
       </div>
