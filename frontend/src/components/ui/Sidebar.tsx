@@ -44,119 +44,141 @@ const navigation = [
   },
 ]
 
-export default function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('sidebarCollapsed') === 'true'
-    }
-    return false
-  })
-  const pathname = usePathname()
+function useSidebarState() {
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', isCollapsed.toString())
-  }, [isCollapsed])
+    // Check if the class was set by the inline script in layout
+    const hasClass = document.documentElement.classList.contains('sidebar-collapsed')
+    setIsCollapsed(hasClass)
+    setIsMounted(true)
+  }, [])
 
-  const sidebarWidth = isCollapsed ? 'w-20' : 'w-72'
+  const toggle = () => {
+    setIsCollapsed(prev => {
+      const newState = !prev
+      localStorage.setItem('sidebarCollapsed', String(newState))
+      // Update the class for consistency
+      if (newState) {
+        document.documentElement.classList.add('sidebar-collapsed')
+      } else {
+        document.documentElement.classList.remove('sidebar-collapsed')
+      }
+      return newState
+    })
+  }
 
-  const renderExpandedNavItem = (item: (typeof navigation)[number]['items'][number]) => {
+  return { isCollapsed, isMounted, toggle }
+}
+
+export default function Sidebar() {
+  const { toggle } = useSidebarState()
+  const pathname = usePathname()
+
+  const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+
     return (
       <Link
         key={item.name}
         href={item.href}
-        className={`flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium transition-all w-full ${
-          isActive
-            ? 'bg-white text-blue-600 shadow-sm'
-            : 'text-slate-300 hover:bg-white/10 hover:text-white'
-        }`}
+        className={`
+          group flex items-center rounded-xl transition-all duration-200
+          ${isActive
+            ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+            : 'text-slate-400 hover:bg-white/5 hover:text-white'
+          }
+          w-full px-3 py-2.5 gap-3
+          [.sidebar-collapsed_&]:w-10 [.sidebar-collapsed_&]:h-10 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:mx-auto [.sidebar-collapsed_&]:px-0
+        `}
       >
-        <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-        <span className="whitespace-nowrap">
+        <item.icon className={`h-5 w-5 flex-shrink-0 transition-colors ${isActive ? 'text-white' : 'group-hover:text-white'}`} />
+        <span className={`
+          whitespace-nowrap font-medium text-sm transition-all duration-200 origin-left
+          [.sidebar-collapsed_&]:hidden
+        `}>
           {item.name}
         </span>
       </Link>
     )
   }
 
-  const renderCollapsedNavItem = (item: (typeof navigation)[number]['items'][number]) => {
-    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-
-    return (
-      <Link
-        key={item.name}
-        href={item.href}
-        className="flex items-center justify-center w-12 h-10 mx-auto rounded-2xl text-slate-300 hover:bg-white/10 hover:text-white"
-      >
-        <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-        <span className="sr-only">{item.name}</span>
-      </Link>
-    )
-  }
-
   return (
     <aside
-      className={`hidden md:flex relative ${sidebarWidth} bg-slate-900/95 text-white min-h-screen transition-all duration-300 flex-col border-r border-slate-800/60 shadow-xl z-20`}
+      className={`
+        hidden md:flex relative bg-[#0B1120] text-white min-h-screen transition-all duration-300 flex-col border-r border-white/5 shadow-2xl z-20
+        w-72 [.sidebar-collapsed_&]:w-20
+      `}
     >
-      <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
-        <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center w-full' : ''}`}>
-          <div className="h-10 w-10 rounded-2xl bg-blue-600 flex items-center justify-center font-semibold text-lg">
+      {/* Header */}
+      <div className={`
+        flex items-center px-6 border-b border-white/5 relative transition-all duration-300
+        h-20 [.sidebar-collapsed_&]:h-32 [.sidebar-collapsed_&]:flex-col [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:gap-4 [.sidebar-collapsed_&]:px-0
+      `}>
+        <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full`}>
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20 flex-shrink-0">
             HR
           </div>
           <div
-            className={`transition-all duration-200 origin-left ${
-              isCollapsed
-                ? 'opacity-0 max-w-0 overflow-hidden -translate-x-1'
-                : 'opacity-100 max-w-[200px] translate-x-0'
-            }`}
+            className={`
+              transition-all duration-300 origin-left
+              opacity-100 max-w-[200px] translate-x-0
+              [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
+            `}
           >
-            <p className="text-base font-semibold tracking-tight">NovaHR Suite</p>
-            <p className="text-xs text-slate-400">Human Resource OS</p>
+            <p className="text-base font-bold tracking-tight text-white">NovaHR</p>
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Workspace</p>
           </div>
         </div>
+
+        {/* Toggle Button */}
+        <button
+          onClick={toggle}
+          className={`
+            p-1.5 rounded-lg text-slate-400 hover:bg-white/10 hover:text-white transition-all duration-200
+            absolute right-4
+            [.sidebar-collapsed_&]:static [.sidebar-collapsed_&]:right-auto
+          `}
+          aria-label="Toggle sidebar"
+        >
+          <ChevronDoubleLeftIcon className="h-5 w-5 hidden [.sidebar-collapsed_&]:block rotate-180" />
+          <ChevronDoubleLeftIcon className="h-5 w-5 block [.sidebar-collapsed_&]:hidden" />
+        </button>
       </div>
 
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute top-6 -right-3 z-10 p-2 rounded-full bg-white text-slate-700 shadow-md hover:shadow-lg transition-all"
-        aria-label="Toggle sidebar"
-      >
-        {isCollapsed ? (
-          <ChevronDoubleRightIcon className="h-4 w-4" />
-        ) : (
-          <ChevronDoubleLeftIcon className="h-4 w-4" />
-        )}
-      </button>
-
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 no-scrollbar">
         {navigation.map((section) => (
           <div key={section.label}>
-            {!isCollapsed && (
-              <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">{section.label}</p>
-            )}
-            <div className="space-y-2">
-              {isCollapsed 
-                ? section.items.map(renderCollapsedNavItem)
-                : section.items.map(renderExpandedNavItem)
-              }
+            <p className={`
+              text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-4 px-2
+              [.sidebar-collapsed_&]:hidden
+            `}>
+              {section.label}
+            </p>
+            <div className="space-y-1">
+              {section.items.map(renderNavItem)}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="px-4 py-5 border-t border-white/10">
+      {/* User Profile */}
+      <div className="p-4 border-t border-white/5 bg-black/20">
         <div
-          className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} rounded-2xl bg-white/5 p-3`}
+          className={`
+            flex items-center rounded-xl p-2 transition-colors hover:bg-white/5 cursor-pointer
+            gap-3 [.sidebar-collapsed_&]:justify-center
+          `}
         >
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center font-semibold">
+          <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-sm shadow-inner flex-shrink-0 border-2 border-white/10">
             JD
           </div>
-          {!isCollapsed && (
-            <div>
-              <p className="text-sm font-semibold">John Doe</p>
-              <p className="text-xs text-slate-400">System Administrator</p>
-            </div>
-          )}
+          <div className="[.sidebar-collapsed_&]:hidden overflow-hidden">
+            <p className="text-sm font-medium text-white truncate">John Doe</p>
+            <p className="text-xs text-slate-400 truncate">admin@novahr.com</p>
+          </div>
         </div>
       </div>
     </aside>

@@ -99,7 +99,7 @@ export default function EmployeesPage() {
     { id: '5', name: 'Finance Manager' }
   ]
 
-  const filteredEmployees = employees.filter(employee => 
+  const filteredEmployees = employees.filter(employee =>
     filterStatus === 'all' || employee.status === filterStatus
   )
 
@@ -133,7 +133,7 @@ export default function EmployeesPage() {
 
   const handleSubmitEmployee = (data: Partial<Employee>) => {
     if (editingEmployee) {
-      setEmployees(prev => prev.map(emp => 
+      setEmployees(prev => prev.map(emp =>
         emp.id === editingEmployee.id ? { ...emp, ...data } : emp
       ))
     } else {
@@ -155,43 +155,39 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="flex h-screen bg-gray-50">
       <Sidebar />
-      
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        
-        <main className="flex-1 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto w-full">
-            <div className="mb-8">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
-                  <p className="text-gray-600">Manage your organization’s employees</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  <div className="flex items-center space-x-2">
-                    <FunnelIcon className="h-5 w-5 text-gray-400" />
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-w-[140px]"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                      <option value="terminated">Terminated</option>
-                    </select>
-                  </div>
-                  <Button
-                    variant="primary"
-                    onClick={handleCreateEmployee}
-                    className="flex items-center space-x-2"
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
+                <p className="text-sm text-gray-500">Manage your workforce</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                <div className="flex items-center space-x-2">
+                  <FunnelIcon className="h-5 w-5 text-gray-400" />
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-w-[140px]"
                   >
-                    <PlusIcon className="h-4 w-4" />
-                    <span>Add Employee</span>
-                  </Button>
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="terminated">Terminated</option>
+                  </select>
                 </div>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateEmployee}
+                  className="flex items-center space-x-2"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  <span>Add Employee</span>
+                </Button>
               </div>
             </div>
 
@@ -213,7 +209,7 @@ export default function EmployeesPage() {
                 <UsersIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
                 <p className="text-gray-500 mb-6">
-                  {filterStatus === 'all' 
+                  {filterStatus === 'all'
                     ? 'Get started by adding your first employee.'
                     : `No employees with ${filterStatus} status.`
                   }
