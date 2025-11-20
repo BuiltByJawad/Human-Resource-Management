@@ -15,6 +15,7 @@ export const employeeSchema = Joi.object({
   managerId: Joi.string().uuid().optional(),
   hireDate: Joi.date().max('now').required(),
   salary: Joi.number().positive().min(1000).max(999999).required(),
+  status: Joi.string().valid('active', 'inactive', 'terminated').optional(),
 })
 
 export const leaveRequestSchema = Joi.object({

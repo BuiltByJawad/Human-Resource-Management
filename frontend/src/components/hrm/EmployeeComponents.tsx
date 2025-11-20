@@ -1,8 +1,6 @@
-'use client'
-
 import { useState } from 'react'
 import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { Button } from '../ui/FormComponents'
+import { Button, Select, Input } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 
 export interface Employee {
@@ -11,8 +9,8 @@ export interface Employee {
   firstName: string
   lastName: string
   email: string
-  department: string
-  role: string
+  department: { id: string, name: string } | null
+  role: { id: string, name: string } | null
   hireDate: string
   salary: number
   status: 'active' | 'inactive' | 'terminated'
@@ -41,7 +39,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, className = '
   }
 
   return (
-    <div 
+    <div
       className={`bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow ${className}`}
     >
       <div className="flex items-start justify-between">
@@ -67,11 +65,11 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, className = '
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div>
           <p className="text-sm font-medium text-gray-500">Department</p>
-          <p className="text-sm text-gray-900">{employee.department}</p>
+          <p className="text-sm text-gray-900">{employee.department?.name || 'N/A'}</p>
         </div>
         <div>
           <p className="text-sm font-medium text-gray-500">Role</p>
-          <p className="text-sm text-gray-900">{employee.role}</p>
+          <p className="text-sm text-gray-900">{employee.role?.name || 'N/A'}</p>
         </div>
         <div>
           <p className="text-sm font-medium text-gray-500">Hire Date</p>
@@ -81,7 +79,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, className = '
         </div>
         <div>
           <p className="text-sm font-medium text-gray-500">Salary</p>
-          <p className="text-sm text-gray-900">${employee.salary.toLocaleString()}</p>
+          <p className="text-sm text-gray-900">${Number(employee.salary).toLocaleString()}</p>
         </div>
       </div>
 
@@ -120,7 +118,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, className = '
 
 interface EmployeeFormProps {
   employee?: Employee
-  onSubmit: (data: Partial<Employee>) => void
+  onSubmit: (data: any) => void
   onCancel: () => void
   departments: Array<{ id: string; name: string }>
   roles: Array<{ id: string; name: string }>
@@ -132,155 +130,153 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
     lastName: employee?.lastName || '',
     email: employee?.email || '',
     employeeNumber: employee?.employeeNumber || '',
-    department: employee?.department || '',
-    role: employee?.role || '',
+    departmentId: employee?.department?.id || '',
+    roleId: employee?.role?.id || '',
     hireDate: employee?.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
     salary: employee?.salary || 0,
     status: employee?.status || 'active'
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required'
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required'
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Invalid email format'
+    }
+    if (!formData.employeeNumber.trim()) newErrors.employeeNumber = 'Employee number is required'
+    if (!formData.departmentId) newErrors.departmentId = 'Department is required'
+    if (!formData.roleId) newErrors.roleId = 'Role is required'
+    if (!formData.hireDate) newErrors.hireDate = 'Hire date is required'
+    if (formData.salary < 0) newErrors.salary = 'Salary cannot be negative'
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
+    if (validateForm()) {
+      onSubmit(formData)
+    }
   }
 
   const handleChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }))
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            First Name *
-          </label>
-          <input
-            type="text"
+          <Input
+            label="First Name"
             required
             value={formData.firstName}
             onChange={(e) => handleChange('firstName', e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            error={errors.firstName}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Last Name *
-          </label>
-          <input
-            type="text"
+          <Input
+            label="Last Name"
             required
             value={formData.lastName}
             onChange={(e) => handleChange('lastName', e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            error={errors.lastName}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email *
-        </label>
-        <input
+        <Input
+          label="Email"
           type="email"
           required
           value={formData.email}
           onChange={(e) => handleChange('email', e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          error={errors.email}
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Employee Number *
-        </label>
-        <input
-          type="text"
+        <Input
+          label="Employee Number"
           required
           value={formData.employeeNumber}
           onChange={(e) => handleChange('employeeNumber', e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          error={errors.employeeNumber}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Department *
-          </label>
-          <select
+          <Select
+            label="Department"
             required
-            value={formData.department}
-            onChange={(e) => handleChange('department', e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Select Department</option>
-            {departments.map((dept) => (
-              <option key={dept.id} value={dept.name}>{dept.name}</option>
-            ))}
-          </select>
+            value={formData.departmentId}
+            onChange={(value) => handleChange('departmentId', value)}
+            options={departments.map(d => ({ value: d.id, label: d.name }))}
+            placeholder="Select Department"
+            error={errors.departmentId}
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Role *
-          </label>
-          <select
+          <Select
+            label="Role"
             required
-            value={formData.role}
-            onChange={(e) => handleChange('role', e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Select Role</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.name}>{role.name}</option>
-            ))}
-          </select>
+            value={formData.roleId}
+            onChange={(value) => handleChange('roleId', value)}
+            options={roles.map(r => ({ value: r.id, label: r.name }))}
+            placeholder="Select Role"
+            error={errors.roleId}
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Hire Date *
-          </label>
-          <input
+          <Input
+            label="Hire Date"
             type="date"
             required
             value={formData.hireDate}
             onChange={(e) => handleChange('hireDate', e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            error={errors.hireDate}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Salary *
-          </label>
-          <input
+          <Input
+            label="Salary"
             type="number"
             required
-            min="0"
-            step="0.01"
-            value={formData.salary}
+            value={formData.salary.toString()}
             onChange={(e) => handleChange('salary', parseFloat(e.target.value) || 0)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            error={errors.salary}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Status *
-        </label>
-        <select
+        <Select
+          label="Status"
           required
           value={formData.status}
-          onChange={(e) => handleChange('status', e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="terminated">Terminated</option>
-        </select>
+          onChange={(value) => handleChange('status', value)}
+          options={[
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+            { value: 'terminated', label: 'Terminated' }
+          ]}
+          error={errors.status}
+        />
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

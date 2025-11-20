@@ -3,40 +3,98 @@ import jwt from 'jsonwebtoken'
 import { asyncHandler } from '../middleware/errorHandler'
 import { loginSchema } from '../validators'
 import { prisma } from '../config/database'
-import { comparePassword, generateTokens } from '../utils/auth'
-import { UnauthorizedError } from '../utils/errors'
+import { comparePassword, generateTokens, hashPassword } from '../utils/auth'
+import { UnauthorizedError, BadRequestError } from '../utils/errors'
 import { AuthRequest } from '../middleware/auth'
+
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password, firstName, lastName } = req.body
+
+  const existingUser = await prisma.user.findUnique({ where: { email } })
+  if (existingUser) {
+    throw new BadRequestError('Email already in use')
+  }
+
+  // Find default role (e.g., 'Employee') or create if not exists (for dev/seed)
+  let defaultRole = await prisma.role.findUnique({ where: { name: 'Employee' } })
+  if (!defaultRole) {
+    // Fallback for initial setup, though seeding is preferred
+    defaultRole = await prisma.role.create({
+      data: { name: 'Employee', description: 'Standard employee role' }
+    })
+  }
+
+  const hashedPassword = await hashPassword(password)
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      roleId: defaultRole.id,
+      status: 'active'
+    },
+    include: {
+      role: true
+    }
+  })
+
+  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name)
+
+  res.status(201).json({
+    success: true,
+    data: {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role.name,
+      }
+    }
+  })
+})
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body
-  
+
   const user = await prisma.user.findUnique({
     where: { email },
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      role: true,
-      isActive: true,
-    },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            include: {
+              permission: true
+            }
+          }
+        }
+      }
+    }
   })
-  
-  if (!user || !user.isActive) {
-    throw new UnauthorizedError('Invalid credentials')
+
+  if (!user || user.status !== 'active') {
+    throw new UnauthorizedError('Invalid credentials or inactive account')
   }
-  
+
   const isPasswordValid = await comparePassword(password, user.password)
   if (!isPasswordValid) {
     throw new UnauthorizedError('Invalid credentials')
   }
-  
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role)
-  
+
+  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name)
+
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLogin: new Date() },
   })
-  
+
+  // Flatten permissions
+  const permissions = user.role.permissions.map(rp => `${rp.permission.resource}.${rp.permission.action}`)
+
   res.json({
     success: true,
     data: {
@@ -45,34 +103,37 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role.name,
+        avatarUrl: user.avatarUrl
       },
-      permissions: getUserPermissions(user.role),
+      permissions,
     },
   })
 })
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
   const { refreshToken } = req.body
-  
+
   if (!refreshToken) {
     throw new UnauthorizedError('Refresh token required')
   }
-  
+
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any
-    
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, role: true, isActive: true },
+      include: { role: true }
     })
-    
-    if (!user || !user.isActive) {
+
+    if (!user || user.status !== 'active') {
       throw new UnauthorizedError('User not found or inactive')
     }
-    
-    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user.id, user.email, user.role)
-    
+
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user.id, user.email, user.role.name)
+
     res.json({
       success: true,
       data: {
@@ -88,49 +149,42 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
 export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      isActive: true,
-      lastLogin: true,
-      createdAt: true,
-    },
+    include: {
+      role: {
+        include: {
+          permissions: {
+            include: {
+              permission: true
+            }
+          }
+        }
+      },
+      department: true,
+      employee: true
+    }
   })
-  
+
+  if (!user) {
+    throw new UnauthorizedError('User not found')
+  }
+
+  const permissions = user.role.permissions.map(rp => `${rp.permission.resource}.${rp.permission.action}`)
+
   res.json({
     success: true,
-    data: { user },
+    data: {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role.name,
+        department: user.department?.name,
+        avatarUrl: user.avatarUrl,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt
+      },
+      permissions
+    },
   })
 })
-
-const getUserPermissions = (role: string): string[] => {
-  const permissions: Record<string, string[]> = {
-    super_admin: ['*'],
-    hr_admin: [
-      'employees.create',
-      'employees.read',
-      'employees.update',
-      'employees.delete',
-      'departments.manage',
-      'leave.manage',
-      'payroll.manage',
-      'reports.generate',
-    ],
-    manager: [
-      'employees.read',
-      'employees.update',
-      'leave.approve',
-      'performance.review',
-      'reports.team',
-    ],
-    employee: [
-      'profile.read',
-      'profile.update',
-      'leave.request',
-      'attendance.view',
-    ],
-  }
-  
-  return permissions[role] || []
-}

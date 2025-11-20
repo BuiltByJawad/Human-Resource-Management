@@ -29,10 +29,10 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const iconMap: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircleIcon className="h-5 w-5" />, 
-  error: <ExclamationTriangleIcon className="h-5 w-5" />, 
-  info: <InformationCircleIcon className="h-5 w-5" />, 
-  warning: <ExclamationTriangleIcon className="h-5 w-5" />, 
+  success: <CheckCircleIcon className="h-5 w-5" />,
+  error: <ExclamationTriangleIcon className="h-5 w-5" />,
+  info: <InformationCircleIcon className="h-5 w-5" />,
+  warning: <ExclamationTriangleIcon className="h-5 w-5" />,
 };
 
 const colorMap: Record<ToastType, string> = {
@@ -98,5 +98,10 @@ export function useToast() {
   if (!context) {
     throw new Error("useToast must be used within a ToastProvider");
   }
-  return context;
+
+  const showToast = useCallback((title: string, type: ToastType = 'info', description?: string) => {
+    context.addToast({ title, type, description });
+  }, [context]);
+
+  return { ...context, showToast };
 }

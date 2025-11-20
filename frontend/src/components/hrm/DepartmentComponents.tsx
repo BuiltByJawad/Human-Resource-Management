@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { BuildingOfficeIcon, UsersIcon } from '@heroicons/react/24/outline'
-import { Button } from '../ui/FormComponents'
+import { Button, Input, Select } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 
 interface Department {
@@ -36,7 +36,7 @@ export function DepartmentCard({ department, onEdit, onView, onDelete, className
   }
 
   return (
-    <div 
+    <div
       className={`bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow ${className}`}
     >
       <div className="flex items-start justify-between">
@@ -120,88 +120,98 @@ export function DepartmentForm({ department, onSubmit, onCancel, employees }: De
     budget: department?.budget || 0,
     status: department?.status || 'active'
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    if (!formData.name.trim()) newErrors.name = 'Department name is required'
+    if (!formData.description.trim()) newErrors.description = 'Description is required'
+    if (formData.budget < 0) newErrors.budget = 'Budget cannot be negative'
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
+    if (validateForm()) {
+      onSubmit(formData)
+    }
   }
 
   const handleChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }))
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Department Name *
-        </label>
-        <input
-          type="text"
+        <Input
+          label="Department Name"
           required
           value={formData.name}
           onChange={(e) => handleChange('name', e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          error={errors.name}
         />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Description *
+          Description
+          <span className="text-red-500 ml-1">*</span>
         </label>
         <textarea
-          required
           rows={3}
           value={formData.description}
           onChange={(e) => handleChange('description', e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 ${errors.description ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
+            }`}
         />
+        {errors.description && (
+          <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Manager
-          </label>
-          <select
+          <Select
+            label="Manager"
             value={formData.manager}
-            onChange={(e) => handleChange('manager', e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Select Manager</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.name}>{employee.name}</option>
-            ))}
-          </select>
+            onChange={(value) => handleChange('manager', value)}
+            options={[
+              { value: '', label: 'Select Manager' },
+              ...employees.map(e => ({ value: e.name, label: e.name }))
+            ]}
+            placeholder="Select Manager"
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Budget
-          </label>
-          <input
+          <Input
+            label="Budget"
             type="number"
             min="0"
             step="1000"
-            value={formData.budget}
+            value={formData.budget.toString()}
             onChange={(e) => handleChange('budget', parseFloat(e.target.value) || 0)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            error={errors.budget}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Status *
-        </label>
-        <select
+        <Select
+          label="Status"
           required
           value={formData.status}
-          onChange={(e) => handleChange('status', e.target.value)}
-          className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+          onChange={(value) => handleChange('status', value)}
+          options={[
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' }
+          ]}
+        />
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

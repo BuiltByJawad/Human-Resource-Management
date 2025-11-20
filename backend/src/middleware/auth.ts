@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { UnauthorizedError } from '../utils/errors'
+import { UnauthorizedError, ForbiddenError } from '../utils/errors'
 import { prisma } from '../config/database'
 
 export interface AuthRequest extends Request {
@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
     id: string
     email: string
     role: string
+    permissions: string[]
   }
 }
 
@@ -18,23 +19,41 @@ export const authenticate = async (
 ) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '')
-    
+
     if (!token) {
       throw new UnauthorizedError('No token provided')
     }
-    
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, role: true, isActive: true },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: {
+                permission: true
+              }
+            }
+          }
+        }
+      }
     })
-    
-    if (!user || !user.isActive) {
+
+    if (!user || user.status !== 'active') {
       throw new UnauthorizedError('User not found or inactive')
     }
-    
-    req.user = user
+
+    const permissions = user.role.permissions.map(rp => `${rp.permission.resource}.${rp.permission.action}`)
+
+    req.user = {
+      id: user.id,
+      email: user.email,
+      role: user.role.name,
+      permissions
+    }
+
     next()
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -50,11 +69,32 @@ export const authorize = (roles: string[]) => {
     if (!req.user) {
       return next(new UnauthorizedError('User not authenticated'))
     }
-    
+
     if (!roles.includes(req.user.role)) {
-      return next(new UnauthorizedError('Insufficient permissions'))
+      return next(new ForbiddenError('Insufficient permissions'))
     }
-    
+
+    next()
+  }
+}
+
+export const checkPermission = (resource: string, action: string) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new UnauthorizedError('User not authenticated'))
+    }
+
+    const requiredPermission = `${resource}.${action}`
+
+    // Super Admin bypass
+    if (req.user.role === 'Super Admin') {
+      return next()
+    }
+
+    if (!req.user.permissions.includes(requiredPermission)) {
+      return next(new ForbiddenError(`Missing permission: ${requiredPermission}`))
+    }
+
     next()
   }
 }
