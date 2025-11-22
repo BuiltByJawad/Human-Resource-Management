@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { Button, Select, Input } from '../ui/FormComponents'
+import { Button, Select, Input, DatePicker } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 
 export interface Employee {
@@ -173,7 +173,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-32">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Input
@@ -243,12 +243,11 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Input
+          <DatePicker
             label="Hire Date"
-            type="date"
             required
             value={formData.hireDate}
-            onChange={(e) => handleChange('hireDate', e.target.value)}
+            onChange={(date) => handleChange('hireDate', date ? date.toISOString().split('T')[0] : '')}
             error={errors.hireDate}
           />
         </div>

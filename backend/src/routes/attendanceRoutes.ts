@@ -6,8 +6,9 @@ import { prisma } from '../config/database'
 import { attendanceSchema } from '../validators'
 import { validateRequest, validateParams, validateQuery } from '../middleware/validation'
 import { NotFoundError, ConflictError } from '../utils/errors'
-import { AuthRequest } from '../types'
+import { AuthRequest } from '../middleware/auth'
 import Joi from 'joi'
+import { validateLocation } from '../utils/geolocation'
 
 const router = Router()
 
@@ -27,12 +28,18 @@ router.get(
   '/',
   authenticate,
   validateQuery(querySchema),
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const { page, limit, employeeId, startDate, endDate } = req.query as any
     const skip = (page - 1) * limit
 
     const where: any = {}
-    if (employeeId) where.employeeId = employeeId
+    // If employeeId is provided, use it. Otherwise, use the authenticated user's employeeId
+    if (employeeId) {
+      where.employeeId = employeeId
+    } else if (req.user?.employeeId) {
+      where.employeeId = req.user.employeeId
+    }
+
     if (startDate && endDate) {
       where.checkIn = {
         gte: new Date(startDate),
@@ -97,7 +104,14 @@ router.post(
   validateRequest(attendanceSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const attendanceData = req.body
-    const employeeId = req.user!.id
+    const employeeId = req.user!.employeeId
+
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not an employee',
+      })
+    }
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -182,27 +196,67 @@ router.post(
   '/clock-in',
   authenticate,
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const employeeId = req.user!.id
+    const employeeId = req.user!.employeeId
+    const { latitude, longitude } = req.body
+
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not an employee',
+      })
+    }
+
+    // Geofencing Validation
+    console.log('Clock-in request body:', req.body)
+    if (latitude !== undefined && longitude !== undefined) {
+      // Default office location (Dhaka) - in production, fetch from CompanySettings
+      const officeLat = 23.8103
+      const officeLon = 90.4125
+      const maxDistance = 200 // meters
+
+      console.log(`Validating location: User(${latitude}, ${longitude}) vs Office(${officeLat}, ${officeLon})`)
+
+      const { isValid, distance } = validateLocation(
+        latitude,
+        longitude,
+        officeLat,
+        officeLon,
+        maxDistance
+      )
+
+      console.log(`Validation result: valid=${isValid}, distance=${distance}`)
+
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          error: `You are ${distance}m away from the office. You must be within ${maxDistance}m to clock in.`,
+        })
+      }
+    }
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    const existingAttendance = await prisma.attendance.findFirst({
+    const activeAttendance = await prisma.attendance.findFirst({
       where: {
         employeeId,
         checkIn: {
           gte: today,
           lt: tomorrow,
         },
+        checkOut: null
       },
+      orderBy: {
+        checkIn: 'desc'
+      }
     })
 
-    if (existingAttendance) {
+    if (activeAttendance) {
       return res.status(400).json({
         success: false,
-        error: 'Already clocked in today',
+        error: 'You are already clocked in. Please clock out first.',
       })
     }
 
@@ -211,6 +265,8 @@ router.post(
         employeeId,
         checkIn: new Date(),
         status: 'present',
+        checkInLatitude: latitude,
+        checkInLongitude: longitude,
       },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -231,7 +287,15 @@ router.put(
   validateParams(paramsSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { id } = req.params
-    const employeeId = req.user!.id
+    const employeeId = req.user!.employeeId
+    const { latitude, longitude } = req.body
+
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is not an employee',
+      })
+    }
 
     const attendance = await prisma.attendance.findFirst({
       where: { id, employeeId },
@@ -256,6 +320,8 @@ router.put(
       data: {
         checkOut,
         workHours,
+        checkOutLatitude: latitude,
+        checkOutLongitude: longitude,
       },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, email: true } },

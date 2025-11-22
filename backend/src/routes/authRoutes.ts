@@ -12,5 +12,4 @@ router.post('/login', authRateLimiter, validateRequest(loginSchema), login)
 router.post('/refresh', refreshToken)
 router.get('/me', authenticate, getProfile)
 
-
 export default router

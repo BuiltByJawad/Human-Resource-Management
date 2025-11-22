@@ -1,227 +1,221 @@
-'use client'
+import { useState, useEffect } from 'react'
+import { Modal } from '@/components/ui/Modal'
+import { Input, TextArea, Select } from '@/components/ui/FormComponents'
+import { DataTable, Column } from '@/components/ui/DataTable'
+import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 
-import { useState } from 'react'
-import { BuildingOfficeIcon, UsersIcon } from '@heroicons/react/24/outline'
-import { Button, Input, Select } from '../ui/FormComponents'
-import { Badge } from '../ui/CommonComponents'
-
-interface Department {
+export interface Department {
   id: string
   name: string
-  description: string
-  manager: string
-  employeeCount: number
-  budget: number
-  status: 'active' | 'inactive'
-}
-
-interface DepartmentCardProps {
-  department: Department
-  onEdit?: (department: Department) => void
-  onView?: (department: Department) => void
-  onDelete?: (department: Department) => void
-  className?: string
-}
-
-export function DepartmentCard({ department, onEdit, onView, onDelete, className = '' }: DepartmentCardProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'success'
-      case 'inactive':
-        return 'secondary'
-      default:
-        return 'secondary'
-    }
+  description?: string
+  managerId?: string
+  parentDepartmentId?: string
+  manager?: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
   }
-
-  return (
-    <div
-      className={`bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow ${className}`}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <BuildingOfficeIcon className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-gray-900">{department.name}</h3>
-            <p className="text-sm text-gray-500 mt-1">{department.description}</p>
-          </div>
-        </div>
-        <Badge variant={getStatusColor(department.status)}>
-          {department.status.charAt(0).toUpperCase() + department.status.slice(1)}
-        </Badge>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
-        <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
-          <UsersIcon className="h-5 w-5 text-slate-400" />
-          <div>
-            <p className="text-xs uppercase tracking-wide">Employees</p>
-            <p className="text-base font-semibold text-slate-900">{department.employeeCount}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
-          <div className="text-slate-400 text-lg">$</div>
-          <div>
-            <p className="text-xs uppercase tracking-wide">Budget</p>
-            <p className="text-base font-semibold text-slate-900">{department.budget.toLocaleString()}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
-          <div className="text-slate-400 text-lg">👤</div>
-          <div>
-            <p className="text-xs uppercase tracking-wide">Manager</p>
-            <p className="text-base font-semibold text-slate-900">{department.manager}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onView?.(department)}
-        >
-          View Details
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onEdit?.(department)}
-        >
-          Edit
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() => onDelete?.(department)}
-        >
-          Delete
-        </Button>
-      </div>
-    </div>
-  )
+  parentDepartment?: {
+    id: string
+    name: string
+  }
+  _count?: {
+    employees: number
+    subDepartments: number
+  }
 }
 
 interface DepartmentFormProps {
-  department?: Department
-  onSubmit: (data: Partial<Department>) => void
-  onCancel: () => void
-  employees: Array<{ id: string; name: string }>
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (data: Partial<Department>) => Promise<void>
+  initialData?: Department | null
+  departments: Department[] // For parent selection
+  employees: any[] // For manager selection - replace any with Employee type if available
+  loading?: boolean
 }
 
-export function DepartmentForm({ department, onSubmit, onCancel, employees }: DepartmentFormProps) {
-  const [formData, setFormData] = useState({
-    name: department?.name || '',
-    description: department?.description || '',
-    manager: department?.manager || '',
-    budget: department?.budget || 0,
-    status: department?.status || 'active'
+export const DepartmentForm = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+  departments,
+  employees,
+  loading
+}: DepartmentFormProps) => {
+  const [formData, setFormData] = useState<Partial<Department>>({
+    name: '',
+    description: '',
+    managerId: '',
+    parentDepartmentId: ''
   })
-  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-    if (!formData.name.trim()) newErrors.name = 'Department name is required'
-    if (!formData.description.trim()) newErrors.description = 'Description is required'
-    if (formData.budget < 0) newErrors.budget = 'Budget cannot be negative'
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name,
+        description: initialData.description || '',
+        managerId: initialData.managerId || '',
+        parentDepartmentId: initialData.parentDepartmentId || ''
+      })
+    } else {
+      setFormData({
+        name: '',
+        description: '',
+        managerId: '',
+        parentDepartmentId: ''
+      })
+    }
+  }, [initialData, isOpen])
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
-      onSubmit(formData)
-    }
+    await onSubmit(formData)
   }
 
-  const handleChange = (field: keyof typeof formData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }
+  // Filter out the current department from parent options to prevent circular dependency
+  const parentOptions = departments
+    .filter(d => d.id !== initialData?.id)
+    .map(d => ({ value: d.id, label: d.name }))
+
+  const managerOptions = employees.map(e => ({
+    value: e.id,
+    label: `${e.firstName} ${e.lastName} (${e.email})`
+  }))
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={initialData ? 'Edit Department' : 'Add Department'}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 pb-32">
         <Input
           label="Department Name"
+          value={formData.name || ''}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           required
-          value={formData.name}
-          onChange={(e) => handleChange('name', e.target.value)}
-          error={errors.name}
+          placeholder="e.g. Engineering"
         />
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Description
-          <span className="text-red-500 ml-1">*</span>
-        </label>
-        <textarea
-          rows={3}
-          value={formData.description}
-          onChange={(e) => handleChange('description', e.target.value)}
-          className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 ${errors.description ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300'
-            }`}
+        <TextArea
+          label="Description"
+          value={formData.description || ''}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Brief description of the department"
         />
-        {errors.description && (
-          <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-        )}
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Select
-            label="Manager"
-            value={formData.manager}
-            onChange={(value) => handleChange('manager', value)}
-            options={[
-              { value: '', label: 'Select Manager' },
-              ...employees.map(e => ({ value: e.name, label: e.name }))
-            ]}
-            placeholder="Select Manager"
-          />
-        </div>
-        <div>
-          <Input
-            label="Budget"
-            type="number"
-            min="0"
-            step="1000"
-            value={formData.budget.toString()}
-            onChange={(e) => handleChange('budget', parseFloat(e.target.value) || 0)}
-            error={errors.budget}
-          />
-        </div>
-      </div>
-
-      <div>
         <Select
-          label="Status"
-          required
-          value={formData.status}
-          onChange={(value) => handleChange('status', value)}
+          label="Parent Department"
+          value={formData.parentDepartmentId || ''}
+          onChange={(value) => setFormData({ ...formData, parentDepartmentId: value || undefined })}
           options={[
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' }
+            { value: '', label: 'None (Top Level)' },
+            ...parentOptions
           ]}
         />
-      </div>
 
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary">
-          {department ? 'Update Department' : 'Create Department'}
-        </Button>
-      </div>
-    </form>
+        <Select
+          label="Manager"
+          value={formData.managerId || ''}
+          onChange={(value) => setFormData({ ...formData, managerId: value || undefined })}
+          options={[
+            { value: '', label: 'Select Manager' },
+            ...managerOptions
+          ]}
+        />
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {loading ? 'Saving...' : initialData ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+interface DepartmentListProps {
+  departments: Department[]
+  onEdit: (dept: Department) => void
+  onDelete: (dept: Department) => void
+  loading?: boolean
+}
+
+export const DepartmentList = ({ departments, onEdit, onDelete, loading }: DepartmentListProps) => {
+  const columns: Column<Department>[] = [
+    {
+      header: 'Name',
+      key: 'name',
+      render: (value, dept) => (
+        <div>
+          <div className="font-medium text-gray-900">{dept.name}</div>
+          {dept.description && <div className="text-xs text-gray-500">{dept.description}</div>}
+        </div>
+      )
+    },
+    {
+      header: 'Parent Department',
+      key: 'parentDepartment',
+      render: (value, dept) => dept.parentDepartment?.name || '-'
+    },
+    {
+      header: 'Manager',
+      key: 'manager',
+      render: (value, dept) => dept.manager ? `${dept.manager.firstName} ${dept.manager.lastName}` : '-'
+    },
+    {
+      header: 'Employees',
+      key: '_count',
+      render: (value, dept) => (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          {dept._count?.employees || 0}
+        </span>
+      )
+    },
+    {
+      header: 'Actions',
+      key: 'actions',
+      render: (value, dept) => (
+        <div className="flex space-x-2 justify-end">
+          <button
+            onClick={() => onEdit(dept)}
+            className="text-blue-600 hover:text-blue-900 p-1"
+            title="Edit"
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => onDelete(dept)}
+            className="text-red-600 hover:text-red-900 p-1"
+            title="Delete"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )
+    }
+  ]
+
+  return (
+    <DataTable
+      data={departments}
+      columns={columns}
+      loading={loading}
+      searchKeys={['name', 'description']}
+    />
   )
 }

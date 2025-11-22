@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Input, Select } from '@/components/ui/FormComponents'
+import { Button, Input, Select, DatePicker } from '@/components/ui/FormComponents'
 import { format } from 'date-fns'
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline'
 
@@ -71,7 +71,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pb-32">
             <Select
                 label="Leave Type"
                 required
@@ -88,20 +88,18 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
             />
 
             <div className="grid grid-cols-2 gap-4">
-                <Input
+                <DatePicker
                     label="Start Date"
-                    type="date"
                     required
                     value={formData.startDate}
-                    onChange={(e) => handleChange('startDate', e.target.value)}
+                    onChange={(date) => handleChange('startDate', date ? date.toISOString().split('T')[0] : '')}
                     error={errors.startDate}
                 />
-                <Input
+                <DatePicker
                     label="End Date"
-                    type="date"
                     required
                     value={formData.endDate}
-                    onChange={(e) => handleChange('endDate', e.target.value)}
+                    onChange={(date) => handleChange('endDate', date ? date.toISOString().split('T')[0] : '')}
                     error={errors.endDate}
                 />
             </div>

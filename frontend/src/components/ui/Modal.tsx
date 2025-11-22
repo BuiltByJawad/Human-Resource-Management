@@ -48,7 +48,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
             leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
           >
             <Dialog.Panel
-              className={`relative w-full ${sizeClasses[size]} bg-white rounded-xl shadow-xl max-h-[90vh] overflow-y-auto p-5 sm:p-6`}
+              className={`relative w-full ${sizeClasses[size]} bg-white rounded-xl shadow-xl max-h-[90vh] min-h-[60vh] overflow-y-auto p-5 sm:p-6`}
             >
               <button
                 type="button"
@@ -137,12 +137,11 @@ export function Alert({ type, title, message, onClose, className = '' }: AlertPr
             <div className="-mx-1.5 -my-1.5">
               <button
                 onClick={onClose}
-                className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  type === 'success' ? 'bg-green-50 text-green-500 hover:bg-green-100 focus:ring-green-600 focus:ring-offset-green-50' :
-                  type === 'error' ? 'bg-red-50 text-red-500 hover:bg-red-100 focus:ring-red-600 focus:ring-offset-red-50' :
-                  type === 'warning' ? 'bg-yellow-50 text-yellow-500 hover:bg-yellow-100 focus:ring-yellow-600 focus:ring-offset-yellow-50' :
-                  'bg-blue-50 text-blue-500 hover:bg-blue-100 focus:ring-blue-600 focus:ring-offset-blue-50'
-                }`}
+                className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${type === 'success' ? 'bg-green-50 text-green-500 hover:bg-green-100 focus:ring-green-600 focus:ring-offset-green-50' :
+                    type === 'error' ? 'bg-red-50 text-red-500 hover:bg-red-100 focus:ring-red-600 focus:ring-offset-red-50' :
+                      type === 'warning' ? 'bg-yellow-50 text-yellow-500 hover:bg-yellow-100 focus:ring-yellow-600 focus:ring-offset-yellow-50' :
+                        'bg-blue-50 text-blue-500 hover:bg-blue-100 focus:ring-blue-600 focus:ring-offset-blue-50'
+                  }`}
               >
                 <span className="sr-only">Dismiss</span>
                 <XMarkIcon className="h-5 w-5" aria-hidden="true" />

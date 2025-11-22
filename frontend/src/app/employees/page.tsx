@@ -375,12 +375,13 @@ export default function EmployeesPage() {
       )}
 
       <ConfirmDialog
-        open={!!pendingDelete}
+        isOpen={!!pendingDelete}
         title="Remove employee?"
-        description={pendingDelete ? `${pendingDelete.firstName} ${pendingDelete.lastName} will be removed from your organization.` : ''}
-        confirmLabel="Delete"
+        message={pendingDelete ? `${pendingDelete.firstName} ${pendingDelete.lastName} will be removed from your organization.` : ''}
+        confirmText="Delete"
         onConfirm={confirmDelete}
-        onCancel={() => setPendingDelete(null)}
+        onClose={() => setPendingDelete(null)}
+        type="danger"
       />
     </div>
   )

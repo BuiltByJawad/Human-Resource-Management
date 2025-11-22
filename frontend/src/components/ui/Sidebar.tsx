@@ -14,8 +14,10 @@ import {
   Cog6ToothIcon,
   SparklesIcon,
   ShieldCheckIcon,
+  KeyIcon,
   ChevronDoubleLeftIcon,
-  ChevronDoubleRightIcon
+  ChevronDoubleRightIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -34,13 +36,17 @@ const navigation = [
     items: [
       { name: 'Payroll', href: '/payroll', icon: BanknotesIcon },
       { name: 'Performance', href: '/performance', icon: SparklesIcon },
+      { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon },
-      { name: 'Compliance', href: '/documents', icon: ShieldCheckIcon },
+      { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon },
     ],
   },
   {
     label: 'System',
-    items: [{ name: 'Settings', href: '/settings', icon: Cog6ToothIcon }],
+    items: [
+      { name: 'Roles & Permissions', href: '/roles', icon: KeyIcon },
+      { name: 'Settings', href: '/settings', icon: Cog6ToothIcon }
+    ],
   },
 ]
 

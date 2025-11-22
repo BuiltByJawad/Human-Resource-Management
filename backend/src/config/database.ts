@@ -47,14 +47,17 @@ export const connectDatabases = async () => {
   try {
     await prisma.$connect()
     logger.info('PostgreSQL connected successfully')
-    
+
     // Try to connect to Redis, but don't fail if it's not available
+    /*
     try {
       await redis.connect()
       logger.info('Redis connected successfully')
     } catch (redisError) {
       logger.warn('Redis connection failed, continuing without Redis:', redisError)
     }
+    */
+    logger.info('Skipping Redis connection for now')
   } catch (error) {
     logger.error('Database connection failed:', error)
     process.exit(1)

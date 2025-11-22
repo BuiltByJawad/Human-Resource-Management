@@ -100,6 +100,7 @@ model Department {
   subDepartments      Department[] @relation("DepartmentHierarchy")
   employees           Employee[]
   users               User[]
+  jobPostings         JobPosting[]
 
   @@index([managerId])
   @@index([parentDepartmentId])
@@ -136,6 +137,7 @@ model Employee {
   payrollRecords   PayrollRecord[]
   performanceReviews PerformanceReview[]
   documents        Document[]
+  complianceLogs   ComplianceLog[]
 
   @@index([departmentId])
   @@index([managerId])
@@ -150,6 +152,13 @@ model Attendance {
   workHours       Decimal?          @db.Decimal(4, 2)
   overtimeHours   Decimal?          @db.Decimal(4, 2) @default(0)
   status          AttendanceStatus  @default(present)
+  
+  // Geolocation tracking
+  checkInLatitude   Decimal?          @db.Decimal(10, 8)
+  checkInLongitude  Decimal?          @db.Decimal(11, 8)
+  checkOutLatitude  Decimal?          @db.Decimal(10, 8)
+  checkOutLongitude Decimal?          @db.Decimal(11, 8)
+  
   createdAt       DateTime          @default(now())
 
   employee        Employee          @relation(fields: [employeeId], references: [id])
@@ -179,21 +188,28 @@ model LeaveRequest {
 }
 
 model PayrollRecord {
-  id          String          @id @default(uuid())
-  employeeId  String
-  payPeriod   String
-  baseSalary  Decimal         @db.Decimal(10, 2)
-  allowances  Decimal         @db.Decimal(10, 2) @default(0)
-  deductions  Decimal         @db.Decimal(10, 2) @default(0)
-  netSalary   Decimal         @db.Decimal(10, 2)
-  status      PayrollStatus   @default(draft)
-  processedAt DateTime?
-  createdAt   DateTime        @default(now())
+  id                  String          @id @default(uuid())
+  employeeId          String
+  payPeriod           String          // Format: "YYYY-MM"
+  baseSalary          Decimal         @db.Decimal(10, 2)
+  allowances          Decimal         @db.Decimal(10, 2) @default(0)
+  deductions          Decimal         @db.Decimal(10, 2) @default(0)
+  netSalary           Decimal         @db.Decimal(10, 2)
+  status              PayrollStatus   @default(draft)
+  
+  allowancesBreakdown Json?           // e.g., [{"name": "Housing", "amount": 500}]
+  deductionsBreakdown Json?           // e.g., [{"name": "Tax", "amount": 200}]
+  attendanceSummary   Json?           // Snapshot of attendance: { "daysWorked": 22, "overtimeHours": 5 }
+  
+  processedAt         DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
-  employee    Employee        @relation(fields: [employeeId], references: [id])
+  employee            Employee        @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
   @@index([status])
+  @@unique([employeeId, payPeriod]) // Prevent duplicate payrolls for same period
 }
 
 model PerformanceReview {
@@ -230,6 +246,16 @@ model Document {
 
   @@index([employeeId])
   @@index([fileName])
+}
+
+model CompanySettings {
+  id                String   @id @default(uuid())
+  companyName       String   @default("NovaHR Company")
+  officeLatitude    Decimal  @db.Decimal(10, 8) @default(23.8103) // Default: Dhaka
+  officeLongitude   Decimal  @db.Decimal(11, 8) @default(90.4125) // Default: Dhaka
+  maxClockInRadius  Int      @default(200) // Meters
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 enum UserStatus {
@@ -281,4 +307,86 @@ enum ReviewStatus {
   submitted
   approved
   acknowledged
+}
+
+model ComplianceRule {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  type        String   // e.g., "max_hours_per_week", "min_rest_period"
+  threshold   Int      // e.g., 48 (hours), 11 (hours)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  logs        ComplianceLog[]
+}
+
+model ComplianceLog {
+  id            String   @id @default(uuid())
+  ruleId        String
+  employeeId    String
+  violationDate DateTime
+  details       String?
+  status        String   @default("open") // open, resolved, ignored
+  createdAt     DateTime @default(now())
+
+  rule        ComplianceRule @relation(fields: [ruleId], references: [id])
+  employee    Employee       @relation(fields: [employeeId], references: [id])
+
+  @@index([ruleId])
+  @@index([employeeId])
+}
+
+enum JobStatus {
+  open
+  closed
+  draft
+}
+
+enum ApplicantStatus {
+  applied
+  screening
+  interview
+  offer
+  hired
+  rejected
+}
+
+model JobPosting {
+  id          String    @id @default(uuid())
+  title       String
+  departmentId String
+  description String?
+  requirements String?
+  status      JobStatus @default(open)
+  postedDate  DateTime  @default(now())
+  closingDate DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  department  Department @relation(fields: [departmentId], references: [id])
+  applicants  Applicant[]
+
+  @@index([departmentId])
+}
+
+model Applicant {
+  id           String          @id @default(uuid())
+  jobId        String
+  firstName    String
+  lastName     String
+  email        String
+  phone        String?
+  resumeUrl    String?
+  status       ApplicantStatus @default(applied)
+  appliedDate  DateTime        @default(now())
+  notes        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  job          JobPosting      @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@index([email])
 }

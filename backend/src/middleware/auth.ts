@@ -9,6 +9,7 @@ export interface AuthRequest extends Request {
     email: string
     role: string
     permissions: string[]
+    employeeId?: string
   }
 }
 
@@ -37,7 +38,8 @@ export const authenticate = async (
               }
             }
           }
-        }
+        },
+        employee: true
       }
     })
 
@@ -51,11 +53,12 @@ export const authenticate = async (
       id: user.id,
       email: user.email,
       role: user.role.name,
-      permissions
+      permissions,
+      employeeId: user.employee?.id
     }
 
     next()
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof jwt.JsonWebTokenError) {
       next(new UnauthorizedError('Invalid token'))
     } else {
