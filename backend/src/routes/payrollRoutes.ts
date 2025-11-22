@@ -5,9 +5,9 @@ import { authenticate, authorize } from '../middleware/auth';
 const router = Router();
 
 // Admin routes
-router.post('/generate', authenticate, authorize(['admin', 'hr_manager']), generatePayroll);
-router.get('/', authenticate, authorize(['admin', 'hr_manager']), getPayrollRecords);
-router.patch('/:id/status', authenticate, authorize(['admin', 'hr_manager']), updatePayrollStatus);
+router.post('/generate', authenticate, authorize(['Super Admin', 'HR Admin']), generatePayroll);
+router.get('/', authenticate, authorize(['Super Admin', 'HR Admin']), getPayrollRecords);
+router.patch('/:id/status', authenticate, authorize(['Super Admin', 'HR Admin']), updatePayrollStatus);
 
 // Employee routes
 router.get('/my-payslips', authenticate, getEmployeePayslips);

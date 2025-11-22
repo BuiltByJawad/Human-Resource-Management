@@ -81,8 +81,12 @@ export const generatePayroll = async (req: Request, res: Response) => {
 
         res.json({ message: `Generated payroll for ${payrolls.length} employees`, data: payrolls });
     } catch (error: any) {
-        console.error('Error generating payroll:', error);
-        res.status(500).json({ error: 'Failed to generate payroll', details: error.message });
+        console.error('Error generating payroll:', JSON.stringify(error, null, 2));
+        res.status(500).json({
+            error: 'Failed to generate payroll',
+            details: error.message || 'Unknown server error',
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

@@ -3,19 +3,32 @@
 import { useState, useEffect } from 'react'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { PayslipModal } from '@/components/hrm/PayslipModal'
+import GeneratePayrollModal from '@/components/hrm/GeneratePayrollModal'
 import { BanknotesIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
+import { useAuthStore } from '@/store/useAuthStore'
+import { useToast } from '@/components/ui/ToastProvider'
+import Sidebar from '@/components/ui/Sidebar'
+import Header from '@/components/ui/Header'
 
 export default function PayrollPage() {
-    const [records, setRecords] = useState([])
+    const { token } = useAuthStore()
+    const { showToast } = useToast()
+    const [records, setRecords] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedPayroll, setSelectedPayroll] = useState<any>(null)
+    const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [stats, setStats] = useState({ totalCost: 0, pendingCount: 0, processedCount: 0 })
 
     const fetchPayroll = async () => {
+        if (!token) {
+            console.log('No token available yet, skipping fetch')
+            setLoading(false)
+            return
+        }
+
         try {
             setLoading(true)
-            const token = localStorage.getItem('token')
             const res = await fetch('http://localhost:5000/api/payroll', {
                 headers: { Authorization: `Bearer ${token}` }
             })
@@ -23,7 +36,6 @@ export default function PayrollPage() {
 
             if (Array.isArray(data)) {
                 setRecords(data)
-                // Calculate stats
                 const total = data.reduce((acc: number, curr: any) => acc + Number(curr.netSalary), 0)
                 const pending = data.filter((r: any) => r.status === 'draft').length
                 const processed = data.filter((r: any) => r.status === 'paid').length
@@ -42,14 +54,10 @@ export default function PayrollPage() {
 
     useEffect(() => {
         fetchPayroll()
-    }, [])
+    }, [token])
 
-    const handleGenerate = async () => {
-        const payPeriod = prompt('Enter Pay Period (YYYY-MM):', new Date().toISOString().slice(0, 7))
-        if (!payPeriod) return
-
+    const handleGenerate = async (payPeriod: string) => {
         try {
-            const token = localStorage.getItem('token')
             const res = await fetch('http://localhost:5000/api/payroll/generate', {
                 method: 'POST',
                 headers: {
@@ -60,14 +68,15 @@ export default function PayrollPage() {
             })
 
             if (res.ok) {
-                alert('Payroll generated successfully!')
+                showToast('Payroll generated successfully!', 'success')
                 fetchPayroll()
             } else {
                 const errData = await res.json()
-                alert(`Failed to generate payroll: ${errData.details || 'Unknown error'}`)
+                showToast(`Failed: ${errData.details || 'Unknown error'}`, 'error')
             }
         } catch (error) {
             console.error('Error generating payroll', error)
+            showToast('An error occurred while generating payroll', 'error')
         }
     }
 
@@ -75,7 +84,6 @@ export default function PayrollPage() {
         if (!confirm(`Mark this record as ${status}?`)) return
 
         try {
-            const token = localStorage.getItem('token')
             await fetch(`http://localhost:5000/api/payroll/${id}/status`, {
                 method: 'PATCH',
                 headers: {
@@ -155,79 +163,91 @@ export default function PayrollPage() {
     ]
 
     return (
-        <div className="p-6 space-y-6 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Payroll Management</h1>
-                    <p className="text-sm text-gray-500 mt-1">Manage salaries, payslips, and payments.</p>
-                </div>
-                <button
-                    onClick={handleGenerate}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95"
-                >
-                    <BanknotesIcon className="h-5 w-5 mr-2" />
-                    Generate Payroll
-                </button>
-            </div>
+        <div className="flex h-screen bg-gray-50">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <Header />
+                <main className="flex-1 overflow-y-auto p-4 md:p-6">
+                    <div className="space-y-6 max-w-7xl mx-auto">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Payroll Management</h1>
+                                <p className="text-sm text-gray-500 mt-1">Manage salaries, payslips, and payments.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsGenerateModalOpen(true)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95"
+                            >
+                                <BanknotesIcon className="h-5 w-5 mr-2" />
+                                Generate Payroll
+                            </button>
+                        </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">Total Cost (Period)</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">${stats.totalCost.toFixed(2)}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-500">Total Cost (Period)</p>
+                                        <p className="text-2xl font-bold text-gray-900 mt-1">${stats.totalCost.toFixed(2)}</p>
+                                    </div>
+                                    <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
+                                        <BanknotesIcon className="h-6 w-6" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-500">Pending Approvals</p>
+                                        <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pendingCount}</p>
+                                    </div>
+                                    <div className="p-3 bg-yellow-50 rounded-xl text-yellow-600">
+                                        <ClockIcon className="h-6 w-6" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-500">Processed</p>
+                                        <p className="text-2xl font-bold text-green-600 mt-1">{stats.processedCount}</p>
+                                    </div>
+                                    <div className="p-3 bg-green-50 rounded-xl text-green-600">
+                                        <CheckCircleIcon className="h-6 w-6" />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
-                            <BanknotesIcon className="h-6 w-6" />
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">Pending Approvals</p>
-                            <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pendingCount}</p>
-                        </div>
-                        <div className="p-3 bg-yellow-50 rounded-xl text-yellow-600">
-                            <ClockIcon className="h-6 w-6" />
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">Processed</p>
-                            <p className="text-2xl font-bold text-green-600 mt-1">{stats.processedCount}</p>
-                        </div>
-                        <div className="p-3 bg-green-50 rounded-xl text-green-600">
-                            <CheckCircleIcon className="h-6 w-6" />
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {/* Payroll Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-                    <h3 className="font-semibold text-gray-900">Payroll Records</h3>
-                    <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">
-                        {records.length} records found
-                    </span>
-                </div>
-                <DataTable
-                    data={records}
-                    columns={columns}
-                    loading={loading}
-                    searchKeys={['payPeriod']}
-                />
-            </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="p-6 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                                <h3 className="font-semibold text-gray-900">Payroll Records</h3>
+                                <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">
+                                    {records.length} records found
+                                </span>
+                            </div>
+                            <DataTable
+                                data={records}
+                                columns={columns}
+                                loading={loading}
+                                searchKeys={['payPeriod']}
+                            />
+                        </div>
 
-            <PayslipModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                payroll={selectedPayroll}
-            />
+                        <PayslipModal
+                            isOpen={isModalOpen}
+                            onClose={() => setIsModalOpen(false)}
+                            payroll={selectedPayroll}
+                        />
+
+                        <GeneratePayrollModal
+                            isOpen={isGenerateModalOpen}
+                            onClose={() => setIsGenerateModalOpen(false)}
+                            onGenerate={handleGenerate}
+                        />
+                    </div>
+                </main>
+            </div>
         </div>
     )
 }

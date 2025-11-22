@@ -5,12 +5,12 @@ import axios from 'axios'
 import { KanbanBoard, Applicant, JobPosting, ApplicantStatus } from '@/components/hrm/RecruitmentComponents'
 import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
-
 import { useAuthStore } from '@/store/useAuthStore'
+import Sidebar from '@/components/ui/Sidebar'
+import Header from '@/components/ui/Header'
+import JobForm from '@/components/hrm/JobForm'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-
-import JobForm from '@/components/hrm/JobForm'
 
 export default function RecruitmentPage() {
     const [applicants, setApplicants] = useState<Applicant[]>([])
@@ -71,7 +71,6 @@ export default function RecruitmentPage() {
     }
 
     const handleStatusChange = async (applicantId: string, newStatus: ApplicantStatus) => {
-        // Optimistic update
         const previousApplicants = [...applicants]
         setApplicants(prev => prev.map(a =>
             a.id === applicantId ? { ...a, status: newStatus } : a
@@ -86,57 +85,60 @@ export default function RecruitmentPage() {
         } catch (error) {
             console.error('Failed to update status', error)
             showToast('Failed to update status', 'error')
-            // Revert
             setApplicants(previousApplicants)
         }
     }
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden flex flex-col bg-gray-50">
-            <div className="flex-1 overflow-hidden p-6">
-                <div className="max-w-[1600px] mx-auto h-full flex flex-col space-y-6">
-                    <div className="flex justify-between items-center flex-shrink-0">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Recruitment Pipeline</h1>
-                            <p className="text-sm text-gray-500">Manage applicants and job postings</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="w-64">
-                                <Select
-                                    value={selectedJobId}
-                                    onChange={(value) => setSelectedJobId(value)}
-                                    options={[
-                                        { value: '', label: 'Select a Job Posting' },
-                                        ...jobs.map(job => ({ value: job.id, label: job.title }))
-                                    ]}
-                                />
+        <div className="flex h-screen bg-gray-50">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <Header />
+                <main className="flex-1 overflow-y-auto p-4 md:p-6">
+                    <div className="max-w-[1600px] mx-auto h-full flex flex-col space-y-6">
+                        <div className="flex justify-between items-center flex-shrink-0">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">Recruitment Pipeline</h1>
+                                <p className="text-sm text-gray-500">Manage applicants and job postings</p>
                             </div>
-                            <Button onClick={() => setIsJobFormOpen(true)}>
-                                Post Job
-                            </Button>
+                            <div className="flex items-center space-x-4">
+                                <div className="w-64">
+                                    <Select
+                                        value={selectedJobId}
+                                        onChange={(value) => setSelectedJobId(value)}
+                                        options={[
+                                            { value: '', label: 'Select a Job Posting' },
+                                            ...jobs.map(job => ({ value: job.id, label: job.title }))
+                                        ]}
+                                    />
+                                </div>
+                                <Button onClick={() => setIsJobFormOpen(true)}>
+                                    Post Job
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                            {loading ? (
+                                <div className="flex justify-center items-center h-full">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                </div>
+                            ) : (
+                                <KanbanBoard applicants={applicants} onStatusChange={handleStatusChange} />
+                            )}
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                        {loading ? (
-                            <div className="flex justify-center items-center h-full">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                            </div>
-                        ) : (
-                            <KanbanBoard applicants={applicants} onStatusChange={handleStatusChange} />
-                        )}
-                    </div>
-                </div>
+                    <JobForm
+                        isOpen={isJobFormOpen}
+                        onClose={() => setIsJobFormOpen(false)}
+                        onSuccess={() => {
+                            fetchJobs()
+                            setIsJobFormOpen(false)
+                        }}
+                    />
+                </main>
             </div>
-
-            <JobForm
-                isOpen={isJobFormOpen}
-                onClose={() => setIsJobFormOpen(false)}
-                onSuccess={() => {
-                    fetchJobs()
-                    setIsJobFormOpen(false)
-                }}
-            />
         </div>
     )
 }
