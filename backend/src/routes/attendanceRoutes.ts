@@ -207,14 +207,14 @@ router.post(
     }
 
     // Geofencing Validation
-    console.log('Clock-in request body:', req.body)
+
     if (latitude !== undefined && longitude !== undefined) {
       // Default office location (Dhaka) - in production, fetch from CompanySettings
       const officeLat = 23.8103
       const officeLon = 90.4125
       const maxDistance = 200 // meters
 
-      console.log(`Validating location: User(${latitude}, ${longitude}) vs Office(${officeLat}, ${officeLon})`)
+
 
       const { isValid, distance } = validateLocation(
         latitude,
@@ -224,7 +224,7 @@ router.post(
         maxDistance
       )
 
-      console.log(`Validation result: valid=${isValid}, distance=${distance}`)
+
 
       if (!isValid) {
         return res.status(400).json({

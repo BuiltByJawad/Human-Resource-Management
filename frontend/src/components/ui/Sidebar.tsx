@@ -16,7 +16,8 @@ import {
   KeyIcon,
   ChevronDoubleLeftIcon,
   UserGroupIcon,
-  ComputerDesktopIcon
+  ComputerDesktopIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -36,6 +37,7 @@ const navigation = [
       { name: 'Payroll', href: '/payroll', icon: BanknotesIcon },
       { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon },
       { name: 'Performance', href: '/performance', icon: SparklesIcon },
+      { name: 'Burnout Analytics', href: '/analytics/burnout', icon: ExclamationTriangleIcon },
       { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon },
       { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon },

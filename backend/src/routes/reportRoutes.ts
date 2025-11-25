@@ -91,7 +91,7 @@ router.get(
 router.get(
   '/employees',
   authenticate,
-  authorize(['super_admin', 'hr_admin', 'manager']),
+  authorize(['Super Admin', 'HR Admin', 'Manager']),
   asyncHandler(async (req: Request, res: Response) => {
     const { startDate, endDate, departmentId, format } = req.query as any
 
@@ -148,7 +148,7 @@ router.get(
 router.get(
   '/attendance',
   authenticate,
-  authorize(['super_admin', 'hr_admin', 'manager']),
+  authorize(['Super Admin', 'HR Admin', 'Manager']),
   asyncHandler(async (req: Request, res: Response) => {
     const { startDate, endDate, departmentId } = req.query as any
 
@@ -201,7 +201,7 @@ router.get(
 router.get(
   '/leave',
   authenticate,
-  authorize(['super_admin', 'hr_admin', 'manager']),
+  authorize(['Super Admin', 'HR Admin', 'Manager']),
   asyncHandler(async (req: Request, res: Response) => {
     const { startDate, endDate, departmentId } = req.query as any
 
@@ -260,7 +260,7 @@ router.get(
 router.get(
   '/payroll',
   authenticate,
-  authorize(['super_admin', 'hr_admin']),
+  authorize(['Super Admin', 'HR Admin']),
   asyncHandler(async (req: Request, res: Response) => {
     const { startDate, endDate, departmentId } = req.query as any
 
@@ -311,16 +311,16 @@ router.get(
 
 const convertToCSV = (data: any[]): string => {
   if (data.length === 0) return ''
-  
+
   const headers = Object.keys(data[0])
   const csvHeaders = headers.join(',')
-  const csvRows = data.map(row => 
+  const csvRows = data.map(row =>
     headers.map(header => {
       const value = row[header]
       return typeof value === 'string' && value.includes(',') ? `"${value}"` : value
     }).join(',')
   )
-  
+
   return `${csvHeaders}\n${csvRows.join('\n')}`
 }
 
