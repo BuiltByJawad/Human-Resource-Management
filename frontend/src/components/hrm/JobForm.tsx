@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button, Input, Select, TextArea } from '../ui/FormComponents'
@@ -30,13 +30,7 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
     const { token } = useAuthStore()
     const { showToast } = useToast()
 
-    useEffect(() => {
-        if (isOpen && token) {
-            fetchDepartments()
-        }
-    }, [isOpen, token])
-
-    const fetchDepartments = async () => {
+    const fetchDepartments = useCallback(async () => {
         try {
             const res = await axios.get(`${API_URL}/departments`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -48,7 +42,13 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
             console.error('Failed to fetch departments', error)
             // showToast('Failed to load departments', 'error')
         }
-    }
+    }, [token])
+
+    useEffect(() => {
+        if (isOpen && token) {
+            fetchDepartments()
+        }
+    }, [isOpen, token, fetchDepartments])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()

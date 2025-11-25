@@ -46,13 +46,12 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
                 <p className="text-sm text-gray-500">{employee.email}</p>
                 <p className="text-sm text-gray-500">#{employee.employeeNumber}</p>
                 <div className="flex items-center mt-2">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    employee.status === 'active' 
-                      ? 'bg-green-100 text-green-800' 
-                      : employee.status === 'inactive'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${employee.status === 'active'
+                    ? 'bg-green-100 text-green-800'
+                    : employee.status === 'inactive'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                    }`}>
                     {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
                   </span>
                 </div>
@@ -64,11 +63,11 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
               <dl className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Department</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{employee.department}</dd>
+                  <dd className="mt-1 text-sm text-gray-900">{employee.department?.name || 'N/A'}</dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Role</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{employee.role}</dd>
+                  <dd className="mt-1 text-sm text-gray-900">{employee.role?.name || 'N/A'}</dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Hire Date</dt>

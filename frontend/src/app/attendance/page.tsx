@@ -75,7 +75,7 @@ export default function AttendancePage() {
         } finally {
             setLoading(false)
         }
-    }, [token, user?.id, showToast])
+    }, [token])
 
     useEffect(() => {
         fetchAttendance()

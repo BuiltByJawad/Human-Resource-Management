@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { PayslipModal } from '@/components/hrm/PayslipModal'
 import GeneratePayrollModal from '@/components/hrm/GeneratePayrollModal'
@@ -20,7 +20,7 @@ export default function PayrollPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [stats, setStats] = useState({ totalCost: 0, pendingCount: 0, processedCount: 0 })
 
-    const fetchPayroll = async () => {
+    const fetchPayroll = useCallback(async () => {
         if (!token) {
             console.log('No token available yet, skipping fetch')
             setLoading(false)
@@ -50,11 +50,11 @@ export default function PayrollPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [token])
 
     useEffect(() => {
         fetchPayroll()
-    }, [token])
+    }, [fetchPayroll])
 
     const handleGenerate = async (payPeriod: string) => {
         try {

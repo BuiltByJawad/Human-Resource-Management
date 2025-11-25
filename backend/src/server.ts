@@ -25,15 +25,15 @@ const startServer = async () => {
     // Graceful shutdown
     const shutdown = async () => {
       logger.info('Shutting down server...');
-      
+
       // Close the HTTP server
       server.close(async () => {
         logger.info('Server closed');
-        
+
         // Close database connection
         await prisma.$disconnect();
         logger.info('Database connection closed');
-        
+
         process.exit(0);
       });
 
@@ -47,9 +47,9 @@ const startServer = async () => {
     // Handle termination signals
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
-    
+
   } catch (err) {
-    logger.error(`Failed to start server: ${err.message}`);
+    logger.error(`Failed to start server: ${(err as Error).message}`);
     process.exit(1);
   }
 };

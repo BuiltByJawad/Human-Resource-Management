@@ -41,7 +41,7 @@ if (error) {
 }
 
 // Export config object
-export default {
+const config = {
   env: envVars.NODE_ENV,
   port: envVars.PORT,
   backendUrl: envVars.BACKEND_URL,
@@ -93,6 +93,8 @@ export default {
     max: 100, // Limit each IP to 100 requests per windowMs
   },
 } as const;
+
+export default config;
 
 // Export individual configs for easier imports
 export const {

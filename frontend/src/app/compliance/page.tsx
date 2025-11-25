@@ -44,7 +44,7 @@ export default function CompliancePage() {
         } finally {
             setLoading(false)
         }
-    }, [token, showToast])
+    }, [token])
 
     useEffect(() => {
         fetchData()

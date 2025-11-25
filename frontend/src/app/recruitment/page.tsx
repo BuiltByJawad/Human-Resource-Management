@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { KanbanBoard, Applicant, JobPosting, ApplicantStatus } from '@/components/hrm/RecruitmentComponents'
 import { Button, Select } from '@/components/ui/FormComponents'
@@ -21,22 +21,7 @@ export default function RecruitmentPage() {
     const { showToast } = useToast()
     const { token } = useAuthStore()
 
-    useEffect(() => {
-        if (token) {
-            fetchJobs()
-        }
-    }, [token])
-
-    useEffect(() => {
-        if (selectedJobId && token) {
-            fetchApplicants(selectedJobId)
-        } else {
-            setApplicants([])
-            setLoading(false)
-        }
-    }, [selectedJobId, token])
-
-    const fetchJobs = async () => {
+    const fetchJobs = useCallback(async () => {
         try {
             const res = await axios.get(`${API_URL}/recruitment/jobs`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -51,9 +36,9 @@ export default function RecruitmentPage() {
             console.error('Failed to fetch jobs', error)
             // showToast('Failed to fetch job postings', 'error')
         }
-    }
+    }, [token, selectedJobId])
 
-    const fetchApplicants = async (jobId: string) => {
+    const fetchApplicants = useCallback(async (jobId: string) => {
         setLoading(true)
         try {
             const res = await axios.get(`${API_URL}/recruitment/applicants?jobId=${jobId}`, {
@@ -68,7 +53,22 @@ export default function RecruitmentPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [token])
+
+    useEffect(() => {
+        if (token) {
+            fetchJobs()
+        }
+    }, [token, fetchJobs])
+
+    useEffect(() => {
+        if (selectedJobId && token) {
+            fetchApplicants(selectedJobId)
+        } else {
+            setApplicants([])
+            setLoading(false)
+        }
+    }, [selectedJobId, token, fetchApplicants])
 
     const handleStatusChange = async (applicantId: string, newStatus: ApplicantStatus) => {
         const previousApplicants = [...applicants]

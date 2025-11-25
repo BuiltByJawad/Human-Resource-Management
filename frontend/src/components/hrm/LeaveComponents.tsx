@@ -177,7 +177,7 @@ export function LeaveRequestCard({ request, onApprove, onReject, canManage }: Le
                 </div>
                 {request.reason && (
                     <div className="mt-2 p-2 bg-gray-50 rounded text-xs italic">
-                        "{request.reason}"
+                        &quot;{request.reason}&quot;
                     </div>
                 )}
             </div>

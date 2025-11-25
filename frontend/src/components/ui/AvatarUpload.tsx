@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import Image from 'next/image'
 
 interface AvatarUploadProps {
     currentAvatarUrl?: string | null
@@ -81,7 +82,13 @@ export default function AvatarUpload({ currentAvatarUrl, onUpload, onRemove, cla
           `}
                 >
                     {previewUrl ? (
-                        <img src={previewUrl} alt="Avatar preview" className="h-full w-full object-cover" />
+                        <Image
+                            src={previewUrl}
+                            alt="Avatar preview"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                        />
                     ) : (
                         <PhotoIcon className="h-8 w-8 text-slate-300" />
                     )}

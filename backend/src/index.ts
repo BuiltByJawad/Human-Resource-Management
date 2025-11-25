@@ -14,6 +14,8 @@ import reportRoutes from './routes/reportRoutes'
 import complianceRoutes from './routes/complianceRoutes'
 import recruitmentRoutes from './routes/recruitmentRoutes'
 import payrollRoutes from './routes/payrollRoutes'
+import assetRoutes from './routes/assetRoutes'
+import performanceRoutes from './routes/performance.routes'
 
 config()
 
@@ -38,6 +40,8 @@ app.use('/api/reports', reportRoutes)
 app.use('/api/compliance', complianceRoutes)
 app.use('/api/recruitment', recruitmentRoutes)
 app.use('/api/payroll', payrollRoutes)
+app.use('/api/assets', assetRoutes)
+app.use('/api/performance', performanceRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })

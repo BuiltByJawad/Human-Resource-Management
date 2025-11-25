@@ -44,7 +44,7 @@ export default function LeavePage() {
         } finally {
             setLoading(false)
         }
-    }, [token, filterStatus, showToast])
+    }, [token, filterStatus])
 
     useEffect(() => {
         if (token) {

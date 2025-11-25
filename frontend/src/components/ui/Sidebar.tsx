@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -16,8 +15,8 @@ import {
   ShieldCheckIcon,
   KeyIcon,
   ChevronDoubleLeftIcon,
-  ChevronDoubleRightIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  ComputerDesktopIcon
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -35,6 +34,7 @@ const navigation = [
     label: 'Operations',
     items: [
       { name: 'Payroll', href: '/payroll', icon: BanknotesIcon },
+      { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon },
       { name: 'Performance', href: '/performance', icon: SparklesIcon },
       { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon },

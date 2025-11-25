@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 import Sidebar from '@/components/ui/Sidebar'
@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { PlusIcon, FunnelIcon, UsersIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useDebounce } from '@/hooks/useDebounce'
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
@@ -34,7 +35,7 @@ interface Pagination {
   pages: number
 }
 
-export default function EmployeesPage() {
+function EmployeesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { token } = useAuthStore()
@@ -384,5 +385,13 @@ export default function EmployeesPage() {
         type="danger"
       />
     </div>
+  )
+}
+
+export default function EmployeesPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EmployeesContent />
+    </Suspense>
   )
 }

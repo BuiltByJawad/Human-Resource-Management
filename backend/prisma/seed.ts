@@ -149,6 +149,26 @@ async function main() {
       }
     })
     console.log('✅ Admin user created: admin@novahr.com / password123')
+
+    // 4. Create Employee record for Admin (Required for Performance Reviews)
+    const adminUserRecord = await prisma.user.findUnique({ where: { email: 'admin@novahr.com' } })
+    if (adminUserRecord) {
+      await prisma.employee.upsert({
+        where: { email: 'admin@novahr.com' },
+        update: { userId: adminUserRecord.id },
+        create: {
+          userId: adminUserRecord.id,
+          employeeNumber: 'EMP001',
+          firstName: 'System',
+          lastName: 'Admin',
+          email: 'admin@novahr.com',
+          hireDate: new Date(),
+          salary: 0,
+          status: 'active'
+        }
+      })
+      console.log('✅ Admin Employee record created')
+    }
   }
 
   console.log('🌱 Seeding completed.')

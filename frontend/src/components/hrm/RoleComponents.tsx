@@ -141,7 +141,7 @@ export const RoleForm = ({
                     </div>
 
                     {/* Permissions Section - Vertical Tabs */}
-                    <div className="border rounded-xl overflow-hidden flex flex-col h-[600px] shadow-sm">
+                    <div className="border rounded-xl overflow-hidden flex flex-col flex-1 shadow-sm min-h-[400px]">
                         <div className="bg-gray-100 px-4 py-3 border-b flex justify-between items-center">
                             <h3 className="font-medium text-gray-900">Permissions Configuration</h3>
                             <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">

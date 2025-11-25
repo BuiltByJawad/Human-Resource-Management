@@ -41,7 +41,7 @@ export default function GeneratePayrollModal({ isOpen, onClose, onGenerate }: Ge
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                 >
-                    <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" />
+                    <div className="fixed inset-0 bg-black/50 transition-opacity" />
                 </Transition.Child>
 
                 <div className="fixed inset-0 z-10 overflow-y-auto">
