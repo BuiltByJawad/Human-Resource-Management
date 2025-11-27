@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import { addHours } from 'date-fns'
 import { asyncHandler } from '../middleware/errorHandler'
 import { prisma } from '../config/database'
-import { comparePassword, generateTokens, hashPassword } from '../utils/auth'
+import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '../utils/auth'
 import { UnauthorizedError, BadRequestError, NotFoundError } from '../utils/errors'
 import { AuthRequest } from '../middleware/auth'
 import { sendEmail } from '../utils/email'
@@ -155,6 +155,11 @@ export const completeInvite = asyncHandler(async (req: Request, res: Response) =
     throw new BadRequestError('Token and password are required')
   }
 
+  const passwordError = validatePasswordStrength(password)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
+  }
+
   const invite = await prisma.userInvite.findFirst({
     where: {
       tokenHash: hashToken(token),
@@ -273,6 +278,11 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   const { token, password } = req.body
   if (!token || !password) {
     throw new BadRequestError('Token and password are required')
+  }
+
+  const passwordError = validatePasswordStrength(password)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
   }
 
   const tokenRecord = await prisma.passwordResetToken.findFirst({
@@ -462,8 +472,9 @@ export const changePassword = asyncHandler(async (req: AuthRequest, res: Respons
     throw new BadRequestError('Current password and new password are required')
   }
 
-  if (newPassword.length < 6) {
-    throw new BadRequestError('New password must be at least 6 characters long')
+  const passwordError = validatePasswordStrength(newPassword)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
   }
 
   const user = await prisma.user.findUnique({

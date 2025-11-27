@@ -4,6 +4,17 @@ import { Dialog } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Employee } from './EmployeeComponents'
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatIsoDate(iso: string): string {
+  if (!iso) return ''
+  const datePart = iso.slice(0, 10)
+  const [year, month, day] = datePart.split('-')
+  const monthIndex = Number(month) - 1
+  const monthName = MONTHS[monthIndex] ?? month
+  return `${day} ${monthName} ${year}`
+}
+
 interface EmployeeDetailsModalProps {
   isOpen: boolean
   onClose: () => void
@@ -72,13 +83,13 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Hire Date</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(employee.hireDate).toLocaleDateString()}
+                    {formatIsoDate(employee.hireDate)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Salary</dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    ${employee.salary.toLocaleString()}
+                    ${employee.salary.toLocaleString('en-US')}
                   </dd>
                 </div>
               </dl>

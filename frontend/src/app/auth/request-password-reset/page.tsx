@@ -87,7 +87,7 @@ export default function RequestPasswordResetPage() {
 
         <div className="text-center text-sm text-gray-500">
           Remembered your password?
-          <Link href="/auth/login" className="ml-1 font-medium text-blue-600 hover:text-blue-700">
+          <Link href="/login" className="ml-1 font-medium text-blue-600 hover:text-blue-700">
             Go back to login
           </Link>
         </div>

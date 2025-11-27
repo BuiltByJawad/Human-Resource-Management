@@ -53,7 +53,12 @@ export const useAuthStore = create<AuthState>()(
                     }
                     set({ user: normalizedUser, token: accessToken, isAuthenticated: true })
                 } catch (error: any) {
-                    throw new Error(error.response?.data?.message || 'Login failed')
+                    const message =
+                        error?.response?.data?.error?.message ||
+                        error?.response?.data?.message ||
+                        error?.message ||
+                        'Login failed'
+                    throw new Error(message)
                 }
             },
             logout: () => set({ user: null, token: null, isAuthenticated: false }),
