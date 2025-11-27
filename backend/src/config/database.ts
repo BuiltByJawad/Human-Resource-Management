@@ -2,12 +2,22 @@ import { PrismaClient } from '@prisma/client'
 import { createClient } from 'redis'
 import winston from 'winston'
 import { config } from 'dotenv'
+import path from 'path'
 
 config()
 
-export const prisma = new PrismaClient({
+declare global {
+  // eslint-disable-next-line no-var
+  var prismaGlobal: PrismaClient | undefined
+}
+
+export const prisma = global.prismaGlobal || new PrismaClient({
   log: ['query', 'error', 'warn'],
 })
+
+if (process.env.NODE_ENV !== 'production') {
+  global.prismaGlobal = prisma
+}
 
 // Redis client with error handling
 export const redis = createClient({

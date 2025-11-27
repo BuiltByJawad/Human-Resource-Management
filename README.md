@@ -139,12 +139,16 @@ npm run test              # Run unit tests
 npm run test:e2e          # Run end-to-end tests
 ```
 
-## 📊 API Documentation
+## API Documentation
 
 The API documentation is available at `http://localhost:5000/api-docs` when running the backend server.
 
 ### Key Endpoints
 - `POST /api/auth/login` - User authentication
+- `POST /api/auth/invite` - Generate an invite link for a new or existing employee (email + role)
+- `POST /api/auth/complete-invite` - Complete an invite by setting a password (marks user as verified)
+- `POST /api/auth/password-reset/request` - Request a password reset link (only for verified users)
+- `POST /api/auth/password-reset/complete` - Complete password reset using a token
 - `GET /api/employees` - List employees
 - `POST /api/employees` - Create employee
 - `GET /api/departments` - List departments
@@ -152,7 +156,7 @@ The API documentation is available at `http://localhost:5000/api-docs` when runn
 - `GET /api/attendance` - Get attendance records
 - `GET /api/reports/dashboard` - Dashboard metrics
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 

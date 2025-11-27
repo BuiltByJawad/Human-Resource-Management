@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '../middleware/errorHandler'
 import { BadRequestError } from '../utils/errors'
 import { AuthRequest } from '../middleware/auth'
-import { prisma } from '../app'
+import { prisma } from '../config/database'
 
 // Helper to get full URL for local uploads
 const getFileUrl = (req: Request, file: any) => {
@@ -84,6 +84,28 @@ export const getSettings = asyncHandler(async (req: AuthRequest, res: Response) 
   res.json({
     success: true,
     data: settings
+  })
+})
+
+export const getPublicBranding = asyncHandler(async (_req: Request, res: Response) => {
+  let settings = await prisma.companySettings.findFirst()
+
+  if (!settings) {
+    settings = await prisma.companySettings.create({ data: {} })
+  }
+
+  const { siteName, tagline, companyName, companyAddress, logoUrl, faviconUrl } = settings
+
+  res.json({
+    success: true,
+    data: {
+      siteName,
+      tagline,
+      companyName,
+      companyAddress,
+      logoUrl,
+      faviconUrl
+    }
   })
 })
 

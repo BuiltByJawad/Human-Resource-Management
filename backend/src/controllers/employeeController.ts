@@ -42,6 +42,9 @@ export const getEmployees = async (req: Request, res: Response, next: NextFuncti
                     role: {
                         select: { id: true, name: true },
                     },
+                    user: {
+                        select: { id: true, verified: true },
+                    },
                 },
                 orderBy: { createdAt: 'desc' },
             }),
@@ -74,6 +77,9 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
             include: {
                 department: true,
                 role: true,
+                user: {
+                    select: { id: true, verified: true },
+                },
                 manager: {
                     select: { id: true, firstName: true, lastName: true },
                 },
@@ -165,6 +171,17 @@ export const createEmployee = async (req: Request, res: Response, next: NextFunc
                 hireDate: new Date(hireDate),
                 salary: parseFloat(salary),
                 status: status || 'active',
+            },
+            include: {
+                department: {
+                    select: { id: true, name: true },
+                },
+                role: {
+                    select: { id: true, name: true },
+                },
+                user: {
+                    select: { id: true, verified: true },
+                },
             },
         })
 

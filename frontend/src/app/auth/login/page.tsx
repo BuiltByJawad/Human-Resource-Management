@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -115,7 +116,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div>
+          <div className="space-y-3">
             <button
               type="submit"
               disabled={isLoading}
@@ -123,6 +124,13 @@ export default function LoginPage() {
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
+
+            <div className="text-center text-sm text-gray-500">
+              <span>Forgot your password?</span>{' '}
+              <Link href="/auth/request-password-reset" className="font-medium text-blue-600 hover:text-blue-700">
+                Reset it
+              </Link>
+            </div>
           </div>
         </form>
       </div>

@@ -46,10 +46,10 @@ export const useAuthStore = create<AuthState>()(
             login: async (email, password) => {
                 try {
                     const response = await axios.post(`${API_URL}/auth/login`, { email, password })
-                    const { user, accessToken } = response.data.data
+                    const { user, accessToken, permissions } = response.data.data
                     const normalizedUser: User = {
                         ...user,
-                        permissions: user.permissions ?? [],
+                        permissions: permissions ?? [],
                     }
                     set({ user: normalizedUser, token: accessToken, isAuthenticated: true })
                 } catch (error: any) {
@@ -74,23 +74,22 @@ export const useAuthStore = create<AuthState>()(
                 }),
             hasPermission: (permission) => {
                 const { user } = get()
-                // Legacy fallback: if permissions are not configured yet, allow access
-                if (!user || !Array.isArray(user.permissions) || user.permissions.length === 0) {
-                    return true
+                if (!user) {
+                    return false
                 }
-                return user.permissions.includes(permission)
+                return Array.isArray(user.permissions) && user.permissions.includes(permission)
             },
             hasAnyPermission: (permissions) => {
                 const { user } = get()
-                if (!user || !Array.isArray(user.permissions) || user.permissions.length === 0) {
-                    return true
+                if (!user || !Array.isArray(user.permissions)) {
+                    return false
                 }
                 return permissions.some((permission) => user.permissions.includes(permission))
             },
             hasAllPermissions: (permissions) => {
                 const { user } = get()
-                if (!user || !Array.isArray(user.permissions) || user.permissions.length === 0) {
-                    return true
+                if (!user || !Array.isArray(user.permissions)) {
+                    return false
                 }
                 return permissions.every((permission) => user.permissions.includes(permission))
             },
