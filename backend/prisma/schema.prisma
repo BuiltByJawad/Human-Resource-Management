@@ -7,6 +7,67 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserStatus {
+  active
+  inactive
+  suspended
+  pending
+}
+
+enum EmployeeStatus {
+  active
+  inactive
+  terminated
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  half_day
+}
+
+enum LeaveType {
+  annual
+  sick
+  personal
+  maternity
+  paternity
+  unpaid
+}
+
+enum PayrollStatus {
+  draft
+  processed
+  paid
+}
+
+enum ReviewStatus {
+  draft
+  submitted
+  approved
+  acknowledged
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum MaritalStatus {
+  single
+  married
+  divorced
+  widowed
+}
+
+enum LeaveRequestStatus {
+  pending
+  approved
+  rejected
+}
+
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
@@ -17,6 +78,7 @@ model User {
   roleId        String
   departmentId  String?
   status        UserStatus @default(active)
+  verified      Boolean   @default(false)
   lastLogin     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -24,6 +86,8 @@ model User {
   role          Role      @relation(fields: [roleId], references: [id])
   department    Department? @relation(fields: [departmentId], references: [id])
   auditLogs     AuditLog[]
+  passwordResetTokens PasswordResetToken[]
+  invites       UserInvite[]
   
   // Employee relation (One-to-One optional, linking system user to employee record if needed)
   employee      Employee?
@@ -44,6 +108,7 @@ model Role {
   users       User[]
   permissions RolePermission[]
   employees   Employee[] // Keep for backward compatibility if needed, or migrate to User-based roles
+  invites     UserInvite[]
 }
 
 model Permission {
@@ -67,6 +132,48 @@ model RolePermission {
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+}
+
+model CompanySettings {
+  id               String   @id @default(uuid())
+  siteName         String   @default("NovaHR")
+  tagline          String   @default("Workspace")
+  companyName      String   @default("NovaHR Company")
+  companyAddress   String   @default("123 Business Road, Tech City")
+  logoUrl          String?
+  faviconUrl       String?
+  officeLatitude   Decimal  @db.Decimal(10, 8) @default(23.8103)
+  officeLongitude  Decimal  @db.Decimal(11, 8) @default(90.4125)
+  maxClockInRadius Int      @default(200)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model UserInvite {
+  id         String   @id @default(uuid())
+  email      String
+  roleId     String
+  userId     String?
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  role Role @relation(fields: [roleId], references: [id])
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -148,7 +255,7 @@ model Employee {
 
   @@index([departmentId])
   @@index([managerId])
-  @@index([status])
+  @@index([userId])
 }
 
 model Attendance {
@@ -181,27 +288,51 @@ model LeaveRequest {
   leaveType    LeaveType
   startDate    DateTime
   endDate      DateTime
-  error
+  daysRequested Int
+  reason       String?
+  status       LeaveRequestStatus @default(pending)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  approver     Employee?     @relation("LeaveApprover", fields: [approverId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
 }
 
-enum ReviewStatus {
-  draft
-  submitted
-  approved
-  acknowledged
+model PayrollRecord {
+  id            String   @id @default(uuid())
+  employeeId    String
+  payPeriod     String
+  baseSalary    Decimal  @db.Decimal(10, 2)
+  allowances    Decimal  @db.Decimal(10, 2) @default(0)
+  deductions    Decimal  @db.Decimal(10, 2) @default(0)
+  netSalary     Decimal  @db.Decimal(10, 2)
+  allowancesBreakdown Json?
+  deductionsBreakdown Json?
+  attendanceSummary   Json?
+  processedAt   DateTime?
+  status        PayrollStatus @default(processed)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  employee      Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, payPeriod], name: "employeeId_payPeriod")
 }
 
-enum Gender {
-  male
-  female
-  other
-}
+model Document {
+  id          String   @id @default(uuid())
+  employeeId  String
+  title       String
+  fileUrl     String
+  category    String?
+  uploadedAt  DateTime @default(now())
 
-enum MaritalStatus {
-  single
-  married
-  divorced
-  widowed
+  employee    Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
 }
 
 model ComplianceRule {

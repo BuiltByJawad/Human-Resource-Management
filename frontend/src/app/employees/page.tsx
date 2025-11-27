@@ -180,12 +180,47 @@ function EmployeesContent() {
           headers: { Authorization: `Bearer ${token}` }
         })
         showToast('Employee created successfully', 'success')
+
+        // Automatically send invite to new employee
+        if (data.email && data.roleId) {
+          try {
+            await axios.post(
+              `${API_URL}/auth/invite`,
+              { email: data.email, roleId: data.roleId },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+            showToast('Invite link sent to employee', 'success')
+          } catch (inviteError: any) {
+            console.error('Failed to send invite', inviteError)
+            showToast(inviteError.response?.data?.message || 'Failed to send invite', 'error')
+          }
+        }
       }
       fetchEmployees()
       setIsModalOpen(false)
     } catch (error: any) {
       console.error('Failed to save employee', error)
       showToast(error.response?.data?.message || 'Failed to save employee', 'error')
+    }
+  }
+
+  const handleSendInvite = async (employee: Employee) => {
+    if (!employee.role?.id) {
+      showToast('Cannot send invite: employee has no role assigned', 'error')
+      return
+    }
+
+    try {
+      await axios.post(
+        `${API_URL}/auth/invite`,
+        { email: employee.email, roleId: employee.role.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      showToast('Invite link sent', 'success')
+      fetchEmployees()
+    } catch (error: any) {
+      console.error('Failed to send invite', error)
+      showToast(error.response?.data?.message || 'Failed to send invite', 'error')
     }
   }
 
@@ -269,6 +304,7 @@ function EmployeesContent() {
                       onEdit={handleEditEmployee}
                       onView={handleViewEmployee}
                       onDelete={handleDeleteEmployee}
+                      onSendInvite={handleSendInvite}
                     />
                   ))}
                 </div>

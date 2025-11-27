@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { Request, Response } from 'express'
+
 import { asyncHandler } from '../middleware/errorHandler'
 import { authenticate, authorize } from '../middleware/auth'
 import { prisma } from '../config/database'
@@ -18,7 +19,7 @@ const paramsSchema = Joi.object({
 const querySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(10),
-  status: Joi.string().valid('pending', 'approved', 'rejected').optional(),
+  status: Joi.string().valid('pending', 'approved', 'rejected', 'cancelled').optional(),
   employeeId: Joi.string().uuid().optional(),
 })
 

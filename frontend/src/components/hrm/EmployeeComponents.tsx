@@ -17,6 +17,7 @@ export interface Employee {
   hireDate: string
   salary: number
   status: 'active' | 'inactive' | 'terminated'
+  user?: { id: string; verified: boolean } | null
 }
 
 interface EmployeeCardProps {
@@ -24,10 +25,11 @@ interface EmployeeCardProps {
   onEdit?: (employee: Employee) => void
   onView?: (employee: Employee) => void
   onDelete?: (employee: Employee) => void
+  onSendInvite?: (employee: Employee) => void
   className?: string
 }
 
-export function EmployeeCard({ employee, onEdit, onView, onDelete, className = '' }: EmployeeCardProps) {
+export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite, className = '' }: EmployeeCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -60,9 +62,32 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, className = '
             <p className="text-sm text-gray-500">#{employee.employeeNumber}</p>
           </div>
         </div>
-        <Badge variant={getStatusColor(employee.status)}>
-          {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
-        </Badge>
+        <div className="flex flex-col items-end space-y-1">
+          <Badge variant={getStatusColor(employee.status)}>
+            {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+          </Badge>
+          {employee.user?.verified ? (
+            <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-100">
+              Verified
+            </span>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <span className="inline-flex items-center rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-medium text-yellow-700 border border-yellow-100">
+                Not verified
+              </span>
+              {onSendInvite && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => onSendInvite(employee)}
+                  className="text-xs px-2 py-1"
+                >
+                  Send invite
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4">
