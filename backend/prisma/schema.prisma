@@ -115,6 +115,12 @@ model Employee {
   firstName        String
   lastName         String
   email            String           @unique
+  phoneNumber      String?
+  address          String?
+  dateOfBirth      DateTime?
+  gender           Gender?
+  maritalStatus    MaritalStatus?
+  emergencyContact Json?            // { name: string, relationship: string, phone: string }
   departmentId     String?
   roleId           String?          // Optional: Can inherit from User or be specific
   managerId        String?
@@ -175,112 +181,6 @@ model LeaveRequest {
   leaveType    LeaveType
   startDate    DateTime
   endDate      DateTime
-  daysRequested Int
-  status       LeaveStatus   @default(pending)
-  reason       String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  employee     Employee      @relation(fields: [employeeId], references: [id])
-  approver     Employee?     @relation("LeaveApprover", fields: [approverId], references: [id])
-
-  @@index([employeeId])
-  @@index([status])
-}
-
-model PayrollRecord {
-  id                  String          @id @default(uuid())
-  employeeId          String
-  payPeriod           String          // Format: "YYYY-MM"
-  baseSalary          Decimal         @db.Decimal(10, 2)
-  allowances          Decimal         @db.Decimal(10, 2) @default(0)
-  deductions          Decimal         @db.Decimal(10, 2) @default(0)
-  netSalary           Decimal         @db.Decimal(10, 2)
-  status              PayrollStatus   @default(draft)
-  
-  allowancesBreakdown Json?           // e.g., [{"name": "Housing", "amount": 500}]
-  deductionsBreakdown Json?           // e.g., [{"name": "Tax", "amount": 200}]
-  attendanceSummary   Json?           // Snapshot of attendance: { "daysWorked": 22, "overtimeHours": 5 }
-  
-  processedAt         DateTime?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-
-  employee            Employee        @relation(fields: [employeeId], references: [id])
-
-  @@index([employeeId])
-  @@index([status])
-  @@unique([employeeId, payPeriod]) // Prevent duplicate payrolls for same period
-}
-
-model Document {
-  id          String    @id @default(uuid())
-  employeeId  String
-  fileName    String
-  fileType    String
-  filePath    String
-  version     Int       @default(1)
-  metadata    Json
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  employee    Employee  @relation(fields: [employeeId], references: [id])
-
-  @@index([employeeId])
-  @@index([fileName])
-}
-
-model CompanySettings {
-  id                String   @id @default(uuid())
-  companyName       String   @default("NovaHR Company")
-  officeLatitude    Decimal  @db.Decimal(10, 8) @default(23.8103) // Default: Dhaka
-  officeLongitude   Decimal  @db.Decimal(11, 8) @default(90.4125) // Default: Dhaka
-  maxClockInRadius  Int      @default(200) // Meters
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
-
-enum UserStatus {
-  active
-  inactive
-  suspended
-  pending
-}
-
-enum EmployeeStatus {
-  active
-  inactive
-  terminated
-  onboarding
-}
-
-enum AttendanceStatus {
-  present
-  absent
-  late
-  half_day
-}
-
-enum LeaveType {
-  annual
-  sick
-  personal
-  maternity
-  paternity
-  unpaid
-}
-
-enum LeaveStatus {
-  pending
-  approved
-  rejected
-  cancelled
-}
-
-enum PayrollStatus {
-  draft
-  processed
-  paid
   error
 }
 
@@ -289,6 +189,19 @@ enum ReviewStatus {
   submitted
   approved
   acknowledged
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum MaritalStatus {
+  single
+  married
+  divorced
+  widowed
 }
 
 model ComplianceRule {

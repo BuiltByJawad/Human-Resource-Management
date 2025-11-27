@@ -288,8 +288,8 @@ export default function ReportsPage() {
             header: 'Status',
             render: (value) => (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${value === 'present' ? 'bg-green-100 text-green-800' :
-                        value === 'late' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
+                    value === 'late' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
                     }`}>
                     {value}
                 </span>
@@ -307,8 +307,8 @@ export default function ReportsPage() {
             header: 'Status',
             render: (value) => (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${value === 'approved' ? 'bg-green-100 text-green-800' :
-                        value === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
+                    value === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
                     }`}>
                     {value}
                 </span>
@@ -359,8 +359,8 @@ export default function ReportsPage() {
                                     setActiveTab(tab.id);
                                 }}
                                 className={`flex-1 min-w-fit px-6 py-4 text-sm font-medium transition-all duration-200 border-b-2 ${activeTab === tab.id
-                                        ? 'border-blue-500 text-blue-600 bg-blue-50/50 cursor-default'
-                                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 cursor-pointer'
+                                    ? 'border-blue-500 text-blue-600 bg-blue-50/50 cursor-default'
+                                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 cursor-pointer'
                                     }`}
                             >
                                 <div className="flex flex-col items-center space-y-1">
@@ -382,10 +382,10 @@ export default function ReportsPage() {
                                     <LoadingSkeleton />
                                 ) : dashboardData ? (
                                     <DashboardStats
-                                        totalEmployees={dashboardData.metrics.totalEmployees}
-                                        presentToday={dashboardData.metrics.presentToday}
-                                        pendingLeaves={dashboardData.metrics.pendingLeaves}
-                                        monthlyPayroll={dashboardData.metrics.monthlyPayroll}
+                                        totalEmployees={dashboardData?.metrics?.totalEmployees ?? 0}
+                                        presentToday={dashboardData?.metrics?.presentToday ?? 0}
+                                        pendingLeaves={dashboardData?.metrics?.pendingLeaves ?? 0}
+                                        monthlyPayroll={dashboardData?.metrics?.monthlyPayroll ?? 0}
                                     />
                                 ) : null}
                             </>
@@ -419,7 +419,7 @@ export default function ReportsPage() {
                                         data={employeesData}
                                         columns={employeeColumns}
                                         loading={false}
-                                        searchKeys={['firstName', 'lastName', 'email', 'employeeNumber']}
+                                        searchKeys={['firstName', 'lastName', 'email', 'employeeNumber', 'department.name']}
                                     />
                                 )}
                             </div>

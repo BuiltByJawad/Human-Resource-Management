@@ -101,3 +101,5 @@ export const checkPermission = (resource: string, action: string) => {
     next()
   }
 }
+
+export const protect = authenticate

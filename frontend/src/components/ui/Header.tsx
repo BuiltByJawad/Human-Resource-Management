@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import MobileMenu from './MobileMenu'
+import { useOrgStore } from '@/store/useOrgStore'
 
 export default function Header() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
@@ -17,6 +19,8 @@ export default function Header() {
   const [isMounted, setIsMounted] = useState(false)
 
   const { user, logout } = useAuthStore()
+  const { siteName, tagline } = useOrgStore()
+
   const router = useRouter()
 
   const profileRef = useClickOutside<HTMLDivElement>(() => setIsProfileOpen(false))
@@ -43,9 +47,10 @@ export default function Header() {
         <div className="flex items-center justify-between px-4 sm:px-6 py-4">
           <div className="flex items-center flex-1 gap-3">
             <div className="hidden sm:flex flex-col">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Human Resource OS</p>
-              <h1 className="text-lg font-semibold text-slate-900">Command Center</h1>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{tagline}</p>
+              <h1 className="text-lg font-semibold text-slate-900">{siteName}</h1>
             </div>
+
             <div className="flex-1"></div>
             <div className="relative w-full max-w-sm">
               <div className="w-full h-10 rounded-2xl bg-slate-100 animate-pulse"></div>
@@ -111,8 +116,8 @@ export default function Header() {
 
             <div className="flex items-center flex-1 gap-3">
               <div className="hidden sm:flex flex-col">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Human Resource OS</p>
-                <h1 className="text-lg font-semibold text-slate-900">Command Center</h1>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{tagline}</p>
+                <h1 className="text-lg font-semibold text-slate-900">{siteName}</h1>
               </div>
               <div className="flex-1"></div>
 

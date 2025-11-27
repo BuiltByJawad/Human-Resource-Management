@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
 import { Button, Select, Input, DatePicker } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 
 export interface Employee {
   id: string
@@ -124,73 +127,73 @@ interface EmployeeFormProps {
   roles: Array<{ id: string; name: string }>
 }
 
+const employeeSchema = yup.object().shape({
+  firstName: yup.string().required('First name is required'),
+  lastName: yup.string().required('Last name is required'),
+  email: yup.string().email('Invalid email format').required('Email is required'),
+  employeeNumber: yup.string().required('Employee number is required'),
+  departmentId: yup.string().required('Department is required'),
+  roleId: yup.string().required('Role is required'),
+  hireDate: yup.string().required('Hire date is required'),
+  salary: yup.number().min(0, 'Salary cannot be negative').required('Salary is required'),
+  status: yup.string().oneOf(['active', 'inactive', 'terminated']).required('Status is required')
+})
+
+type EmployeeFormData = yup.InferType<typeof employeeSchema>
+
 export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles }: EmployeeFormProps) {
-  const [formData, setFormData] = useState({
-    firstName: employee?.firstName || '',
-    lastName: employee?.lastName || '',
-    email: employee?.email || '',
-    employeeNumber: employee?.employeeNumber || '',
-    departmentId: employee?.department?.id || '',
-    roleId: employee?.role?.id || '',
-    hireDate: employee?.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
-    salary: employee?.salary || 0,
-    status: employee?.status || 'active'
+  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<EmployeeFormData>({
+    resolver: yupResolver(employeeSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      employeeNumber: '',
+      departmentId: '',
+      roleId: '',
+      hireDate: '',
+      salary: 0,
+      status: 'active'
+    }
   })
-  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required'
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required'
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Invalid email format'
+  useEffect(() => {
+    if (employee) {
+      reset({
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: employee.email,
+        employeeNumber: employee.employeeNumber,
+        departmentId: employee.department?.id || '',
+        roleId: employee.role?.id || '',
+        hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
+        salary: employee.salary,
+        status: employee.status
+      })
     }
-    if (!formData.employeeNumber.trim()) newErrors.employeeNumber = 'Employee number is required'
-    if (!formData.departmentId) newErrors.departmentId = 'Department is required'
-    if (!formData.roleId) newErrors.roleId = 'Role is required'
-    if (!formData.hireDate) newErrors.hireDate = 'Hire date is required'
-    if (formData.salary < 0) newErrors.salary = 'Salary cannot be negative'
+  }, [employee, reset])
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (validateForm()) {
-      onSubmit(formData)
-    }
-  }
-
-  const handleChange = (field: keyof typeof formData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
+  const onFormSubmit = (data: EmployeeFormData) => {
+    onSubmit(data)
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pb-32">
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-32">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Input
             label="First Name"
             required
-            value={formData.firstName}
-            onChange={(e) => handleChange('firstName', e.target.value)}
-            error={errors.firstName}
+            error={errors.firstName?.message}
+            {...register('firstName')}
           />
         </div>
         <div>
           <Input
             label="Last Name"
             required
-            value={formData.lastName}
-            onChange={(e) => handleChange('lastName', e.target.value)}
-            error={errors.lastName}
+            error={errors.lastName?.message}
+            {...register('lastName')}
           />
         </div>
       </div>
@@ -200,9 +203,8 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
           label="Email"
           type="email"
           required
-          value={formData.email}
-          onChange={(e) => handleChange('email', e.target.value)}
-          error={errors.email}
+          error={errors.email?.message}
+          {...register('email')}
         />
       </div>
 
@@ -210,45 +212,62 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
         <Input
           label="Employee Number"
           required
-          value={formData.employeeNumber}
-          onChange={(e) => handleChange('employeeNumber', e.target.value)}
-          error={errors.employeeNumber}
+          error={errors.employeeNumber?.message}
+          {...register('employeeNumber')}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Select
-            label="Department"
-            required
-            value={formData.departmentId}
-            onChange={(value) => handleChange('departmentId', value)}
-            options={departments.map(d => ({ value: d.id, label: d.name }))}
-            placeholder="Select Department"
-            error={errors.departmentId}
+          <Controller
+            control={control}
+            name="departmentId"
+            render={({ field }) => (
+              <Select
+                label="Department"
+                value={field.value}
+                onChange={field.onChange}
+                options={departments.map(d => ({ value: d.id, label: d.name }))}
+                placeholder="Select Department"
+                required
+                error={errors.departmentId?.message}
+              />
+            )}
           />
         </div>
         <div>
-          <Select
-            label="Role"
-            required
-            value={formData.roleId}
-            onChange={(value) => handleChange('roleId', value)}
-            options={roles.map(r => ({ value: r.id, label: r.name }))}
-            placeholder="Select Role"
-            error={errors.roleId}
+          <Controller
+            control={control}
+            name="roleId"
+            render={({ field }) => (
+              <Select
+                label="Role"
+                value={field.value}
+                onChange={field.onChange}
+                options={roles.map(r => ({ value: r.id, label: r.name }))}
+                placeholder="Select Role"
+                required
+                error={errors.roleId?.message}
+              />
+            )}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <DatePicker
-            label="Hire Date"
-            required
-            value={formData.hireDate}
-            onChange={(date) => handleChange('hireDate', date ? date.toISOString().split('T')[0] : '')}
-            error={errors.hireDate}
+          <Controller
+            control={control}
+            name="hireDate"
+            render={({ field }) => (
+              <DatePicker
+                label="Hire Date"
+                required
+                value={field.value}
+                onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                error={errors.hireDate?.message}
+              />
+            )}
           />
         </div>
         <div>
@@ -256,25 +275,30 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
             label="Salary"
             type="number"
             required
-            value={formData.salary.toString()}
-            onChange={(e) => handleChange('salary', parseFloat(e.target.value) || 0)}
-            error={errors.salary}
+            error={errors.salary?.message}
+            {...register('salary')}
           />
         </div>
       </div>
 
       <div>
-        <Select
-          label="Status"
-          required
-          value={formData.status}
-          onChange={(value) => handleChange('status', value)}
-          options={[
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' },
-            { value: 'terminated', label: 'Terminated' }
-          ]}
-          error={errors.status}
+        <Controller
+          control={control}
+          name="status"
+          render={({ field }) => (
+            <Select
+              label="Status"
+              value={field.value}
+              onChange={field.onChange}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'terminated', label: 'Terminated' }
+              ]}
+              required
+              error={errors.status?.message}
+            />
+          )}
         />
       </div>
 

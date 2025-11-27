@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { Button, Input, Select, DatePicker } from '@/components/ui/FormComponents'
-import { format } from 'date-fns'
+import { Button, Select, TextArea, Input, DatePicker } from '../ui/FormComponents'
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { format } from 'date-fns'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 
 export interface LeaveRequest {
     id: string
-    leaveType: 'annual' | 'sick' | 'personal' | 'maternity' | 'paternity'
+    leaveType: string
     startDate: string
     endDate: string
-    reason?: string
+    reason: string
     status: 'pending' | 'approved' | 'rejected'
     employee: {
         id: string
@@ -17,106 +20,110 @@ export interface LeaveRequest {
         email: string
     }
     approver?: {
-        id: string
         firstName: string
         lastName: string
     }
-    createdAt: string
 }
 
 interface LeaveRequestFormProps {
-    onSubmit: (data: any) => void
+    onSubmit: (data: any) => Promise<void>
     onCancel: () => void
     loading?: boolean
 }
 
+const leaveRequestSchema = yup.object().shape({
+    leaveType: yup.string().required('Leave type is required'),
+    startDate: yup.string().required('Start date is required'),
+    endDate: yup.string().required('End date is required'),
+    reason: yup.string().required('Reason is required')
+})
+
+type LeaveRequestFormData = yup.InferType<typeof leaveRequestSchema>
+
 export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFormProps) {
-    const [formData, setFormData] = useState({
-        leaveType: 'annual',
-        startDate: '',
-        endDate: '',
-        reason: ''
+    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<LeaveRequestFormData>({
+        resolver: yupResolver(leaveRequestSchema),
+        defaultValues: {
+            leaveType: 'annual',
+            startDate: '',
+            endDate: '',
+            reason: ''
+        }
     })
-    const [errors, setErrors] = useState<Record<string, string>>({})
 
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {}
-
-        if (!formData.leaveType) newErrors.leaveType = 'Leave type is required'
-        if (!formData.startDate) newErrors.startDate = 'Start date is required'
-        if (!formData.endDate) newErrors.endDate = 'End date is required'
-
-        if (formData.startDate && formData.endDate) {
-            if (new Date(formData.startDate) > new Date(formData.endDate)) {
-                newErrors.endDate = 'End date must be after start date'
-            }
-        }
-
-        setErrors(newErrors)
-        return Object.keys(newErrors).length === 0
-    }
-
-    const handleChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: '' }))
-        }
-    }
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        if (validateForm()) {
-            onSubmit(formData)
-        }
+    const onFormSubmit = async (data: LeaveRequestFormData) => {
+        await onSubmit(data)
+        reset()
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 pb-32">
-            <Select
-                label="Leave Type"
-                required
-                value={formData.leaveType}
-                onChange={(value) => handleChange('leaveType', value)}
-                options={[
-                    { value: 'annual', label: 'Annual Leave' },
-                    { value: 'sick', label: 'Sick Leave' },
-                    { value: 'personal', label: 'Personal Leave' },
-                    { value: 'maternity', label: 'Maternity Leave' },
-                    { value: 'paternity', label: 'Paternity Leave' },
-                ]}
-                error={errors.leaveType}
+        <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+            <Controller
+                control={control}
+                name="leaveType"
+                render={({ field }) => (
+                    <Select
+                        label="Leave Type"
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                            { value: 'annual', label: 'Annual Leave' },
+                            { value: 'sick', label: 'Sick Leave' },
+                            { value: 'personal', label: 'Personal Leave' },
+                            { value: 'maternity', label: 'Maternity Leave' },
+                            { value: 'paternity', label: 'Paternity Leave' },
+                            { value: 'unpaid', label: 'Unpaid Leave' },
+                        ]}
+                        required
+                        error={errors.leaveType?.message}
+                    />
+                )}
             />
 
             <div className="grid grid-cols-2 gap-4">
-                <DatePicker
-                    label="Start Date"
-                    required
-                    value={formData.startDate}
-                    onChange={(date) => handleChange('startDate', date ? date.toISOString().split('T')[0] : '')}
-                    error={errors.startDate}
+                <Controller
+                    control={control}
+                    name="startDate"
+                    render={({ field }) => (
+                        <DatePicker
+                            label="Start Date"
+                            required
+                            value={field.value}
+                            onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                            error={errors.startDate?.message}
+                        />
+                    )}
                 />
-                <DatePicker
-                    label="End Date"
-                    required
-                    value={formData.endDate}
-                    onChange={(date) => handleChange('endDate', date ? date.toISOString().split('T')[0] : '')}
-                    error={errors.endDate}
+                <Controller
+                    control={control}
+                    name="endDate"
+                    render={({ field }) => (
+                        <DatePicker
+                            label="End Date"
+                            required
+                            value={field.value}
+                            onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                            error={errors.endDate?.message}
+                        />
+                    )}
                 />
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                <textarea
-                    value={formData.reason}
-                    onChange={(e) => handleChange('reason', e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="Optional reason for leave..."
-                />
-            </div>
+            <TextArea
+                label="Reason"
+                rows={3}
+                placeholder="Please provide a reason for your leave request..."
+                required
+                error={errors.reason?.message}
+                {...register('reason')}
+            />
 
-            <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" onClick={onCancel}>
+            <div className="flex justify-end space-x-3">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onCancel}
+                >
                     Cancel
                 </Button>
                 <Button type="submit" loading={loading}>

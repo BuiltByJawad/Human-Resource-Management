@@ -3,23 +3,9 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '../middleware/errorHandler'
 import { authenticate, authorize } from '../middleware/auth'
 import { prisma } from '../config/database'
-import { NotFoundError, ConflictError } from '../utils/errors'
 import Joi from 'joi'
-import { validateRequest, validateParams, validateQuery } from '../middleware/validation'
-import { AuthRequest } from '../types'
 
 const router = Router()
-
-const paramsSchema = Joi.object({
-  id: Joi.string().uuid().required(),
-})
-
-const reportQuerySchema = Joi.object({
-  startDate: Joi.date().optional(),
-  endDate: Joi.date().optional(),
-  departmentId: Joi.string().uuid().optional(),
-  format: Joi.string().valid('json', 'csv', 'pdf').default('json'),
-})
 
 router.get(
   '/dashboard',
@@ -66,23 +52,22 @@ router.get(
       }),
     ])
 
+    const formattedActivities = recentActivities.map((emp: any) => ({
+      id: emp.id,
+      employee: `${emp.firstName} ${emp.lastName}`,
+      department: emp.department?.name,
+      date: emp.createdAt,
+      type: 'new_employee',
+    }))
+
     res.json({
       success: true,
       data: {
-        metrics: {
-          totalEmployees,
-          presentToday,
-          pendingLeaves,
-          monthlyPayroll: monthlyPayroll._sum.netSalary || 0,
-        },
-        recentActivities: recentActivities.map(emp => ({
-          id: emp.id,
-          name: `${emp.firstName} ${emp.lastName}`,
-          email: emp.email,
-          department: emp.department?.name,
-          date: emp.createdAt,
-          type: 'new_employee',
-        })),
+        totalEmployees,
+        presentToday,
+        pendingLeaves,
+        monthlyPayroll: monthlyPayroll._sum.netSalary || 0,
+        recentActivities: formattedActivities,
       },
     })
   })

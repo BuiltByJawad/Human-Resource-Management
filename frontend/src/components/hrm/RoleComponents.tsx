@@ -4,6 +4,9 @@ import { SlideOver } from '@/components/ui/SlideOver'
 import { Input, TextArea } from '@/components/ui/FormComponents'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 
 export interface Permission {
     id: string
@@ -33,6 +36,14 @@ interface RoleFormProps {
     loading?: boolean
 }
 
+const roleSchema = yup.object().shape({
+    name: yup.string().required('Role name is required'),
+    description: yup.string().default(''),
+    permissionIds: yup.array().of(yup.string().required()).required()
+})
+
+type RoleFormData = yup.InferType<typeof roleSchema>
+
 export const RoleForm = ({
     isOpen,
     onClose,
@@ -42,33 +53,34 @@ export const RoleForm = ({
     groupedPermissions,
     loading
 }: RoleFormProps) => {
-    const [formData, setFormData] = useState<{
-        name: string
-        description: string
-        permissionIds: string[]
-    }>({
-        name: '',
-        description: '',
-        permissionIds: []
+    const [activeResource, setActiveResource] = useState<string>('')
+
+    const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
+        resolver: yupResolver(roleSchema),
+        defaultValues: {
+            name: '',
+            description: '',
+            permissionIds: []
+        }
     })
 
-    const [activeResource, setActiveResource] = useState<string>('')
+    const selectedPermissionIds = watch('permissionIds') || []
 
     useEffect(() => {
         if (initialData) {
-            setFormData({
+            reset({
                 name: initialData.name,
                 description: initialData.description || '',
                 permissionIds: initialData.permissions?.map(p => p.permission.id) || []
             })
         } else {
-            setFormData({
+            reset({
                 name: '',
                 description: '',
                 permissionIds: []
             })
         }
-    }, [initialData, isOpen])
+    }, [initialData, isOpen, reset])
 
     // Set initial active resource
     useEffect(() => {
@@ -77,39 +89,38 @@ export const RoleForm = ({
         }
     }, [isOpen, groupedPermissions])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        await onSubmit(formData)
+    const onFormSubmit = async (data: RoleFormData) => {
+        await onSubmit({
+            ...data,
+            permissionIds: data.permissionIds as string[]
+        })
     }
 
     const togglePermission = (id: string) => {
-        setFormData(prev => {
-            const exists = prev.permissionIds.includes(id)
-            if (exists) {
-                return { ...prev, permissionIds: prev.permissionIds.filter(pid => pid !== id) }
-            } else {
-                return { ...prev, permissionIds: [...prev.permissionIds, id] }
-            }
-        })
+        const currentIds = selectedPermissionIds
+        const exists = currentIds.includes(id)
+        if (exists) {
+            setValue('permissionIds', currentIds.filter(pid => pid !== id))
+        } else {
+            setValue('permissionIds', [...currentIds, id])
+        }
     }
 
     const toggleResource = (resource: string) => {
         const resourcePerms = groupedPermissions[resource].map(p => p.id)
-        const allSelected = resourcePerms.every(id => formData.permissionIds.includes(id))
+        const allSelected = resourcePerms.every(id => selectedPermissionIds.includes(id))
 
-        setFormData(prev => {
-            if (allSelected) {
-                // Deselect all
-                return { ...prev, permissionIds: prev.permissionIds.filter(pid => !resourcePerms.includes(pid)) }
-            } else {
-                // Select all (add missing ones)
-                const newIds = [...prev.permissionIds]
-                resourcePerms.forEach(id => {
-                    if (!newIds.includes(id)) newIds.push(id)
-                })
-                return { ...prev, permissionIds: newIds }
-            }
-        })
+        if (allSelected) {
+            // Deselect all
+            setValue('permissionIds', selectedPermissionIds.filter(pid => !resourcePerms.includes(pid)))
+        } else {
+            // Select all (add missing ones)
+            const newIds = [...selectedPermissionIds]
+            resourcePerms.forEach(id => {
+                if (!newIds.includes(id)) newIds.push(id)
+            })
+            setValue('permissionIds', newIds)
+        }
     }
 
     return (
@@ -119,24 +130,24 @@ export const RoleForm = ({
             title={initialData ? 'Edit Role' : 'Create New Role'}
             size="2xl"
         >
-            <form onSubmit={handleSubmit} className="flex flex-col h-full">
+            <form onSubmit={handleSubmit(onFormSubmit)} className="flex flex-col h-full">
                 <div className="flex-1 space-y-8 pb-20">
                     {/* Basic Info Section */}
                     <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h3 className="text-sm font-medium text-gray-900 uppercase tracking-wider">Role Details</h3>
                         <Input
                             label="Role Name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             required
                             placeholder="e.g. HR Manager"
                             disabled={initialData?.isSystem}
+                            error={errors.name?.message}
+                            {...register('name')}
                         />
                         <TextArea
                             label="Description"
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             placeholder="What is this role for?"
+                            error={errors.description?.message}
+                            {...register('description')}
                         />
                     </div>
 
@@ -145,7 +156,7 @@ export const RoleForm = ({
                         <div className="bg-gray-100 px-4 py-3 border-b flex justify-between items-center">
                             <h3 className="font-medium text-gray-900">Permissions Configuration</h3>
                             <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">
-                                {formData.permissionIds.length} permissions selected
+                                {selectedPermissionIds.length} permissions selected
                             </span>
                         </div>
 
@@ -153,7 +164,7 @@ export const RoleForm = ({
                             {/* Left Sidebar: Resources */}
                             <div className="w-1/3 border-r bg-gray-50 overflow-y-auto">
                                 {Object.entries(groupedPermissions).map(([resource, perms]) => {
-                                    const selectedCount = perms.filter(p => formData.permissionIds.includes(p.id)).length
+                                    const selectedCount = perms.filter(p => selectedPermissionIds.includes(p.id)).length
                                     const totalCount = perms.length
                                     const isComplete = selectedCount === totalCount
                                     const isActive = activeResource === resource
@@ -202,7 +213,7 @@ export const RoleForm = ({
                                                 onClick={() => toggleResource(activeResource)}
                                                 className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded transition-colors"
                                             >
-                                                {groupedPermissions[activeResource].every(p => formData.permissionIds.includes(p.id))
+                                                {groupedPermissions[activeResource].every(p => selectedPermissionIds.includes(p.id))
                                                     ? 'Deselect All'
                                                     : 'Select All'}
                                             </button>
@@ -210,7 +221,7 @@ export const RoleForm = ({
 
                                         <div className="space-y-3">
                                             {groupedPermissions[activeResource].map(perm => {
-                                                const isSelected = formData.permissionIds.includes(perm.id)
+                                                const isSelected = selectedPermissionIds.includes(perm.id)
                                                 return (
                                                     <div
                                                         key={perm.id}

@@ -8,12 +8,13 @@ import { useRouter } from 'next/navigation';
 import { PlusIcon, ChartBarIcon, ClipboardDocumentCheckIcon, UserGroupIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { useToast } from '@/components/ui/ToastProvider';
+import { PERMISSIONS } from '@/constants/permissions';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function PerformancePage() {
     const router = useRouter();
-    const { user, token } = useAuthStore();
+    const { user, token, hasPermission } = useAuthStore();
     const { showToast } = useToast();
     const [cycles, setCycles] = useState([]);
     const [selectedCycle, setSelectedCycle] = useState<any>(null);
@@ -27,6 +28,8 @@ export default function PerformancePage() {
     const [userReviews, setUserReviews] = useState<any[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
+
+    const canManageCycles = hasPermission(PERMISSIONS.MANAGE_PERFORMANCE_CYCLES);
 
     useEffect(() => {
         if (token && user) {
@@ -164,7 +167,7 @@ export default function PerformancePage() {
                             <p className="mt-1 text-sm text-gray-500">Manage your reviews, track progress, and view insights.</p>
                         </div>
                     </div>
-                    {user?.role === 'Admin' && (
+                    {canManageCycles && (
                         <div className="mt-4 md:mt-0">
                             <Button onClick={() => setIsCreateModalOpen(true)} className="shadow-lg shadow-blue-500/30">
                                 <PlusIcon className="-ml-1 mr-2 h-5 w-5" />

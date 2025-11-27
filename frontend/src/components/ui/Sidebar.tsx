@@ -19,35 +19,50 @@ import {
   ComputerDesktopIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import { useAuthStore } from '@/store/useAuthStore'
+import { useOrgStore } from '@/store/useOrgStore'
+import { PERMISSIONS, type Permission } from '@/constants/permissions'
 
-const navigation = [
+type NavIcon = typeof HomeIcon
+
+type NavItem = {
+  name: string
+  href: string
+  icon: NavIcon
+  permissions?: Permission[]
+}
+
+const navigation: { label: string; items: NavItem[] }[] = [
   {
     label: 'Workspace',
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-      { name: 'Employees', href: '/employees', icon: UsersIcon },
-      { name: 'Departments', href: '/departments', icon: BuildingOfficeIcon },
-      { name: 'Attendance', href: '/attendance', icon: ClockIcon },
+      { name: 'Employees', href: '/employees', icon: UsersIcon, permissions: [PERMISSIONS.VIEW_EMPLOYEES] },
+      { name: 'Departments', href: '/departments', icon: BuildingOfficeIcon, permissions: [PERMISSIONS.MANAGE_DEPARTMENTS] },
+      { name: 'Attendance', href: '/attendance', icon: ClockIcon, permissions: [PERMISSIONS.VIEW_ATTENDANCE] },
+      // Leave is available to all authenticated users; fine-grained actions are permission-gated inside
       { name: 'Leave', href: '/leave', icon: ClipboardDocumentListIcon },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { name: 'Payroll', href: '/payroll', icon: BanknotesIcon },
-      { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon },
-      { name: 'Performance', href: '/performance', icon: SparklesIcon },
-      { name: 'Burnout Analytics', href: '/analytics/burnout', icon: ExclamationTriangleIcon },
-      { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon },
-      { name: 'Reports', href: '/reports', icon: ChartBarIcon },
-      { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon },
+      { name: 'Payroll', href: '/payroll', icon: BanknotesIcon, permissions: [PERMISSIONS.VIEW_PAYROLL] },
+      { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon, permissions: [PERMISSIONS.VIEW_ASSETS] },
+      { name: 'Performance', href: '/performance', icon: SparklesIcon, permissions: [PERMISSIONS.VIEW_PERFORMANCE] },
+      { name: 'Burnout Analytics', href: '/analytics/burnout', icon: ExclamationTriangleIcon, permissions: [PERMISSIONS.VIEW_ANALYTICS] },
+      // Recruitment typically for HR/recruiters; reuse MANAGE_EMPLOYEES as a reasonable gate
+      { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon, permissions: [PERMISSIONS.MANAGE_EMPLOYEES] },
+      { name: 'Reports', href: '/reports', icon: ChartBarIcon, permissions: [PERMISSIONS.VIEW_REPORTS] },
+      { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon, permissions: [PERMISSIONS.VIEW_COMPLIANCE] },
     ],
   },
   {
     label: 'System',
     items: [
-      { name: 'Roles & Permissions', href: '/roles', icon: KeyIcon },
-      { name: 'Settings', href: '/settings', icon: Cog6ToothIcon }
+      { name: 'Roles & Permissions', href: '/roles', icon: KeyIcon, permissions: [PERMISSIONS.MANAGE_ROLES] },
+      // Settings is visible to everyone; sections inside are permission-gated
+      { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
     ],
   },
 ]
@@ -81,8 +96,27 @@ function useSidebarState() {
 }
 
 export default function Sidebar() {
-  const { toggle } = useSidebarState()
+  const { toggle, isMounted } = useSidebarState()
+  const user = useAuthStore((state) => state.user)
+  const hasAnyPermission = useAuthStore((state) => state.hasAnyPermission)
+  const { siteName, shortName, tagline, logoUrl } = useOrgStore()
   const pathname = usePathname()
+
+  const canSeeItem = (item: NavItem) => {
+    if (!item.permissions || item.permissions.length === 0) return true
+    return hasAnyPermission(item.permissions)
+  }
+
+  const hasUser = isMounted && !!user
+
+  const initials = hasUser && user?.firstName && user?.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : (user?.email?.[0]?.toUpperCase() ?? 'U')
+
+  const userDisplayName = hasUser
+    ? (`${user!.firstName ?? ''} ${user!.lastName ?? ''}`.trim() || user!.email)
+    : ''
+  const userEmail = hasUser ? user!.email : ''
 
   const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
@@ -125,8 +159,12 @@ export default function Sidebar() {
         h-20 [.sidebar-collapsed_&]:h-32 [.sidebar-collapsed_&]:flex-col [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:gap-4 [.sidebar-collapsed_&]:px-0
       `}>
         <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full`}>
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20 flex-shrink-0">
-            HR
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20 flex-shrink-0 overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt={siteName} className="h-full w-full object-cover" />
+            ) : (
+              <span>{shortName}</span>
+            )}
           </div>
           <div
             className={`
@@ -135,8 +173,8 @@ export default function Sidebar() {
               [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
             `}
           >
-            <p className="text-base font-bold tracking-tight text-white">NovaHR</p>
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Workspace</p>
+            <p className="text-base font-bold tracking-tight text-white">{siteName}</p>
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{tagline}</p>
           </div>
         </div>
 
@@ -157,19 +195,23 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 no-scrollbar">
-        {navigation.map((section) => (
-          <div key={section.label}>
-            <p className={`
-              text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-4 px-2
-              [.sidebar-collapsed_&]:hidden
-            `}>
-              {section.label}
-            </p>
-            <div className="space-y-1">
-              {section.items.map(renderNavItem)}
+        {navigation.map((section) => {
+          const visibleItems = section.items.filter(canSeeItem)
+          if (visibleItems.length === 0) return null
+          return (
+            <div key={section.label}>
+              <p className={`
+                text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-4 px-2
+                [.sidebar-collapsed_&]:hidden
+              `}>
+                {section.label}
+              </p>
+              <div className="space-y-1">
+                {visibleItems.map(renderNavItem)}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* User Profile */}
@@ -181,11 +223,24 @@ export default function Sidebar() {
           `}
         >
           <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-sm shadow-inner flex-shrink-0 border-2 border-white/10">
-            JD
+            {hasUser ? (
+              initials
+            ) : (
+              <span className="h-6 w-6 rounded-full bg-slate-500/60 animate-pulse block" />
+            )}
           </div>
           <div className="[.sidebar-collapsed_&]:hidden overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">John Doe</p>
-            <p className="text-xs text-slate-400 truncate">admin@novahr.com</p>
+            {hasUser ? (
+              <>
+                <p className="text-sm font-medium text-white truncate">{userDisplayName}</p>
+                <p className="text-xs text-slate-400 truncate">{userEmail}</p>
+              </>
+            ) : (
+              <div className="space-y-1">
+                <div className="h-3 w-24 bg-slate-700/70 rounded animate-pulse" />
+                <div className="h-2 w-20 bg-slate-700/50 rounded animate-pulse" />
+              </div>
+            )}
           </div>
         </div>
       </div>

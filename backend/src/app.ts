@@ -60,6 +60,9 @@ export const createApp = (): { app: Application; httpServer: any } => {
   // API routes
   app.use('/api', routes);
 
+  // Serve static files
+  app.use('/uploads', express.static('uploads'));
+
   // Health check endpoint
   app.get('/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });

@@ -1,8 +1,11 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { StarIcon as StarIconOutline } from '@heroicons/react/24/outline';
-import { Button } from '@/components/ui/FormComponents';
+import { Button, TextArea } from '@/components/ui/FormComponents';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 
 export interface ReviewFormProps {
     isOpen: boolean;
@@ -16,36 +19,88 @@ export interface ReviewFormProps {
     };
 }
 
-export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = false, initialData }: ReviewFormProps) {
-    const [ratings, setRatings] = useState<Record<string, number>>({
-        'Technical Proficiency': 0,
-        'Code Quality': 0,
-        'Problem Solving': 0,
-        'Communication': 0,
-        'Collaboration': 0,
-        'Leadership': 0,
-        'Initiative': 0,
-        'Reliability': 0,
-        ...(initialData?.ratings || {})
-    });
+const reviewSchema = yup.object().shape({
+    ratings: yup.object().test('all-rated', 'All skills must be rated', (value) => {
+        if (!value) return false;
+        const categories = [
+            'Technical Proficiency', 'Code Quality', 'Problem Solving',
+            'Communication', 'Collaboration',
+            'Leadership', 'Initiative', 'Reliability'
+        ];
+        return categories.every(cat => (value as any)[cat] > 0);
+    }),
+    comments: yup.string()
+});
 
+type ReviewFormData = yup.InferType<typeof reviewSchema>;
+
+export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = false, initialData }: ReviewFormProps) {
     const categories = {
         'Core Competencies': ['Technical Proficiency', 'Code Quality', 'Problem Solving'],
         'Soft Skills': ['Communication', 'Collaboration'],
         'Values & Impact': ['Leadership', 'Initiative', 'Reliability']
     };
 
-    const [comments, setComments] = useState(initialData?.comments || '');
+    const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<ReviewFormData>({
+        resolver: yupResolver(reviewSchema),
+        defaultValues: {
+            ratings: {
+                'Technical Proficiency': 0,
+                'Code Quality': 0,
+                'Problem Solving': 0,
+                'Communication': 0,
+                'Collaboration': 0,
+                'Leadership': 0,
+                'Initiative': 0,
+                'Reliability': 0,
+            },
+            comments: ''
+        }
+    });
+
+    const currentRatings = watch('ratings') as Record<string, number>;
+
+    useEffect(() => {
+        if (initialData) {
+            reset({
+                ratings: {
+                    'Technical Proficiency': 0,
+                    'Code Quality': 0,
+                    'Problem Solving': 0,
+                    'Communication': 0,
+                    'Collaboration': 0,
+                    'Leadership': 0,
+                    'Initiative': 0,
+                    'Reliability': 0,
+                    ...initialData.ratings
+                },
+                comments: initialData.comments || ''
+            });
+        } else {
+            reset({
+                ratings: {
+                    'Technical Proficiency': 0,
+                    'Code Quality': 0,
+                    'Problem Solving': 0,
+                    'Communication': 0,
+                    'Collaboration': 0,
+                    'Leadership': 0,
+                    'Initiative': 0,
+                    'Reliability': 0,
+                },
+                comments: ''
+            });
+        }
+    }, [initialData, isOpen, reset]);
 
     const handleRatingChange = (category: string, rating: number) => {
         if (readOnly) return;
-        setRatings(prev => ({ ...prev, [category]: rating }));
+        setValue(`ratings.${category}` as any, rating);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const onFormSubmit = (data: ReviewFormData) => {
         if (readOnly) return;
-        onSubmit({ ratings, comments });
+        onSubmit(data);
     };
 
     return (
@@ -82,8 +137,13 @@ export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = f
                                     </Dialog.Title>
                                 </div>
 
-                                <form onSubmit={handleSubmit} className="px-6 py-6 max-h-[70vh] overflow-y-auto">
+                                <form onSubmit={handleSubmit(onFormSubmit)} className="px-6 py-6 max-h-[70vh] overflow-y-auto">
                                     <div className="space-y-8">
+                                        {errors.ratings && (
+                                            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                                                Please rate all skills before submitting.
+                                            </div>
+                                        )}
                                         {Object.entries(categories).map(([groupName, skills]) => (
                                             <div key={groupName} className="bg-gray-50 p-5 rounded-xl border border-gray-100">
                                                 <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">
@@ -95,7 +155,7 @@ export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = f
                                                             <div className="flex justify-between items-center mb-2">
                                                                 <label className="text-sm font-medium text-gray-700">{skill}</label>
                                                                 <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                                                                    {ratings[skill] > 0 ? `${ratings[skill]}/5` : '-'}
+                                                                    {currentRatings?.[skill] > 0 ? `${currentRatings[skill]}/5` : '-'}
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center space-x-1">
@@ -107,7 +167,7 @@ export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = f
                                                                         disabled={readOnly}
                                                                         className={`p-1 focus:outline-none transition-transform ${readOnly ? 'cursor-default' : 'hover:scale-110'}`}
                                                                     >
-                                                                        {ratings[skill] >= star ? (
+                                                                        {currentRatings?.[skill] >= star ? (
                                                                             <StarIcon className="h-7 w-7 text-yellow-400 drop-shadow-sm" />
                                                                         ) : (
                                                                             <StarIconOutline className="h-7 w-7 text-gray-300 hover:text-yellow-200" />
@@ -122,18 +182,12 @@ export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = f
                                         ))}
 
                                         <div>
-                                            <label htmlFor="comments" className="block text-sm font-medium text-gray-900 mb-2">
-                                                Additional Feedback & Goals
-                                            </label>
-                                            <textarea
-                                                id="comments"
-                                                name="comments"
-                                                rows={4}
-                                                disabled={readOnly}
-                                                className={`block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3 border ${readOnly ? 'bg-gray-100 text-gray-600' : ''}`}
-                                                value={comments}
-                                                onChange={(e) => setComments(e.target.value)}
+                                            <TextArea
+                                                label="Additional Feedback & Goals"
                                                 placeholder={readOnly ? "No additional comments provided." : "Share specific examples of achievements, areas for improvement, and goals for the next cycle..."}
+                                                disabled={readOnly}
+                                                error={errors.comments?.message}
+                                                {...register('comments')}
                                             />
                                         </div>
                                     </div>

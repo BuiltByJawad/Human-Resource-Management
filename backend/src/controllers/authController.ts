@@ -1,7 +1,6 @@
 import { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { asyncHandler } from '../middleware/errorHandler'
-import { loginSchema } from '../validators'
 import { prisma } from '../config/database'
 import { comparePassword, generateTokens, hashPassword } from '../utils/auth'
 import { UnauthorizedError, BadRequestError } from '../utils/errors'
@@ -182,9 +181,143 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
         department: user.department?.name,
         avatarUrl: user.avatarUrl,
         lastLogin: user.lastLogin,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        employee: user.employee // Include employee details
       },
       permissions
     },
+  })
+})
+
+export const uploadAvatar = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.file) {
+    throw new BadRequestError('No file uploaded')
+  }
+
+  // Cloudinary storage puts the URL in req.file.path
+  const avatarUrl = req.file.path
+
+  const user = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { avatarUrl }
+  })
+
+  res.json({
+    success: true,
+    data: {
+      avatarUrl: user.avatarUrl
+    }
+  })
+})
+
+export const changePassword = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { currentPassword, newPassword } = req.body
+
+  if (!currentPassword || !newPassword) {
+    throw new BadRequestError('Current password and new password are required')
+  }
+
+  if (newPassword.length < 6) {
+    throw new BadRequestError('New password must be at least 6 characters long')
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id }
+  })
+
+  if (!user) {
+    throw new UnauthorizedError('User not found')
+  }
+
+  const isPasswordValid = await comparePassword(currentPassword, user.password)
+  if (!isPasswordValid) {
+    throw new BadRequestError('Current password is incorrect')
+  }
+
+  const hashedPassword = await hashPassword(newPassword)
+
+  await prisma.user.update({
+    where: { id: req.user!.id },
+    data: { password: hashedPassword }
+  })
+
+  res.json({
+    success: true,
+    message: 'Password changed successfully'
+  })
+})
+
+export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const {
+    firstName,
+    lastName,
+    phoneNumber,
+    address,
+    dateOfBirth,
+    gender,
+    maritalStatus,
+    emergencyContact
+  } = req.body
+
+  // Fetch current user to get existing details if not provided
+  const currentUser = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!currentUser) throw new UnauthorizedError('User not found');
+
+  // Update User basic info if provided
+  if (firstName || lastName) {
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: {
+        firstName: firstName || undefined,
+        lastName: lastName || undefined
+      }
+    })
+  }
+
+  // Use provided values or fallback to current user values
+  const finalFirstName = firstName || currentUser.firstName || '';
+  const finalLastName = lastName || currentUser.lastName || '';
+
+  // Upsert Employee record
+  const employeeData: any = {
+    userId: req.user!.id,
+    email: req.user!.email,
+    firstName: finalFirstName,
+    lastName: finalLastName,
+    employeeNumber: `EMP-${Date.now()}`, // Simple generation for now
+    hireDate: new Date(),
+    salary: 0,
+    phoneNumber,
+    address,
+    dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+    gender: gender || undefined,
+    maritalStatus: maritalStatus || undefined,
+    emergencyContact
+  }
+
+  const employee = await prisma.employee.upsert({
+    where: { userId: req.user!.id },
+    create: employeeData,
+    update: {
+      firstName: finalFirstName,
+      lastName: finalLastName,
+      phoneNumber,
+      address,
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+      gender: gender || undefined,
+      maritalStatus: maritalStatus || undefined,
+      emergencyContact
+    }
+  })
+
+  res.json({
+    success: true,
+    data: {
+      user: {
+        firstName: finalFirstName,
+        lastName: finalLastName,
+      },
+      employee
+    }
   })
 })

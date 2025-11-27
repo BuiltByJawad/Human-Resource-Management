@@ -7,26 +7,28 @@ import { ArrowLeftIcon, ExclamationTriangleIcon, ChartBarIcon, UserGroupIcon } f
 import axios from 'axios';
 import { RiskScoreCard, AtRiskList, WorkPatternChart } from '@/components/analytics/BurnoutComponents';
 import { Select } from '@/components/ui/CustomSelect';
+import { PERMISSIONS } from '@/constants/permissions';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export default function BurnoutAnalyticsPage() {
     const router = useRouter();
-    const { user, token } = useAuthStore();
+    const { user, token, hasPermission } = useAuthStore();
     const [analyticsData, setAnalyticsData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [period, setPeriod] = useState(30);
 
+    const canViewAnalytics = !!user && hasPermission(PERMISSIONS.VIEW_ANALYTICS);
+
     useEffect(() => {
         if (token && user) {
-            // Check if user has access
-            if (user.role !== 'Super Admin' && user.role !== 'HR Admin') {
+            if (!canViewAnalytics) {
                 setIsLoading(false);
                 return;
             }
             fetchAnalytics();
         }
-    }, [token, user, period]);
+    }, [token, user, period, canViewAnalytics]);
 
     const fetchAnalytics = async () => {
         setIsLoading(true);
@@ -43,7 +45,7 @@ export default function BurnoutAnalyticsPage() {
         }
     };
 
-    if (user && user.role !== 'Super Admin' && user.role !== 'HR Admin') {
+    if (user && !canViewAnalytics) {
         return (
             <div className="min-h-screen bg-gray-50/50 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">

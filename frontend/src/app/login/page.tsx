@@ -1,48 +1,50 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/useAuthStore'
 import { Button, Input } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
+
+const loginSchema = yup.object().shape({
+  email: yup.string().email('Invalid email address').required('Email is required'),
+  password: yup.string().required('Password is required'),
+})
+
+type LoginFormData = yup.InferType<typeof loginSchema>
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { login } = useAuthStore()
   const { showToast } = useToast()
+  const isSubmittingRef = useRef(false)
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-    if (!email.trim()) {
-      newErrors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Invalid email address'
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
+    resolver: yupResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: ''
     }
-    if (!password) {
-      newErrors.password = 'Password is required'
-    }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+  })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validateForm()) return
-
+  const onSubmit = async (data: LoginFormData) => {
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      await login(data.email, data.password)
       showToast('Successfully logged in', 'success')
       router.push('/employees')
     } catch (error: any) {
       showToast(error.message || 'Failed to login', 'error')
     } finally {
       setIsLoading(false)
+      isSubmittingRef.current = false
     }
   }
 
@@ -67,31 +69,25 @@ export default function LoginPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <Input
               label="Email address"
               type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                if (errors.email) setErrors(prev => ({ ...prev, email: '' }))
-              }}
-              required
               placeholder="you@example.com"
-              error={errors.email}
+              required
+              showRequiredIndicator={false}
+              error={errors.email?.message}
+              {...register('email')}
             />
 
             <Input
               label="Password"
               type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value)
-                if (errors.password) setErrors(prev => ({ ...prev, password: '' }))
-              }}
-              required
               placeholder="••••••••"
-              error={errors.password}
+              required
+              showRequiredIndicator={false}
+              error={errors.password?.message}
+              {...register('password')}
             />
 
             <div className="flex items-center justify-between">

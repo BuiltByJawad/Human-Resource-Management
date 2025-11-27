@@ -3,6 +3,9 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, TextArea, Select } from '@/components/ui/FormComponents'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { PencilSquareIcon, TrashIcon, PlayIcon } from '@heroicons/react/24/outline'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 
 export interface ComplianceRule {
     id: string
@@ -37,48 +40,70 @@ interface RuleFormProps {
     loading?: boolean
 }
 
+const ruleSchema = yup.object().shape({
+    name: yup.string().required('Rule name is required'),
+    description: yup.string(),
+    type: yup.string().required('Rule type is required'),
+    threshold: yup.number().required('Threshold is required').min(0, 'Threshold must be positive')
+})
+
+type RuleFormData = yup.InferType<typeof ruleSchema>
+
 export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        type: 'max_hours_per_week',
-        threshold: 48
+    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<RuleFormData>({
+        resolver: yupResolver(ruleSchema),
+        defaultValues: {
+            name: '',
+            description: '',
+            type: 'max_hours_per_week',
+            threshold: 48
+        }
     })
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        await onSubmit(formData)
+    const onFormSubmit = async (data: RuleFormData) => {
+        await onSubmit(data)
+        reset()
     }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add Compliance Rule">
-            <form onSubmit={handleSubmit} className="space-y-4 pb-32">
+            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-32">
                 <Input
                     label="Rule Name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Max Hours Per Week"
                     required
+                    error={errors.name?.message}
+                    {...register('name')}
                 />
                 <TextArea
                     label="Description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Description of the rule"
+                    error={errors.description?.message}
+                    {...register('description')}
                 />
-                <Select
-                    label="Rule Type"
-                    value={formData.type}
-                    onChange={(value) => setFormData({ ...formData, type: value })}
-                    options={[
-                        { value: 'max_hours_per_week', label: 'Max Hours Per Week' },
-                        // Add more types as backend supports them
-                    ]}
+                <Controller
+                    control={control}
+                    name="type"
+                    render={({ field }) => (
+                        <Select
+                            label="Rule Type"
+                            value={field.value}
+                            onChange={field.onChange}
+                            options={[
+                                { value: 'max_hours_per_week', label: 'Max Hours Per Week' },
+                                // Add more types as backend supports them
+                            ]}
+                            required
+                            error={errors.type?.message}
+                        />
+                    )}
                 />
                 <Input
                     label="Threshold (Hours)"
                     type="number"
-                    value={formData.threshold}
-                    onChange={(e) => setFormData({ ...formData, threshold: parseInt(e.target.value) })}
                     required
+                    error={errors.threshold?.message}
+                    {...register('threshold')}
                 />
                 <div className="flex justify-end space-x-3 pt-4">
                     <button
@@ -126,7 +151,7 @@ export const RuleList = ({ rules, onToggle }: RuleListProps) => {
         }
     ]
 
-    return <DataTable data={rules} columns={columns} />
+    return <DataTable data={rules} columns={columns} searchKeys={['name', 'type']} />
 }
 
 interface ViolationLogProps {
@@ -163,5 +188,5 @@ export const ViolationLog = ({ logs }: ViolationLogProps) => {
         }
     ]
 
-    return <DataTable data={logs} columns={columns} />
+    return <DataTable data={logs} columns={columns} searchKeys={['employee.firstName', 'employee.lastName', 'rule.name', 'details', 'status']} />
 }

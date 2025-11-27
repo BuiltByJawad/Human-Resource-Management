@@ -230,7 +230,7 @@ export default function PayrollPage() {
                                 data={records}
                                 columns={columns}
                                 loading={loading}
-                                searchKeys={['payPeriod']}
+                                searchKeys={['payPeriod', 'employee.firstName', 'employee.lastName', 'employee.employeeNumber']}
                             />
                         </div>
 

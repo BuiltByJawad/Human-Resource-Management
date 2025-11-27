@@ -3,6 +3,10 @@
 import { useState, Fragment } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon, BanknotesIcon } from '@heroicons/react/24/outline'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
+import { Input } from '../ui/FormComponents'
 
 interface GeneratePayrollModalProps {
     isOpen: boolean
@@ -10,18 +14,28 @@ interface GeneratePayrollModalProps {
     onGenerate: (payPeriod: string) => Promise<void>
 }
 
+const payrollSchema = yup.object().shape({
+    payPeriod: yup.string().required('Pay period is required')
+})
+
+type PayrollFormData = yup.InferType<typeof payrollSchema>
+
 export default function GeneratePayrollModal({ isOpen, onClose, onGenerate }: GeneratePayrollModalProps) {
-    const [payPeriod, setPayPeriod] = useState(new Date().toISOString().slice(0, 7))
     const [loading, setLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!payPeriod) return
+    const { register, handleSubmit, formState: { errors }, reset } = useForm<PayrollFormData>({
+        resolver: yupResolver(payrollSchema),
+        defaultValues: {
+            payPeriod: new Date().toISOString().slice(0, 7)
+        }
+    })
 
+    const onSubmit = async (data: PayrollFormData) => {
         setLoading(true)
         try {
-            await onGenerate(payPeriod)
+            await onGenerate(data.payPeriod)
             onClose()
+            reset()
         } catch (error) {
             // Error handled by parent
         } finally {
@@ -55,7 +69,7 @@ export default function GeneratePayrollModal({ isOpen, onClose, onGenerate }: Ge
                             leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                             leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                         >
-                            <Dialog.Panel className="relative transform overflow-hidden rounded-2xl bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                            <Dialog.Panel className="relative transform overflow-hidden rounded-2xl bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 max-h-[90vh] overflow-y-auto">
                                 <div className="absolute right-0 top-0 pr-4 pt-4">
                                     <button
                                         type="button"
@@ -81,19 +95,14 @@ export default function GeneratePayrollModal({ isOpen, onClose, onGenerate }: Ge
                                             </p>
                                         </div>
 
-                                        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+                                        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-5">
                                             <div>
-                                                <label htmlFor="payPeriod" className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Pay Period
-                                                </label>
-                                                <input
+                                                <Input
+                                                    label="Pay Period"
                                                     type="month"
-                                                    id="payPeriod"
-                                                    name="payPeriod"
-                                                    value={payPeriod}
-                                                    onChange={(e) => setPayPeriod(e.target.value)}
-                                                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base px-4 py-2.5 border"
                                                     required
+                                                    error={errors.payPeriod?.message}
+                                                    {...register('payPeriod')}
                                                 />
                                                 <p className="mt-2 text-xs text-gray-500">
                                                     Select the month and year for payroll generation

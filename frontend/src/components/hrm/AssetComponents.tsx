@@ -1,6 +1,4 @@
-'use client'
-
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useEffect } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import {
     ComputerDesktopIcon,
@@ -9,8 +7,11 @@ import {
     UserCircleIcon,
     XMarkIcon
 } from '@heroicons/react/24/outline'
-import { Button, Select } from '../ui/FormComponents'
+import { Button, Select, Input, TextArea, DatePicker } from '../ui/FormComponents'
 import { CreatableSelect } from '../ui/CreatableSelect'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 
 export interface AssetAssignment {
     id: string
@@ -154,21 +155,54 @@ const ASSET_TYPES = [
     { value: 'License', label: 'License' }
 ]
 
+const assetSchema = yup.object().shape({
+    name: yup.string().required('Asset name is required'),
+    serialNumber: yup.string().required('Serial number is required'),
+    type: yup.string().required('Type is required'),
+    purchaseDate: yup.string().required('Purchase date is required'),
+    purchasePrice: yup.number().nullable().transform((value, originalValue) => originalValue === '' ? null : value)
+})
+
+type AssetFormData = yup.InferType<typeof assetSchema>
+
 export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormProps) => {
-    const [formData, setFormData] = useState({
-        name: initialData?.name || '',
-        serialNumber: initialData?.serialNumber || '',
-        type: initialData?.type || 'Laptop',
-        purchaseDate: initialData?.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : '',
-        purchasePrice: initialData?.purchasePrice || ''
-    })
     const [loading, setLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<AssetFormData>({
+        resolver: yupResolver(assetSchema),
+        defaultValues: {
+            name: '',
+            serialNumber: '',
+            type: 'Laptop',
+            purchaseDate: '',
+            purchasePrice: null
+        }
+    })
+
+    useEffect(() => {
+        if (initialData) {
+            reset({
+                name: initialData.name,
+                serialNumber: initialData.serialNumber,
+                type: initialData.type,
+                purchaseDate: initialData.purchaseDate ? new Date(initialData.purchaseDate).toISOString().split('T')[0] : '',
+                purchasePrice: initialData.purchasePrice || null
+            })
+        } else {
+            reset({
+                name: '',
+                serialNumber: '',
+                type: 'Laptop',
+                purchaseDate: '',
+                purchasePrice: null
+            })
+        }
+    }, [initialData, isOpen, reset])
+
+    const onFormSubmit = async (data: AssetFormData) => {
         setLoading(true)
         try {
-            await onSubmit(formData)
+            await onSubmit(data)
             onClose()
         } finally {
             setLoading(false)
@@ -192,7 +226,7 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
 
                 <div className="fixed inset-0 z-10 overflow-y-auto">
                     <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-                        <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                        <Dialog.Panel className="relative transform rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 max-h-[90vh] overflow-y-auto">
                             <div className="absolute right-0 top-0 pr-4 pt-4">
                                 <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
                                     <XMarkIcon className="h-6 w-6" />
@@ -201,55 +235,64 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
                             <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-gray-900 mb-4">
                                 {initialData ? 'Edit Asset' : 'Add New Asset'}
                             </Dialog.Title>
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Asset Name</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                        value={formData.name}
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    <Input
+                                        label="Asset Name"
                                         placeholder="e.g. MacBook Pro M3"
+                                        required
+                                        error={errors.name?.message}
+                                        {...register('name')}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Serial Number</label>
-                                    <input
-                                        type="text"
+                                    <Input
+                                        label="Serial Number"
                                         required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                        value={formData.serialNumber}
-                                        onChange={e => setFormData({ ...formData, serialNumber: e.target.value })}
+                                        error={errors.serialNumber?.message}
+                                        {...register('serialNumber')}
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <CreatableSelect
-                                            label="Type"
-                                            value={formData.type}
-                                            onChange={(val) => setFormData({ ...formData, type: val })}
-                                            options={ASSET_TYPES}
+                                        <Controller
+                                            control={control}
+                                            name="type"
+                                            render={({ field }) => (
+                                                <CreatableSelect
+                                                    label="Type"
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    options={ASSET_TYPES}
+                                                    required
+                                                    error={errors.type?.message}
+                                                />
+                                            )}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Price</label>
-                                        <input
+                                        <Input
+                                            label="Price"
                                             type="number"
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                            value={formData.purchasePrice}
-                                            onChange={e => setFormData({ ...formData, purchasePrice: e.target.value })}
+                                            placeholder="0.00"
+                                            error={errors.purchasePrice?.message}
+                                            {...register('purchasePrice')}
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Purchase Date</label>
-                                    <input
-                                        type="date"
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                        value={formData.purchaseDate}
-                                        onChange={e => setFormData({ ...formData, purchaseDate: e.target.value })}
+                                    <Controller
+                                        control={control}
+                                        name="purchaseDate"
+                                        render={({ field }) => (
+                                            <DatePicker
+                                                label="Purchase Date"
+                                                required
+                                                value={field.value}
+                                                onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                                                error={errors.purchaseDate?.message}
+                                            />
+                                        )}
                                     />
                                 </div>
                                 <div className="mt-5 sm:mt-6">
@@ -277,17 +320,34 @@ interface AssignmentModalProps {
     employees: any[]
 }
 
+const assignmentSchema = yup.object().shape({
+    employeeId: yup.string().required('Employee is required'),
+    notes: yup.string()
+})
+
+type AssignmentFormData = yup.InferType<typeof assignmentSchema>
+
 export const AssignmentModal = ({ isOpen, onClose, onAssign, employees }: AssignmentModalProps) => {
-    const [employeeId, setEmployeeId] = useState('')
-    const [notes, setNotes] = useState('')
     const [loading, setLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!employeeId) return
+    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<AssignmentFormData>({
+        resolver: yupResolver(assignmentSchema),
+        defaultValues: {
+            employeeId: '',
+            notes: ''
+        }
+    })
+
+    useEffect(() => {
+        if (!isOpen) {
+            reset()
+        }
+    }, [isOpen, reset])
+
+    const onFormSubmit = async (data: AssignmentFormData) => {
         setLoading(true)
         try {
-            await onAssign(employeeId, notes)
+            await onAssign(data.employeeId, data.notes || '')
             onClose()
         } finally {
             setLoading(false)
@@ -320,25 +380,31 @@ export const AssignmentModal = ({ isOpen, onClose, onAssign, employees }: Assign
                             <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-gray-900 mb-4">
                                 Assign Asset
                             </Dialog.Title>
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
                                 <div>
-                                    <Select
-                                        label="Select Employee"
-                                        value={employeeId}
-                                        onChange={setEmployeeId}
-                                        options={employeeOptions}
-                                        required
-                                        placeholder="Select an employee..."
+                                    <Controller
+                                        control={control}
+                                        name="employeeId"
+                                        render={({ field }) => (
+                                            <Select
+                                                label="Select Employee"
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                options={employeeOptions}
+                                                required
+                                                placeholder="Select an employee..."
+                                                error={errors.employeeId?.message}
+                                            />
+                                        )}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Notes</label>
-                                    <textarea
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                        rows={3}
-                                        value={notes}
-                                        onChange={e => setNotes(e.target.value)}
+                                    <TextArea
+                                        label="Notes"
                                         placeholder="Condition, accessories included, etc."
+                                        rows={3}
+                                        error={errors.notes?.message}
+                                        {...register('notes')}
                                     />
                                 </div>
                                 <div className="mt-5 sm:mt-6">
@@ -346,7 +412,6 @@ export const AssignmentModal = ({ isOpen, onClose, onAssign, employees }: Assign
                                         type="submit"
                                         loading={loading}
                                         className="w-full"
-                                        disabled={!employeeId}
                                     >
                                         {loading ? 'Assigning...' : 'Confirm Assignment'}
                                     </Button>
@@ -366,27 +431,44 @@ interface MaintenanceModalProps {
     onSubmit: (data: any) => Promise<void>
 }
 
+const maintenanceSchema = yup.object().shape({
+    description: yup.string().required('Description is required'),
+    cost: yup.number().nullable().transform((value, originalValue) => originalValue === '' ? null : value),
+    date: yup.string().required('Date is required'),
+    performedBy: yup.string()
+})
+
+type MaintenanceFormData = yup.InferType<typeof maintenanceSchema>
+
 export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModalProps) => {
-    const [formData, setFormData] = useState({
-        description: '',
-        cost: '',
-        date: new Date().toISOString().split('T')[0],
-        performedBy: ''
-    })
     const [loading, setLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setLoading(true)
-        try {
-            await onSubmit(formData)
-            onClose()
-            setFormData({
+    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<MaintenanceFormData>({
+        resolver: yupResolver(maintenanceSchema),
+        defaultValues: {
+            description: '',
+            cost: null,
+            date: new Date().toISOString().split('T')[0],
+            performedBy: ''
+        }
+    })
+
+    useEffect(() => {
+        if (!isOpen) {
+            reset({
                 description: '',
-                cost: '',
+                cost: null,
                 date: new Date().toISOString().split('T')[0],
                 performedBy: ''
             })
+        }
+    }, [isOpen, reset])
+
+    const onFormSubmit = async (data: MaintenanceFormData) => {
+        setLoading(true)
+        try {
+            await onSubmit(data)
+            onClose()
         } finally {
             setLoading(false)
         }
@@ -413,48 +495,49 @@ export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModal
                             <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-gray-900 mb-4">
                                 Log Maintenance
                             </Dialog.Title>
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Description</label>
-                                    <textarea
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                        rows={3}
-                                        value={formData.description}
-                                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                    <TextArea
+                                        label="Description"
                                         placeholder="Describe the issue and resolution..."
+                                        rows={3}
+                                        required
+                                        error={errors.description?.message}
+                                        {...register('description')}
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Date</label>
-                                        <input
-                                            type="date"
-                                            required
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                            value={formData.date}
-                                            onChange={e => setFormData({ ...formData, date: e.target.value })}
+                                        <Controller
+                                            control={control}
+                                            name="date"
+                                            render={({ field }) => (
+                                                <DatePicker
+                                                    label="Date"
+                                                    required
+                                                    value={field.value}
+                                                    onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                                                    error={errors.date?.message}
+                                                />
+                                            )}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">Cost</label>
-                                        <input
+                                        <Input
+                                            label="Cost"
                                             type="number"
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                            value={formData.cost}
-                                            onChange={e => setFormData({ ...formData, cost: e.target.value })}
                                             placeholder="0.00"
+                                            error={errors.cost?.message}
+                                            {...register('cost')}
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Performed By</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                                        value={formData.performedBy}
-                                        onChange={e => setFormData({ ...formData, performedBy: e.target.value })}
+                                    <Input
+                                        label="Performed By"
                                         placeholder="Technician or Vendor Name"
+                                        error={errors.performedBy?.message}
+                                        {...register('performedBy')}
                                     />
                                 </div>
                                 <div className="mt-5 sm:mt-6">

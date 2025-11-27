@@ -3,6 +3,9 @@ import { Modal } from '@/components/ui/Modal'
 import { Input, TextArea, Select } from '@/components/ui/FormComponents'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import * as yup from 'yup'
 
 export interface Department {
   id: string
@@ -36,6 +39,15 @@ interface DepartmentFormProps {
   loading?: boolean
 }
 
+const departmentSchema = yup.object().shape({
+  name: yup.string().required('Department name is required'),
+  description: yup.string(),
+  managerId: yup.string().nullable(),
+  parentDepartmentId: yup.string().nullable()
+})
+
+type DepartmentFormData = yup.InferType<typeof departmentSchema>
+
 export const DepartmentForm = ({
   isOpen,
   onClose,
@@ -45,34 +57,40 @@ export const DepartmentForm = ({
   employees,
   loading
 }: DepartmentFormProps) => {
-  const [formData, setFormData] = useState<Partial<Department>>({
-    name: '',
-    description: '',
-    managerId: '',
-    parentDepartmentId: ''
+  const { register, handleSubmit, control, reset, formState: { errors } } = useForm<DepartmentFormData>({
+    resolver: yupResolver(departmentSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      managerId: '',
+      parentDepartmentId: ''
+    }
   })
 
   useEffect(() => {
     if (initialData) {
-      setFormData({
+      reset({
         name: initialData.name,
         description: initialData.description || '',
         managerId: initialData.managerId || '',
         parentDepartmentId: initialData.parentDepartmentId || ''
       })
     } else {
-      setFormData({
+      reset({
         name: '',
         description: '',
         managerId: '',
         parentDepartmentId: ''
       })
     }
-  }, [initialData, isOpen])
+  }, [initialData, isOpen, reset])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await onSubmit(formData)
+  const onFormSubmit = async (data: DepartmentFormData) => {
+    await onSubmit({
+      ...data,
+      managerId: data.managerId || undefined,
+      parentDepartmentId: data.parentDepartmentId || undefined
+    })
   }
 
   // Filter out the current department from parent options to prevent circular dependency
@@ -91,40 +109,54 @@ export const DepartmentForm = ({
       onClose={onClose}
       title={initialData ? 'Edit Department' : 'Add Department'}
     >
-      <form onSubmit={handleSubmit} className="space-y-4 pb-32">
+      <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-32">
         <Input
           label="Department Name"
-          value={formData.name || ''}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          required
           placeholder="e.g. Engineering"
+          required
+          error={errors.name?.message}
+          {...register('name')}
         />
 
         <TextArea
           label="Description"
-          value={formData.description || ''}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Brief description of the department"
+          error={errors.description?.message}
+          {...register('description')}
         />
 
-        <Select
-          label="Parent Department"
-          value={formData.parentDepartmentId || ''}
-          onChange={(value) => setFormData({ ...formData, parentDepartmentId: value || undefined })}
-          options={[
-            { value: '', label: 'None (Top Level)' },
-            ...parentOptions
-          ]}
+        <Controller
+          control={control}
+          name="parentDepartmentId"
+          render={({ field }) => (
+            <Select
+              label="Parent Department"
+              value={field.value || ''}
+              onChange={field.onChange}
+              options={[
+                { value: '', label: 'None (Top Level)' },
+                ...parentOptions
+              ]}
+              error={errors.parentDepartmentId?.message}
+            />
+          )}
         />
 
-        <Select
-          label="Manager"
-          value={formData.managerId || ''}
-          onChange={(value) => setFormData({ ...formData, managerId: value || undefined })}
-          options={[
-            { value: '', label: 'Select Manager' },
-            ...managerOptions
-          ]}
+        <Controller
+          control={control}
+          name="managerId"
+          render={({ field }) => (
+            <Select
+              label="Manager"
+              value={field.value || ''}
+              onChange={field.onChange}
+              options={[
+                { value: '', label: 'Select Manager' },
+                ...managerOptions
+              ]}
+              error={errors.managerId?.message}
+            />
+          )}
         />
 
         <div className="flex justify-end space-x-3 mt-6">
@@ -215,7 +247,7 @@ export const DepartmentList = ({ departments, onEdit, onDelete, loading }: Depar
       data={departments}
       columns={columns}
       loading={loading}
-      searchKeys={['name', 'description']}
+      searchKeys={['name', 'description', 'manager.firstName', 'manager.lastName', 'parentDepartment.name']}
     />
   )
 }

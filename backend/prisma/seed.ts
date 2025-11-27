@@ -8,106 +8,179 @@ async function main() {
 
   // 1. Create Permissions
   const permissions = [
-    // Employee Management
-    { resource: 'employees', action: 'create', description: 'Create new employees' },
-    { resource: 'employees', action: 'read', description: 'View employee profiles' },
-    { resource: 'employees', action: 'update', description: 'Update employee details' },
-    { resource: 'employees', action: 'delete', description: 'Remove employees' },
+    { resource: 'auth', action: 'update_own_profile', description: 'Update own profile' },
+    { resource: 'auth', action: 'change_own_password', description: 'Change own password' },
 
-    // Department Management
+    { resource: 'notifications', action: 'update_own_notifications', description: 'Update own notification preferences' },
+    { resource: 'notifications', action: 'manage', description: 'Manage organization notifications' },
+    { resource: 'notifications', action: 'manage_templates', description: 'Manage notification templates' },
+
+    { resource: 'employees', action: 'view', description: 'View employees' },
+    { resource: 'employees', action: 'manage', description: 'Create or edit employees' },
+    { resource: 'employees', action: 'view_details', description: 'View employee details' },
+
+    { resource: 'roles', action: 'manage', description: 'Manage roles' },
+    { resource: 'roles', action: 'assign', description: 'Assign roles to users' },
+
     { resource: 'departments', action: 'manage', description: 'Manage departments' },
 
-    // Leave Management
-    { resource: 'leave', action: 'request', description: 'Request leave' },
-    { resource: 'leave', action: 'approve', description: 'Approve leave requests' },
-    { resource: 'leave', action: 'manage', description: 'Manage leave policies' },
+    { resource: 'attendance', action: 'view', description: 'View attendance' },
+    { resource: 'attendance', action: 'manage', description: 'Manage attendance' },
 
-    // Payroll
-    { resource: 'payroll', action: 'view', description: 'View own payroll' },
-    { resource: 'payroll', action: 'manage', description: 'Process payroll' },
+    { resource: 'leave_requests', action: 'view', description: 'View leave requests' },
+    { resource: 'leave_requests', action: 'manage', description: 'Manage leave requests' },
+    { resource: 'leave_requests', action: 'approve', description: 'Approve leave requests' },
+    { resource: 'leave_policies', action: 'manage', description: 'Manage leave policies' },
 
-    // Reports
+    { resource: 'payroll', action: 'view', description: 'View payroll' },
+    { resource: 'payroll', action: 'manage', description: 'Manage payroll' },
+    { resource: 'payroll', action: 'generate', description: 'Generate payroll' },
+    { resource: 'payroll', action: 'configure', description: 'Configure payroll settings' },
+
+    { resource: 'assets', action: 'view', description: 'View assets' },
+    { resource: 'assets', action: 'manage', description: 'Manage assets' },
+    { resource: 'assets', action: 'assign', description: 'Assign assets' },
+
+    { resource: 'compliance', action: 'view', description: 'View compliance' },
+    { resource: 'compliance', action: 'manage', description: 'Manage compliance' },
+
     { resource: 'reports', action: 'view', description: 'View reports' },
-    { resource: 'reports', action: 'generate', description: 'Generate system reports' },
+    { resource: 'reports', action: 'export', description: 'Export reports' },
+    { resource: 'reports', action: 'configure', description: 'Configure reports' },
+
+    { resource: 'analytics', action: 'view', description: 'View analytics' },
+    { resource: 'analytics', action: 'manage', description: 'Manage analytics' },
+
+    { resource: 'performance', action: 'view', description: 'View performance module' },
+    { resource: 'performance', action: 'manage_cycles', description: 'Manage performance cycles' },
+    { resource: 'performance', action: 'review', description: 'Submit performance reviews' },
+
+    { resource: 'settings', action: 'manage_system_settings', description: 'Manage system settings and branding' },
   ]
 
+  const permissionsMap = new Map<string, string>()
+
   for (const p of permissions) {
-    await prisma.permission.upsert({
+    const permission = await prisma.permission.upsert({
       where: { resource_action: { resource: p.resource, action: p.action } },
-      update: {},
+      update: { description: p.description },
       create: p,
     })
+    permissionsMap.set(`${p.resource}.${p.action}`, permission.id)
   }
   console.log('✅ Permissions created')
 
   // 2. Create Roles
+  const resolvePermissionIds = (patterns: string[]) => {
+    if (patterns.includes('*')) {
+      return Array.from(new Set(permissionsMap.values()))
+    }
+
+    const ids = new Set<string>()
+    for (const pattern of patterns) {
+      if (pattern.endsWith('.*')) {
+        const resourcePrefix = pattern.replace('.*', '')
+        for (const [key, id] of permissionsMap.entries()) {
+          if (key.startsWith(`${resourcePrefix}.`)) {
+            ids.add(id)
+          }
+        }
+        continue
+      }
+
+      const id = permissionsMap.get(pattern)
+      if (id) {
+        ids.add(id)
+      } else {
+        console.warn(`⚠️ Permission not found for pattern: ${pattern}`)
+      }
+    }
+    return Array.from(ids)
+  }
+
   const roles = [
     {
       name: 'Super Admin',
       description: 'Full system access',
       isSystem: true,
-      permissions: ['*'] // Special handling in code, or assign all
+      permissions: ['*']
     },
     {
       name: 'HR Admin',
       description: 'HR Department Administrator',
       isSystem: false,
-      permissions: ['employees.*', 'departments.*', 'leave.manage', 'payroll.manage', 'reports.*']
+      permissions: [
+        'employees.*',
+        'departments.manage',
+        'leave_requests.*',
+        'leave_policies.manage',
+        'attendance.*',
+        'payroll.*',
+        'reports.*',
+        'performance.*',
+        'notifications.manage',
+        'notifications.manage_templates',
+        'roles.manage',
+        'roles.assign',
+        'settings.manage_system_settings',
+        'assets.*',
+        'analytics.*',
+        'compliance.*'
+      ]
     },
     {
       name: 'Manager',
       description: 'Team Manager',
       isSystem: false,
-      permissions: ['employees.read', 'leave.approve', 'reports.view']
+      permissions: [
+        'employees.view',
+        'employees.view_details',
+        'leave_requests.view',
+        'leave_requests.approve',
+        'attendance.view',
+        'reports.view',
+        'performance.view',
+        'performance.review',
+        'assets.view'
+      ]
     },
     {
       name: 'Employee',
       description: 'Standard Employee',
       isSystem: true,
-      permissions: ['employees.read', 'leave.request', 'payroll.view']
+      permissions: [
+        'auth.update_own_profile',
+        'auth.change_own_password',
+        'notifications.update_own_notifications',
+        'employees.view',
+        'leave_requests.view',
+        'leave_requests.manage',
+        'payroll.view',
+        'performance.review'
+      ]
     }
   ]
 
-  // Helper to find permission IDs
-  const allPermissions = await prisma.permission.findMany()
-
-  for (const r of roles) {
+  for (const roleConfig of roles) {
     const createdRole = await prisma.role.upsert({
-      where: { name: r.name },
-      update: {},
+      where: { name: roleConfig.name },
+      update: { description: roleConfig.description },
       create: {
-        name: r.name,
-        description: r.description,
-        isSystem: r.isSystem
+        name: roleConfig.name,
+        description: roleConfig.description,
+        isSystem: roleConfig.isSystem
       }
     })
 
-    // Assign permissions
-    if (r.permissions.includes('*')) {
-      // Assign all permissions
-      for (const p of allPermissions) {
-        await prisma.rolePermission.upsert({
-          where: { roleId_permissionId: { roleId: createdRole.id, permissionId: p.id } },
-          update: {},
-          create: { roleId: createdRole.id, permissionId: p.id }
-        })
-      }
-    } else {
-      // Assign specific permissions
-      for (const pPattern of r.permissions) {
-        const [resource, action] = pPattern.split('.')
-        const matches = allPermissions.filter(p =>
-          p.resource === resource && (action === '*' || p.action === action)
-        )
+    await prisma.rolePermission.deleteMany({ where: { roleId: createdRole.id } })
 
-        for (const p of matches) {
-          await prisma.rolePermission.upsert({
-            where: { roleId_permissionId: { roleId: createdRole.id, permissionId: p.id } },
-            update: {},
-            create: { roleId: createdRole.id, permissionId: p.id }
-          })
-        }
-      }
+    const permissionIds = resolvePermissionIds(roleConfig.permissions)
+
+    if (permissionIds.length) {
+      await prisma.rolePermission.createMany({
+        data: permissionIds.map(permissionId => ({ roleId: createdRole.id, permissionId })),
+        skipDuplicates: true
+      })
     }
   }
   console.log('✅ Roles & Permissions assigned')

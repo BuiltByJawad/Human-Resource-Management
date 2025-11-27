@@ -36,12 +36,17 @@ export function DataTable<T extends { id: string }>({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Helper to get nested value
+  const getNestedValue = (obj: any, path: string) => {
+    return path.split('.').reduce((acc, part) => acc && acc[part], obj)
+  }
+
   // Filter data based on search query
   const filteredData = data.filter(item => {
     if (!searchQuery || searchKeys.length === 0) return true
     return searchKeys.some(key => {
-      const value = item[key as keyof T]
-      return String(value).toLowerCase().includes(searchQuery.toLowerCase())
+      const value = getNestedValue(item, key)
+      return String(value ?? '').toLowerCase().includes(searchQuery.toLowerCase())
     })
   })
 
@@ -53,8 +58,8 @@ export function DataTable<T extends { id: string }>({
     if (!sortKey) return 0
 
     // Handle custom accessor keys if needed, for now simple property access
-    const aValue = (a as any)[sortKey]
-    const bValue = (b as any)[sortKey]
+    const aValue = getNestedValue(a, sortKey as string)
+    const bValue = getNestedValue(b, sortKey as string)
 
     if (aValue === null || aValue === undefined) return 1
     if (bValue === null || bValue === undefined) return -1
@@ -201,8 +206,8 @@ export function DataTable<T extends { id: string }>({
                     key={i + 1}
                     onClick={() => setCurrentPage(i + 1)}
                     className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === i + 1
-                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                      ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                       }`}
                   >
                     {i + 1}

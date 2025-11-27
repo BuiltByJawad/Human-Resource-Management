@@ -9,12 +9,13 @@ import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
 import { PlusIcon, FunnelIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
+import { PERMISSIONS } from '@/constants/permissions'
 import axios from 'axios'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 export default function LeavePage() {
-    const { token, user } = useAuthStore()
+    const { token, hasAnyPermission } = useAuthStore()
     const { showToast } = useToast()
 
     const [requests, setRequests] = useState<LeaveRequest[]>([])
@@ -22,7 +23,11 @@ export default function LeavePage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [filterStatus, setFilterStatus] = useState<string>('all')
 
-    const canManage = ['super_admin', 'hr_admin', 'manager'].includes(user?.role || '')
+    const canManage = hasAnyPermission([
+        PERMISSIONS.APPROVE_LEAVE,
+        PERMISSIONS.MANAGE_LEAVE_REQUESTS,
+        PERMISSIONS.MANAGE_LEAVE_POLICIES,
+    ])
 
     const fetchRequests = useCallback(async () => {
         setLoading(true)

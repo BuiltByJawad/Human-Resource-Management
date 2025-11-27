@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { forwardRef } from 'react'
 export { Select } from './CustomSelect'
 export { DatePicker } from './DatePicker'
 
@@ -62,23 +62,27 @@ export function Button({
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
+  showRequiredIndicator?: boolean
 }
 
-export function Input({
+export const Input = forwardRef<HTMLInputElement, InputProps>(({ 
   label,
   error,
+  required,
+  showRequiredIndicator = true,
   className = '',
   ...props
-}: InputProps) {
+}, ref) => {
   return (
     <div className={`${className}`}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {required && showRequiredIndicator && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <input
+        ref={ref}
         className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 ${error
           ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500'
           : 'border-gray-300'
@@ -90,7 +94,8 @@ export function Input({
       )}
     </div>
   )
-}
+})
+Input.displayName = 'Input'
 
 interface CardProps {
   children: React.ReactNode
@@ -118,21 +123,23 @@ interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
   error?: string
 }
 
-export function TextArea({
+export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(({
   label,
   error,
+  required,
   className = '',
   ...props
-}: TextAreaProps) {
+}, ref) => {
   return (
     <div className={`${className}`}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <textarea
+        ref={ref}
         className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900 ${error
           ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500'
           : 'border-gray-300'
@@ -145,4 +152,5 @@ export function TextArea({
       )}
     </div>
   )
-}
+})
+TextArea.displayName = 'TextArea'
