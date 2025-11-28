@@ -57,6 +57,7 @@ export default function SettingsPage() {
         companyAddress: ''
     })
     const [isSavingSettings, setIsSavingSettings] = useState(false)
+    const [isMounted, setIsMounted] = useState(false)
 
     const { register, handleSubmit, reset, formState: { errors } } = useForm<PasswordFormData>({
         resolver: yupResolver(passwordSchema),
@@ -101,6 +102,10 @@ export default function SettingsPage() {
         fetchSettings()
     }, [updateOrg])
 
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
     const handleSaveNotifications = () => {
         // In a real app, this would save to backend
         showToast('Notification preferences saved', 'success')
@@ -121,7 +126,12 @@ export default function SettingsPage() {
                 showToast('Organization settings saved', 'success')
             }
         } catch (error: any) {
-            showToast(error.response?.data?.message || 'Failed to save settings', 'error')
+            const message =
+                error?.response?.data?.error?.message ||
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to save settings'
+            showToast(message, 'error')
         } finally {
             setIsSavingSettings(false)
         }
@@ -143,7 +153,12 @@ export default function SettingsPage() {
                 showToast('Logo uploaded but no URL returned from server', 'error')
             }
         } catch (error: any) {
-            showToast(error.response?.data?.message || 'Failed to upload logo', 'error')
+            const message =
+                error?.response?.data?.error?.message ||
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to upload logo'
+            showToast(message, 'error')
         }
     }
 
@@ -163,7 +178,12 @@ export default function SettingsPage() {
                 showToast('Favicon uploaded but no URL returned from server', 'error')
             }
         } catch (error: any) {
-            showToast(error.response?.data?.message || 'Failed to upload favicon', 'error')
+            const message =
+                error?.response?.data?.error?.message ||
+                error?.response?.data?.message ||
+                error?.message ||
+                'Failed to upload favicon'
+            showToast(message, 'error')
         }
     }
 
@@ -215,21 +235,21 @@ export default function SettingsPage() {
             permission: PERMISSIONS.MANAGE_ROLES,
             title: 'Roles & Permissions',
             description: 'Create roles, assign permissions, and control access across the organization.',
-            action: () => window.location.assign('/roles'),
+            action: () => router.push('/roles'),
             actionLabel: 'Manage roles'
         },
         {
             permission: PERMISSIONS.CONFIGURE_PAYROLL,
             title: 'Payroll Configuration',
             description: 'Define pay cycles, tax rules, and payroll policies.',
-            action: () => window.location.assign('/payroll'),
+            action: () => router.push('/payroll'),
             actionLabel: 'Go to payroll settings'
         },
         {
             permission: PERMISSIONS.MANAGE_COMPLIANCE,
             title: 'Compliance & Policies',
             description: 'Set up compliance rules and audit your HR policies.',
-            action: () => window.location.assign('/compliance'),
+            action: () => router.push('/compliance'),
             actionLabel: 'Manage compliance'
         },
         {
@@ -295,7 +315,7 @@ export default function SettingsPage() {
                 </div>
             )
         }
-    ]), [notifications, handleSaveNotifications, orgSettings, isSavingSettings, logoUrl, faviconUrl])
+    ]), [notifications, handleSaveNotifications, orgSettings, isSavingSettings, logoUrl, faviconUrl, router])
 
     const onSubmit = async (data: PasswordFormData) => {
         setIsChangingPassword(true)
@@ -314,9 +334,24 @@ export default function SettingsPage() {
         }
     }
 
+    if (!isMounted) {
+        return (
+            <div className="min-h-screen bg-gray-50/50 py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                    <div className="h-8 w-40 bg-slate-200 rounded animate-pulse mb-6" />
+                    <div className="space-y-4">
+                        <div className="h-32 bg-slate-100 rounded animate-pulse" />
+                        <div className="h-32 bg-slate-100 rounded animate-pulse" />
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            <div className="mb-6">
+        <div className="min-h-screen bg-gray-50/50 py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                <div className="mb-6">
                 <button
                     onClick={() => router.back()}
                     className="inline-flex items-center justify-center p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-900"
@@ -326,9 +361,9 @@ export default function SettingsPage() {
                 </button>
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
 
-            <div className="space-y-6">
+                <div className="space-y-6">
                 {/* Organization / admin sections */}
                 {adminSections
                     .filter((section) => hasPermission(section.permission))
@@ -466,6 +501,7 @@ export default function SettingsPage() {
                     </div>
                 </form>
             </Modal>
+            </div>
         </div>
     )
 }

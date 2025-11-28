@@ -18,7 +18,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isMounted, setIsMounted] = useState(false)
 
-  const { user, logout } = useAuthStore()
+  const { user, logout, isLoggingOut } = useAuthStore()
   const { siteName, tagline } = useOrgStore()
 
   const router = useRouter()
@@ -67,17 +67,25 @@ export default function Header() {
             </div>
           </div>
         </div>
+
+        {isLoggingOut && (
+          <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+            <div className="h-12 w-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-sm font-medium text-slate-700">Signing you out</p>
+          </div>
+        )}
       </header>
     )
   }
 
-  const initials = user.firstName && user.lastName
+  const initials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
     : 'U'
 
   return (
     <header className="bg-white/80 backdrop-blur border-b border-slate-200/80 sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
+
         {isMobileSearchOpen ? (
           <div className="flex items-center w-full gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
             <button
@@ -225,6 +233,13 @@ export default function Header() {
         )}
       </div>
       <MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={user} />
+
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="h-12 w-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-sm font-medium text-slate-700">Signing you out</p>
+        </div>
+      )}
     </header>
   )
 }
