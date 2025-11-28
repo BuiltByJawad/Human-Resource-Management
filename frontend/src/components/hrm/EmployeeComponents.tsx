@@ -1,10 +1,22 @@
 import { useState, useEffect } from 'react'
+
 import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
 import { Button, Select, Input, DatePicker } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatIsoDate(iso: string): string {
+  if (!iso) return ''
+  const datePart = iso.slice(0, 10) // YYYY-MM-DD
+  const [year, month, day] = datePart.split('-')
+  const monthIndex = Number(month) - 1
+  const monthName = MONTHS[monthIndex] ?? month
+  return `${day} ${monthName} ${year}`
+}
 
 export interface Employee {
   id: string
@@ -102,12 +114,12 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
         <div>
           <p className="text-sm font-medium text-gray-500">Hire Date</p>
           <p className="text-sm text-gray-900">
-            {new Date(employee.hireDate).toLocaleDateString()}
+            {formatIsoDate(employee.hireDate)}
           </p>
         </div>
         <div>
           <p className="text-sm font-medium text-gray-500">Salary</p>
-          <p className="text-sm text-gray-900">${Number(employee.salary).toLocaleString()}</p>
+          <p className="text-sm text-gray-900">${Number(employee.salary).toLocaleString('en-US')}</p>
         </div>
       </div>
 

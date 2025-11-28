@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import axios from 'axios'
 import Sidebar from '@/components/ui/Sidebar'
@@ -14,7 +15,6 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { PlusIcon, FunnelIcon, UsersIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useDebounce } from '@/hooks/useDebounce'
-
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
@@ -41,6 +41,7 @@ function EmployeesContent() {
   const { token } = useAuthStore()
   const { showToast } = useToast()
 
+  const [mounted, setMounted] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [roles, setRoles] = useState<Role[]>([])
@@ -54,8 +55,19 @@ function EmployeesContent() {
 
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterDepartment, setFilterDepartment] = useState<string>('all')
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
+  const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearch = useDebounce(searchTerm, 500)
+
+  // Mark mounted on client to avoid hydration issues
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Initialize search term from URL on client after mount to avoid server/client mismatch
+  useEffect(() => {
+    const initial = searchParams.get('search') || ''
+    setSearchTerm(initial)
+  }, [searchParams])
 
   const fetchDepartments = useCallback(async () => {
     try {
@@ -228,6 +240,10 @@ function EmployeesContent() {
     if (newPage >= 1 && newPage <= pagination.pages) {
       setPagination(prev => ({ ...prev, page: newPage }))
     }
+  }
+
+  if (!mounted) {
+    return null
   }
 
   return (
@@ -426,8 +442,6 @@ function EmployeesContent() {
 
 export default function EmployeesPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <EmployeesContent />
-    </Suspense>
+    <EmployeesContent />
   )
 }

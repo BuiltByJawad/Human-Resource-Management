@@ -7,9 +7,26 @@ import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import api from '@/app/api/api'
+import { PasswordStrengthBar } from '@/components/ui/PasswordStrengthBar'
 
 const resetSchema = yup.object().shape({
-  password: yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
+  password: yup
+    .string()
+    .required('Password is required')
+    .min(8, 'Password must be at least 8 characters long')
+    .test(
+      'complexity',
+      'Password must include at least three of the following: uppercase letter, lowercase letter, number, special character',
+      (value) => {
+        if (!value) return false
+        const hasUpper = /[A-Z]/.test(value)
+        const hasLower = /[a-z]/.test(value)
+        const hasNumber = /\d/.test(value)
+        const hasSymbol = /[^A-Za-z0-9]/.test(value)
+        const categories = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length
+        return categories >= 3
+      }
+    ),
   confirmPassword: yup
     .string()
     .oneOf([yup.ref('password')], 'Passwords must match')
@@ -29,6 +46,7 @@ export default function ResetPasswordPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors }
   } = useForm<ResetForm>({
     resolver: yupResolver(resetSchema),
@@ -39,6 +57,7 @@ export default function ResetPasswordPage() {
   })
 
   const tokenValid = useMemo(() => Boolean(token && token.length > 0), [token])
+  const passwordValue = watch('password', '')
 
   const onSubmit = async (data: ResetForm) => {
     if (!tokenValid) {
@@ -86,7 +105,7 @@ export default function ResetPasswordPage() {
             <h1 className="text-2xl font-semibold text-gray-900">Password updated</h1>
             <p className="text-gray-600">Your password has been reset successfully. You can now log in with your new credentials.</p>
             <button
-              onClick={() => router.push('/auth/login')}
+              onClick={() => router.push('/login')}
               className="w-full inline-flex justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               Go to login
@@ -111,6 +130,7 @@ export default function ResetPasswordPage() {
                   {...register('password')}
                 />
                 {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
+                <PasswordStrengthBar password={passwordValue} />
               </div>
 
               <div>
@@ -141,7 +161,7 @@ export default function ResetPasswordPage() {
 
             <div className="text-center text-sm text-gray-500 mt-4">
               Didn&apos;t request this reset?
-              <Link href="/auth/login" className="ml-1 font-medium text-blue-600 hover:text-blue-700">
+              <Link href="/login" className="ml-1 font-medium text-blue-600 hover:text-blue-700">
                 Return to login
               </Link>
             </div>

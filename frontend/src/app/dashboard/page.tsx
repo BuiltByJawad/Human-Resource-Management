@@ -33,6 +33,7 @@ interface RecentActivity {
 }
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false)
   const [stats, setStats] = useState<DashboardStats>({
     totalEmployees: 0,
     activeEmployees: 0,
@@ -44,6 +45,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setMounted(true)
+
     const fetchStats = async () => {
       try {
         const response = await api.get('/dashboard/stats')
@@ -136,6 +139,10 @@ export default function DashboardPage() {
       default:
         return '📅'
     }
+  }
+
+  if (!mounted) {
+    return null
   }
 
   return (

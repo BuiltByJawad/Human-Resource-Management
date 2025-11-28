@@ -134,14 +134,31 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
 
         const employee = await prisma.employee.findUnique({
             where: { id },
+            include: {
+                user: true,
+            },
         })
 
         if (!employee) {
             throw new NotFoundError('Employee')
         }
 
-        await prisma.employee.delete({
-            where: { id },
+        const userId = employee.userId
+
+        await prisma.$transaction(async (tx) => {
+            // Delete the employee record first so there is no FK reference to the user
+            await tx.employee.delete({
+                where: { id },
+            })
+
+            // If this employee is linked to a user account, remove that user as well
+            if (userId) {
+                // Clean up any audit logs tied to this user to avoid FK constraints
+                await tx.auditLog.deleteMany({ where: { userId } })
+
+                // Password reset tokens and invites are configured with onDelete: Cascade
+                await tx.user.delete({ where: { id: userId } })
+            }
         })
 
         res.json({

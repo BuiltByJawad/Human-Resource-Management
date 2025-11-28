@@ -17,7 +17,22 @@ import { useRouter } from 'next/navigation'
 
 const passwordSchema = yup.object().shape({
     currentPassword: yup.string().required('Current password is required'),
-    newPassword: yup.string().min(6, 'Password must be at least 6 characters long').required('New password is required'),
+    newPassword: yup.string()
+        .required('New password is required')
+        .min(8, 'Password must be at least 8 characters long')
+        .test(
+            'complexity',
+            'Password must include at least three of the following: uppercase letter, lowercase letter, number, special character',
+            (value) => {
+                if (!value) return false
+                const hasUpper = /[A-Z]/.test(value)
+                const hasLower = /[a-z]/.test(value)
+                const hasNumber = /\d/.test(value)
+                const hasSymbol = /[^A-Za-z0-9]/.test(value)
+                const categories = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length
+                return categories >= 3
+            }
+        ),
     confirmPassword: yup.string()
         .oneOf([yup.ref('newPassword')], 'Passwords must match')
         .required('Confirm password is required'),

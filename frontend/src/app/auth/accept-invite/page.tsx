@@ -8,9 +8,26 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import api from '@/app/api/api'
 import { useAuthStore } from '@/store/useAuthStore'
+import { PasswordStrengthBar } from '@/components/ui/PasswordStrengthBar'
 
 const inviteSchema = yup.object().shape({
-  password: yup.string().min(6, 'Password must be at least 6 characters').required('Password is required'),
+  password: yup
+    .string()
+    .required('Password is required')
+    .min(8, 'Password must be at least 8 characters long')
+    .test(
+      'complexity',
+      'Password must include at least three of the following: uppercase letter, lowercase letter, number, special character',
+      (value) => {
+        if (!value) return false
+        const hasUpper = /[A-Z]/.test(value)
+        const hasLower = /[a-z]/.test(value)
+        const hasNumber = /\d/.test(value)
+        const hasSymbol = /[^A-Za-z0-9]/.test(value)
+        const categories = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length
+        return categories >= 3
+      }
+    ),
   confirmPassword: yup
     .string()
     .oneOf([yup.ref('password')], 'Passwords must match')
@@ -30,6 +47,7 @@ export default function AcceptInvitePage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors }
   } = useForm<InviteForm>({
     resolver: yupResolver(inviteSchema),
@@ -40,6 +58,7 @@ export default function AcceptInvitePage() {
   })
 
   const inviteValid = useMemo(() => Boolean(token && token.length > 0), [token])
+  const passwordValue = watch('password', '')
 
   const onSubmit = async (data: InviteForm) => {
     if (!inviteValid) {
@@ -63,7 +82,12 @@ export default function AcceptInvitePage() {
       await login(email, data.password)
       router.push('/dashboard')
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to accept invite'
+      console.error('Failed to complete invite', error)
+      const message =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to accept invite'
       setServerError(message)
     } finally {
       setIsSubmitting(false)
@@ -79,7 +103,7 @@ export default function AcceptInvitePage() {
             This invite link is missing or malformed. Please use the link provided in your email or ask an administrator to
             resend the invitation.
           </p>
-          <Link href="/auth/login" className="mt-6 inline-flex text-sm font-medium text-blue-600 hover:text-blue-700">
+          <Link href="/login" className="mt-6 inline-flex text-sm font-medium text-blue-600 hover:text-blue-700">
             Back to login
           </Link>
         </div>
@@ -107,6 +131,7 @@ export default function AcceptInvitePage() {
               {...register('password')}
             />
             {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
+            <PasswordStrengthBar password={passwordValue} />
           </div>
 
           <div>
@@ -137,7 +162,7 @@ export default function AcceptInvitePage() {
 
         <div className="text-center text-sm text-gray-500 mt-4">
           Already have access?
-          <Link href="/auth/login" className="ml-1 font-medium text-blue-600 hover:text-blue-700">
+          <Link href="/login" className="ml-1 font-medium text-blue-600 hover:text-blue-700">
             Go to login
           </Link>
         </div>

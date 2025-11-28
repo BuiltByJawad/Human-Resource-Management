@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import { addHours } from 'date-fns'
 import { asyncHandler } from '../middleware/errorHandler'
 import { prisma } from '../config/database'
-import { comparePassword, generateTokens, hashPassword } from '../utils/auth'
+import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '../utils/auth'
 import { UnauthorizedError, BadRequestError, NotFoundError } from '../utils/errors'
 import { AuthRequest } from '../middleware/auth'
 import { sendEmail } from '../utils/email'
@@ -75,6 +75,9 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
     throw new NotFoundError('Role not found')
   }
 
+  // Use the existing employee record as a default source of name information
+  const employeeForEmail = await prisma.employee.findFirst({ where: { email } })
+
   let user = await prisma.user.findUnique({ where: { email } })
 
   if (user && user.verified) {
@@ -92,13 +95,30 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
         roleId,
         status: 'active',
         verified: false,
+        // Default name from employee record, if present
+        firstName: employeeForEmail?.firstName ?? null,
+        lastName: employeeForEmail?.lastName ?? null,
       }
     })
-  } else if (user.roleId !== roleId) {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: { roleId },
-    })
+  } else {
+    const updateData: any = {}
+
+    if (user.roleId !== roleId) {
+      updateData.roleId = roleId
+    }
+
+    // If the user does not yet have a name, default it from the employee record
+    if ((!user.firstName && employeeForEmail?.firstName) || (!user.lastName && employeeForEmail?.lastName)) {
+      updateData.firstName = user.firstName ?? employeeForEmail?.firstName ?? null
+      updateData.lastName = user.lastName ?? employeeForEmail?.lastName ?? null
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      })
+    }
   }
 
   await prisma.userInvite.deleteMany({ where: { OR: [{ email }, { userId: user.id }] } })
@@ -153,6 +173,11 @@ export const completeInvite = asyncHandler(async (req: Request, res: Response) =
 
   if (!token || !password) {
     throw new BadRequestError('Token and password are required')
+  }
+
+  const passwordError = validatePasswordStrength(password)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
   }
 
   const invite = await prisma.userInvite.findFirst({
@@ -273,6 +298,11 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   const { token, password } = req.body
   if (!token || !password) {
     throw new BadRequestError('Token and password are required')
+  }
+
+  const passwordError = validatePasswordStrength(password)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
   }
 
   const tokenRecord = await prisma.passwordResetToken.findFirst({
@@ -462,8 +492,9 @@ export const changePassword = asyncHandler(async (req: AuthRequest, res: Respons
     throw new BadRequestError('Current password and new password are required')
   }
 
-  if (newPassword.length < 6) {
-    throw new BadRequestError('New password must be at least 6 characters long')
+  const passwordError = validatePasswordStrength(newPassword)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
   }
 
   const user = await prisma.user.findUnique({

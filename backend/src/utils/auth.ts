@@ -2,6 +2,27 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 
+export const PASSWORD_MIN_LENGTH = 8
+
+export const validatePasswordStrength = (password: string): string | null => {
+  if (!password || password.length < PASSWORD_MIN_LENGTH) {
+    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters long`
+  }
+
+  const hasUpper = /[A-Z]/.test(password)
+  const hasLower = /[a-z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  const hasSymbol = /[^A-Za-z0-9]/.test(password)
+
+  const categories = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length
+
+  if (categories < 3) {
+    return 'Password must include at least three of the following: uppercase letter, lowercase letter, number, special character'
+  }
+
+  return null
+}
+
 export const hashPassword = async (password: string): Promise<string> => {
   const saltRounds = 12
   return bcrypt.hash(password, saltRounds)
