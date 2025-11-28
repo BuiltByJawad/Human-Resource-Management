@@ -210,7 +210,9 @@ async function main() {
 
     await prisma.user.upsert({
       where: { email: 'admin@novahr.com' },
-      update: {},
+      update: {
+        verified: true,
+      },
       create: {
         email: 'admin@novahr.com',
         password: hashedPassword,
@@ -218,6 +220,7 @@ async function main() {
         lastName: 'Admin',
         roleId: adminRole.id,
         status: 'active',
+        verified: true,
         avatarUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=0D8ABC&color=fff'
       }
     })

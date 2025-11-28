@@ -75,6 +75,9 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
     throw new NotFoundError('Role not found')
   }
 
+  // Use the existing employee record as a default source of name information
+  const employeeForEmail = await prisma.employee.findFirst({ where: { email } })
+
   let user = await prisma.user.findUnique({ where: { email } })
 
   if (user && user.verified) {
@@ -92,13 +95,30 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
         roleId,
         status: 'active',
         verified: false,
+        // Default name from employee record, if present
+        firstName: employeeForEmail?.firstName ?? null,
+        lastName: employeeForEmail?.lastName ?? null,
       }
     })
-  } else if (user.roleId !== roleId) {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: { roleId },
-    })
+  } else {
+    const updateData: any = {}
+
+    if (user.roleId !== roleId) {
+      updateData.roleId = roleId
+    }
+
+    // If the user does not yet have a name, default it from the employee record
+    if ((!user.firstName && employeeForEmail?.firstName) || (!user.lastName && employeeForEmail?.lastName)) {
+      updateData.firstName = user.firstName ?? employeeForEmail?.firstName ?? null
+      updateData.lastName = user.lastName ?? employeeForEmail?.lastName ?? null
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      })
+    }
   }
 
   await prisma.userInvite.deleteMany({ where: { OR: [{ email }, { userId: user.id }] } })
