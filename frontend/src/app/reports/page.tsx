@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import axios from 'axios';
 import { DataTable, Column } from '@/components/ui/DataTable';
@@ -106,36 +106,7 @@ export default function ReportsPage() {
     const [leaveData, setLeaveData] = useState<any>(null);
     const [payrollData, setPayrollData] = useState<any>(null);
 
-    useEffect(() => {
-        if (!token) {
-            setError('Please log in to access reports');
-            return;
-        }
-        fetchDepartments();
-    }, [token]);
-
-    useEffect(() => {
-        if (!token) return;
-
-        const hasData = activeTab === 'overview' ? dashboardData !== null :
-            activeTab === 'employees' ? employeesData.length > 0 :
-                activeTab === 'attendance' ? attendanceData !== null :
-                    activeTab === 'leave' ? leaveData !== null :
-                        activeTab === 'payroll' ? payrollData !== null : false;
-
-        if (!hasData) {
-            fetchTabData();
-        } else {
-            setIsLoading(false);
-        }
-    }, [activeTab, token]);
-
-    useEffect(() => {
-        if (!token || activeTab === 'overview') return;
-        fetchTabData();
-    }, [startDate, endDate, departmentId]);
-
-    const fetchDepartments = async () => {
+    const fetchDepartments = useCallback(async () => {
         try {
             const response = await axios.get(`${API_URL}/departments`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -147,9 +118,9 @@ export default function ReportsPage() {
         } catch (error) {
             console.error('Error fetching departments:', error);
         }
-    };
+    }, [token]);
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         if (!token) return;
 
         setIsLoading(true);
@@ -168,9 +139,9 @@ export default function ReportsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [token]);
 
-    const fetchTabData = async () => {
+    const fetchTabData = useCallback(async () => {
         if (activeTab === 'overview') {
             fetchDashboardData();
             return;
@@ -224,7 +195,36 @@ export default function ReportsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [activeTab, employeesData.length, attendanceData, leaveData, payrollData, startDate, endDate, departmentId, token, fetchDashboardData]);
+
+    useEffect(() => {
+        if (!token) {
+            setError('Please log in to access reports');
+            return;
+        }
+        fetchDepartments();
+    }, [token, fetchDepartments]);
+
+    useEffect(() => {
+        if (!token) return;
+
+        const hasData = activeTab === 'overview' ? dashboardData !== null :
+            activeTab === 'employees' ? employeesData.length > 0 :
+                activeTab === 'attendance' ? attendanceData !== null :
+                    activeTab === 'leave' ? leaveData !== null :
+                        activeTab === 'payroll' ? payrollData !== null : false;
+
+        if (!hasData) {
+            fetchTabData();
+        } else {
+            setIsLoading(false);
+        }
+    }, [activeTab, token, fetchTabData, dashboardData, employeesData.length, attendanceData, leaveData, payrollData]);
+
+    useEffect(() => {
+        if (!token || activeTab === 'overview') return;
+        fetchTabData();
+    }, [startDate, endDate, departmentId, activeTab, token, fetchTabData]);
 
     const handleExportCSV = async () => {
         try {

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import MobileMenu from './MobileMenu'
@@ -193,7 +194,15 @@ export default function Header() {
                   className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 text-sm text-slate-700 shadow-sm"
                 >
                   {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="Profile" className="h-8 w-8 rounded-full object-cover" />
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden">
+                      <Image
+                        src={user.avatarUrl}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
+                        sizes="32px"
+                      />
+                    </div>
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold">
                       {initials}

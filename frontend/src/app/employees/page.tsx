@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import axios from 'axios'
 import Sidebar from '@/components/ui/Sidebar'
@@ -14,6 +13,7 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useDebounce } from '@/hooks/useDebounce'
 import { EmployeesToolbar, EmployeesListSection } from '@/components/hrm/EmployeesPageComponents'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
@@ -38,12 +38,9 @@ function EmployeesContent() {
   const searchParams = useSearchParams()
   const { token } = useAuthStore()
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
 
   const [mounted, setMounted] = useState(false)
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [departments, setDepartments] = useState<Department[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
-  const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 9, total: 0, pages: 0 })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -67,37 +64,31 @@ function EmployeesContent() {
     setSearchTerm(initial)
   }, [searchParams])
 
-  const fetchDepartments = useCallback(async () => {
-    try {
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
       const response = await axios.get(`${API_URL}/departments`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      if (response.data.success) {
-        setDepartments(response.data.data)
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch departments', error)
-      setDepartments([])
-    }
-  }, [token])
+      return response.data.data as Department[]
+    },
+    enabled: !!token
+  })
 
-  const fetchRoles = useCallback(async () => {
-    try {
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
       const response = await axios.get(`${API_URL}/roles`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      if (response.data.success) {
-        setRoles(response.data.data)
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch roles', error)
-      setRoles([])
-    }
-  }, [token])
+      return response.data.data as Role[]
+    },
+    enabled: !!token
+  })
 
-  const fetchEmployees = useCallback(async () => {
-    setLoading(true)
-    try {
+  const { data: employeesData, isLoading: loading } = useQuery({
+    queryKey: ['employees', pagination.page, pagination.limit, debouncedSearch, filterStatus, filterDepartment],
+    queryFn: async () => {
       const params: any = {
         page: pagination.page,
         limit: pagination.limit,
@@ -111,32 +102,86 @@ function EmployeesContent() {
         headers: { Authorization: `Bearer ${token}` },
         params
       })
+      return response.data.data
+    },
+    enabled: !!token,
+    placeholderData: (previousData) => previousData,
+  })
 
-      if (response.data.status === 'success') {
-        setEmployees(response.data.data.employees)
-        setPagination(response.data.data.pagination)
+  // Update pagination state when data changes
+  useEffect(() => {
+    if (employeesData?.pagination) {
+      setPagination(employeesData.pagination)
+    }
+  }, [employeesData])
+
+  const employees = employeesData?.employees || []
+
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await axios.post(`${API_URL}/employees`, data, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return response.data
+    },
+    onSuccess: async (data, variables) => {
+      showToast('Employee created successfully', 'success')
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      setIsModalOpen(false)
+
+      // Automatically send invite to new employee
+      if (variables.email && variables.roleId) {
+        try {
+          await axios.post(
+            `${API_URL}/auth/invite`,
+            { email: variables.email, roleId: variables.roleId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          showToast('Invite link sent to employee', 'success')
+        } catch (inviteError: any) {
+          console.error('Failed to send invite', inviteError)
+          showToast(inviteError.response?.data?.message || 'Failed to send invite', 'error')
+        }
       }
-    } catch (error: any) {
-      console.error('Failed to fetch employees', error)
-      setEmployees([])
-      setPagination(prev => ({ ...prev, total: 0, pages: 0 }))
-    } finally {
-      setLoading(false)
+    },
+    onError: (error: any) => {
+      showToast(error.response?.data?.message || 'Failed to create employee', 'error')
     }
-  }, [token, pagination.page, pagination.limit, debouncedSearch, filterStatus, filterDepartment])
+  })
 
-  useEffect(() => {
-    if (token) {
-      fetchDepartments()
-      fetchRoles()
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const { id, ...payload } = data
+      const response = await axios.patch(`${API_URL}/employees/${id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return response.data
+    },
+    onSuccess: () => {
+      showToast('Employee updated successfully', 'success')
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      setIsModalOpen(false)
+    },
+    onError: (error: any) => {
+      showToast(error.response?.data?.message || 'Failed to update employee', 'error')
     }
-  }, [token, fetchDepartments, fetchRoles])
+  })
 
-  useEffect(() => {
-    if (token) {
-      fetchEmployees()
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await axios.delete(`${API_URL}/employees/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+    },
+    onSuccess: () => {
+      showToast('Employee deleted successfully', 'success')
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      setPendingDelete(null)
+    },
+    onError: (error: any) => {
+      showToast('Failed to delete employee', 'error')
     }
-  }, [token, fetchEmployees])
+  })
 
   const handleCreateEmployee = () => {
     setEditingEmployee(undefined)
@@ -156,61 +201,21 @@ function EmployeesContent() {
     setPendingDelete(employee)
   }
 
-  const confirmDelete = async () => {
-    if (!pendingDelete) return
-    try {
-      await axios.delete(`${API_URL}/employees/${pendingDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      showToast('Employee deleted successfully', 'success')
-      fetchEmployees()
-    } catch (error) {
-      console.error('Failed to delete employee', error)
-      showToast('Failed to delete employee', 'error')
-    } finally {
-      setPendingDelete(null)
+  const confirmDelete = () => {
+    if (pendingDelete) {
+      deleteEmployeeMutation.mutate(pendingDelete.id)
     }
   }
 
-  const handleSubmitEmployee = async (data: any) => {
-    try {
-      // Transform data for API
-      const payload = {
-        ...data,
-        // departmentId and roleId are already in data from the form
-      }
+  const handleSubmitEmployee = (data: any) => {
+    const payload = {
+      ...data,
+    }
 
-      if (editingEmployee) {
-        await axios.patch(`${API_URL}/employees/${editingEmployee.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        showToast('Employee updated successfully', 'success')
-      } else {
-        await axios.post(`${API_URL}/employees`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        showToast('Employee created successfully', 'success')
-
-        // Automatically send invite to new employee
-        if (data.email && data.roleId) {
-          try {
-            await axios.post(
-              `${API_URL}/auth/invite`,
-              { email: data.email, roleId: data.roleId },
-              { headers: { Authorization: `Bearer ${token}` } }
-            )
-            showToast('Invite link sent to employee', 'success')
-          } catch (inviteError: any) {
-            console.error('Failed to send invite', inviteError)
-            showToast(inviteError.response?.data?.message || 'Failed to send invite', 'error')
-          }
-        }
-      }
-      fetchEmployees()
-      setIsModalOpen(false)
-    } catch (error: any) {
-      console.error('Failed to save employee', error)
-      showToast(error.response?.data?.message || 'Failed to save employee', 'error')
+    if (editingEmployee) {
+      updateEmployeeMutation.mutate({ id: editingEmployee.id, ...payload })
+    } else {
+      createEmployeeMutation.mutate(payload)
     }
   }
 
@@ -282,6 +287,7 @@ function EmployeesContent() {
 
       <ConfirmDialog
         isOpen={!!pendingDelete}
+
         title="Remove employee?"
         message={pendingDelete ? `${pendingDelete.firstName} ${pendingDelete.lastName} will be removed from your organization.` : ''}
         confirmText="Delete"
@@ -295,6 +301,8 @@ function EmployeesContent() {
 
 export default function EmployeesPage() {
   return (
-    <EmployeesContent />
+    <Suspense fallback={<div>Loading...</div>}>
+      <EmployeesContent />
+    </Suspense>
   )
 }

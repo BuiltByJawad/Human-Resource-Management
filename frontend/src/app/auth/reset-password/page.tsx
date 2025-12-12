@@ -9,6 +9,8 @@ import * as yup from 'yup'
 import api from '@/app/api/api'
 import { PasswordStrengthBar } from '@/components/ui/PasswordStrengthBar'
 
+import { Suspense } from 'react'
+
 const resetSchema = yup.object().shape({
   password: yup
     .string()
@@ -35,7 +37,7 @@ const resetSchema = yup.object().shape({
 
 type ResetForm = yup.InferType<typeof resetSchema>
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get('token') || ''
@@ -123,9 +125,8 @@ export default function ResetPasswordPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
                 <input
                   type="password"
-                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.password ? 'border-red-400' : 'border-gray-300'
-                  }`}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.password ? 'border-red-400' : 'border-gray-300'
+                    }`}
                   placeholder="Enter new password"
                   {...register('password')}
                 />
@@ -137,9 +138,8 @@ export default function ResetPasswordPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
                 <input
                   type="password"
-                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.confirmPassword ? 'border-red-400' : 'border-gray-300'
-                  }`}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.confirmPassword ? 'border-red-400' : 'border-gray-300'
+                    }`}
                   placeholder="Re-enter password"
                   {...register('confirmPassword')}
                 />
@@ -169,5 +169,13 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </section>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }

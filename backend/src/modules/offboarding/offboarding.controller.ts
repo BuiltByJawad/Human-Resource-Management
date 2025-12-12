@@ -1,0 +1,37 @@
+
+import { Request, Response } from 'express';
+import { asyncHandler } from '../../shared/middleware/errorHandler';
+import { offboardingService } from './offboarding.service';
+import { initiateOffboardingSchema, updateOffboardingTaskSchema } from './dto';
+
+export const initiateOffboarding = asyncHandler(async (req: Request, res: Response) => {
+    const { error, value } = initiateOffboardingSchema.validate(req.body);
+    if (error) throw new Error(error.details[0].message);
+
+    const process = await offboardingService.initiateOffboarding(value);
+    res.status(201).json({ success: true, data: process });
+});
+
+export const getOffboarding = asyncHandler(async (req: Request, res: Response) => {
+    const employeeId = req.params.employeeId;
+    const process = await offboardingService.getEmployeeOffboarding(employeeId);
+    res.json({ success: true, data: process });
+});
+
+export const getAllOffboarding = asyncHandler(async (req: Request, res: Response) => {
+    const processes = await offboardingService.getAllProcesses();
+    res.json({ success: true, data: processes });
+});
+
+export const updateTask = asyncHandler(async (req: Request, res: Response) => {
+    const taskId = req.params.taskId;
+    const { error, value } = updateOffboardingTaskSchema.validate(req.body);
+    if (error) throw new Error(error.details[0].message);
+
+    const updated = await offboardingService.updateTask(taskId, {
+        ...value,
+        completedBy: (req as any).user?.id || 'system',
+    });
+
+    res.json({ success: true, data: updated });
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ReviewCycleCard, ReviewForm, FeedbackSummary, CreateCycleModal } from '@/components/hrm/performance';
 import { Button } from '@/components/ui/FormComponents';
@@ -31,6 +31,28 @@ export default function PerformancePage() {
 
     const canManageCycles = hasPermission(PERMISSIONS.MANAGE_PERFORMANCE_CYCLES);
 
+    const fetchCycles = useCallback(async () => {
+        try {
+            const response = await axios.get(`${API_URL}/performance/cycles`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setCycles(response.data);
+        } catch (error) {
+            console.error('Error fetching cycles:', error);
+        }
+    }, [token]);
+
+    const fetchUserReviews = useCallback(async () => {
+        try {
+            const response = await axios.get(`${API_URL}/performance/reviews/${user?.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setUserReviews(response.data);
+        } catch (error) {
+            console.error('Error fetching user reviews:', error);
+        }
+    }, [token, user?.id]);
+
     useEffect(() => {
         if (token && user) {
             const loadData = async () => {
@@ -45,29 +67,7 @@ export default function PerformancePage() {
             };
             loadData();
         }
-    }, [token, user]);
-
-    const fetchCycles = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/performance/cycles`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setCycles(response.data);
-        } catch (error) {
-            console.error('Error fetching cycles:', error);
-        }
-    };
-
-    const fetchUserReviews = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/performance/reviews/${user?.id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setUserReviews(response.data);
-        } catch (error) {
-            console.error('Error fetching user reviews:', error);
-        }
-    };
+    }, [token, user, fetchCycles, fetchUserReviews]);
 
     const handleCreateCycle = async (data: any) => {
         try {
@@ -242,7 +242,7 @@ export default function PerformancePage() {
                                             <div className="col-span-full flex flex-col items-center justify-center py-16 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                                                 <ClipboardDocumentCheckIcon className="h-12 w-12 text-gray-300 mb-3" />
                                                 <p className="text-gray-500 font-medium">No pending reviews.</p>
-                                                <p className="text-sm text-gray-400">You're all caught up!</p>
+                                                <p className="text-sm text-gray-400">You&apos;re all caught up!</p>
                                             </div>
                                         )}
                                     </div>

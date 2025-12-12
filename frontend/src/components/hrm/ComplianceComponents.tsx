@@ -51,7 +51,7 @@ type RuleFormData = yup.InferType<typeof ruleSchema>
 
 export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) => {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<RuleFormData>({
-        resolver: yupResolver(ruleSchema),
+        resolver: yupResolver(ruleSchema) as any,
         defaultValues: {
             name: '',
             description: '',

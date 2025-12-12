@@ -58,7 +58,7 @@ export const DepartmentForm = ({
   loading
 }: DepartmentFormProps) => {
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<DepartmentFormData>({
-    resolver: yupResolver(departmentSchema),
+    resolver: yupResolver(departmentSchema) as any,
     defaultValues: {
       name: '',
       description: '',

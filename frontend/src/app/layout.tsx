@@ -3,21 +3,34 @@ import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { FaviconManager } from "@/components/ui/FaviconManager";
+import QueryProvider from "@/components/providers/QueryProvider";
 
 const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: 'swap',
 });
 
 const robotoMono = Roboto_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: "HRM Platform",
   description:
     "A modern Human Resource Management platform with attendance, payroll, performance, and document workflows.",
+  openGraph: {
+    title: "HRM Platform",
+    description: "A modern Human Resource Management platform.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "HRM Platform",
+    description: "A modern Human Resource Management platform.",
+  },
 };
 
 export default function RootLayout({
@@ -46,12 +59,14 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${robotoMono.variable} bg-[var(--background)] text-[var(--foreground)] antialiased`}
       >
-        <FaviconManager />
-        <ToastProvider>
-          <div className="min-h-screen">
-            {children}
-          </div>
-        </ToastProvider>
+        <QueryProvider>
+          <FaviconManager />
+          <ToastProvider>
+            <div className="min-h-screen">
+              {children}
+            </div>
+          </ToastProvider>
+        </QueryProvider>
       </body>
     </html>
   );

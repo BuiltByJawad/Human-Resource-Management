@@ -1,0 +1,110 @@
+groups:
+  - name: api_alerts
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # High response time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API response time is high"
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+      # Too many requests
+      - alert: HighRequestRate
+        expr: rate(http_requests_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request rate"
+          description: "Request rate is {{ $value }} req/s"
+
+  - name: database_alerts
+    rules:
+      # Database down
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL has been down for more than 1 minute"
+
+      # High database connections
+      - alert: HighDatabaseConnections
+        expr: db_connections_active > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of database connections"
+          description: "{{ $value }} active connections (threshold: 80)"
+
+      # Slow queries
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database queries are slow"
+          description: "95th percentile query time is {{ $value }}s"
+
+  - name: redis_alerts
+    rules:
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+  - name: system_alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPU
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      # High memory usage
+      - alert: HighMemory
+        expr: (process_resident_memory_bytes / 1024 / 1024) > 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}MB"
+
+  - name: business_alerts
+    rules:
+      # High failed login rate
+      - alert: HighFailedLogins
+        expr: rate(login_attempts_total{status="failed"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate of failed login attempts"
+          description: "{{ $value }} failed logins per second - possible brute force attack"

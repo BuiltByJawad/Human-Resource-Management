@@ -21,6 +21,21 @@ export default function BurnoutAnalyticsPage() {
     const canViewAnalytics = !!user && hasPermission(PERMISSIONS.VIEW_ANALYTICS);
 
     useEffect(() => {
+        const fetchAnalytics = async () => {
+            setIsLoading(true);
+            try {
+                const response = await axios.get(`${API_URL}/analytics/burnout?period=${period}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setAnalyticsData(response.data);
+            } catch (error) {
+                console.error('Error fetching burnout analytics:', error);
+                setAnalyticsData(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         if (token && user) {
             if (!canViewAnalytics) {
                 setIsLoading(false);
@@ -29,21 +44,6 @@ export default function BurnoutAnalyticsPage() {
             fetchAnalytics();
         }
     }, [token, user, period, canViewAnalytics]);
-
-    const fetchAnalytics = async () => {
-        setIsLoading(true);
-        try {
-            const response = await axios.get(`${API_URL}/analytics/burnout?period=${period}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setAnalyticsData(response.data);
-        } catch (error) {
-            console.error('Error fetching burnout analytics:', error);
-            setAnalyticsData(null);
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     if (user && !canViewAnalytics) {
         return (

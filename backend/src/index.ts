@@ -1,86 +1,117 @@
-import express from 'express'
-import cors from 'cors'
-import { config } from 'dotenv'
-import { securityMiddleware, rateLimiter, requestLogger } from './middleware/security'
-import { errorHandler, notFoundHandler } from './middleware/errorHandler'
-import { connectDatabases } from './config/database'
-import authRoutes from './routes/authRoutes'
-import employeeRoutes from './routes/employeeRoutes'
-import departmentRoutes from './routes/departmentRoutes'
-import roleRoutes from './routes/roleRoutes'
-import leaveRoutes from './routes/leaveRoutes'
-import attendanceRoutes from './routes/attendanceRoutes'
-import reportRoutes from './routes/reportRoutes'
-import complianceRoutes from './routes/complianceRoutes'
-import recruitmentRoutes from './routes/recruitmentRoutes'
-import payrollRoutes from './routes/payrollRoutes'
-import assetRoutes from './routes/assetRoutes'
-import performanceRoutes from './routes/performance.routes'
-import analyticsRoutes from './routes/analytics.routes'
-import orgRoutes from './routes/orgRoutes'
+import { config } from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import { connectDatabases } from './shared/config/database';
+import { requestLogger, rateLimiter, securityMiddleware } from './shared/middleware/security';
+import { errorHandler, notFoundHandler } from './shared/middleware/errorHandler';
 
-config()
+// Import modular routes
+import { authRoutes } from './modules/auth';
+import { employeeRoutes } from './modules/employee';
+import { departmentRoutes } from './modules/department';
+import { roleRoutes } from './modules/role';
+import { leaveRoutes } from './modules/leave';
+import { payrollRoutes } from './modules/payroll';
+import { assetRoutes } from './modules/asset';
+import { complianceRoutes } from './modules/compliance';
+import { organizationRoutes } from './modules/organization';
+import { performanceRoutes } from './modules/performance';
+import { recruitmentRoutes } from './modules/recruitment';
+import { analyticsRoutes } from './modules/analytics';
+import { attendanceRoutes } from './modules/attendance';
+import { portalRoutes } from './modules/portal';
+import { onboardingRoutes } from './modules/onboarding';
+import { offboardingRoutes } from './modules/offboarding';
+import { benefitsRoutes } from './modules/benefits';
+import { expenseRoutes } from './modules/expense';
+import { timeTrackingRoutes } from './modules/time-tracking';
+import { shiftRoutes } from './modules/shift';
+import { documentsRoutes } from './modules/documents';
+import { trainingRoutes } from './modules/training';
 
-const app = express()
-const PORT = process.env.PORT || 5000
+// Import legacy routes (if any still exist)
+import reportRoutes from './routes/reportRoutes';
 
-app.use(cors())
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+config();
 
-// Serve uploaded files (e.g. branding logo/favicon)
-app.use('/uploads', express.static('uploads'))
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-app.use(requestLogger)
-app.use(rateLimiter)
-app.use(securityMiddleware)
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use('/api/auth', authRoutes)
-app.use('/api/employees', employeeRoutes)
-app.use('/api/departments', departmentRoutes)
-app.use('/api/roles', roleRoutes)
-app.use('/api/leave', leaveRoutes)
-app.use('/api/attendance', attendanceRoutes)
-app.use('/api/reports', reportRoutes)
-app.use('/api/compliance', complianceRoutes)
-app.use('/api/recruitment', recruitmentRoutes)
-app.use('/api/payroll', payrollRoutes)
-app.use('/api/assets', assetRoutes)
-app.use('/api/performance', performanceRoutes)
-app.use('/api/analytics', analyticsRoutes)
-app.use('/api/org', orgRoutes)
+// Static files
+app.use('/uploads', express.static('uploads'));
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() })
-})
+app.use(requestLogger);
+app.use(rateLimiter);
+app.use(securityMiddleware);
 
-app.use(notFoundHandler)
-app.use(errorHandler)
+// API Routes - Modular architecture
+app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/leave', leaveRoutes);
+app.use('/api/payroll', payrollRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/organization', organizationRoutes);
+app.use('/api/performance', performanceRoutes);
+app.use('/api/recruitment', recruitmentRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/portal', portalRoutes);
+app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/offboarding', offboardingRoutes);
+app.use('/api/benefits', benefitsRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/time-tracking', timeTrackingRoutes);
+app.use('/api/shifts', shiftRoutes);
+app.use('/api/documents', documentsRoutes);
+app.use('/api/training', trainingRoutes);
 
+// Legacy routes
+app.use('/api/reports', reportRoutes);
+
+// Health check
+app.get('/health', (req: express.Request, res: express.Response) => {
+  res.json({ status: ' healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
+// Error handling
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// Start server
 const startServer = async () => {
   try {
-    await connectDatabases()
+    await connectDatabases();
 
     app.listen(PORT, () => {
-      console.log(`🚀 HRM Backend Server running on port ${PORT}`)
-      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
-    })
+      console.log(`🚀 HRM Backend Server running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📍 Health check: http://localhost:${PORT}/health`);
+    });
   } catch (error) {
-    console.error('❌ Failed to start server:', error)
-    process.exit(1)
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
-}
+};
 
+// Graceful shutdown handlers
 process.on('SIGTERM', async () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully')
-  process.exit(0)
-})
+  console.log('🛑 SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
 
 process.on('SIGINT', async () => {
-  console.log('🛑 SIGINT received, shutting down gracefully')
-  process.exit(0)
-})
+  console.log('🛑 SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
 
-startServer()
+startServer();
 
-export default app
+export default app;
