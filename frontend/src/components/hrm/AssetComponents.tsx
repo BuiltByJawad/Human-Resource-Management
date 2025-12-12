@@ -160,7 +160,7 @@ const assetSchema = yup.object().shape({
     serialNumber: yup.string().required('Serial number is required'),
     type: yup.string().required('Type is required'),
     purchaseDate: yup.string().required('Purchase date is required'),
-    purchasePrice: yup.number().nullable().transform((value, originalValue) => originalValue === '' ? null : value)
+    purchasePrice: yup.number().nullable().transform((value, originalValue) => originalValue === '' ? null : value).notRequired()
 })
 
 type AssetFormData = yup.InferType<typeof assetSchema>
@@ -169,7 +169,7 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
     const [loading, setLoading] = useState(false)
 
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<AssetFormData>({
-        resolver: yupResolver(assetSchema),
+        resolver: yupResolver(assetSchema) as any,
         defaultValues: {
             name: '',
             serialNumber: '',
@@ -331,7 +331,7 @@ export const AssignmentModal = ({ isOpen, onClose, onAssign, employees }: Assign
     const [loading, setLoading] = useState(false)
 
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<AssignmentFormData>({
-        resolver: yupResolver(assignmentSchema),
+        resolver: yupResolver(assignmentSchema) as any,
         defaultValues: {
             employeeId: '',
             notes: ''
@@ -444,7 +444,7 @@ export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModal
     const [loading, setLoading] = useState(false)
 
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<MaintenanceFormData>({
-        resolver: yupResolver(maintenanceSchema),
+        resolver: yupResolver(maintenanceSchema) as any,
         defaultValues: {
             description: '',
             cost: null,

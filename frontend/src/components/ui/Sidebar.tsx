@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   HomeIcon,
@@ -161,7 +162,16 @@ export default function Sidebar() {
         <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full`}>
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20 flex-shrink-0 overflow-hidden">
             {logoUrl ? (
-              <img src={logoUrl} alt={siteName} className="h-full w-full object-cover" />
+              <div className="relative h-full w-full">
+                <Image
+                  src={logoUrl}
+                  alt={siteName}
+                  fill
+                  className="object-cover"
+                  priority
+                  sizes="36px"
+                />
+              </div>
             ) : (
               <span>{shortName}</span>
             )}

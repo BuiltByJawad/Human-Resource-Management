@@ -8,6 +8,7 @@ import { comparePassword, generateTokens, hashPassword, validatePasswordStrength
 import { UnauthorizedError, BadRequestError, NotFoundError } from '../utils/errors'
 import { AuthRequest } from '../middleware/auth'
 import { sendEmail } from '../utils/email'
+import { createAuditLog } from '../utils/audit'
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex')
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
@@ -47,6 +48,13 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
   const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name)
 
+  // Audit: user self-registered
+  await createAuditLog({
+    userId: user.id,
+    action: 'auth.register',
+    resourceId: user.id,
+  })
+
   res.status(201).json({
     success: true,
     data: {
@@ -60,6 +68,13 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         role: user.role.name,
       }
     }
+  })
+
+  // Audit: user completed invite
+  await createAuditLog({
+    userId: user.id,
+    action: 'auth.complete_invite',
+    resourceId: user.id,
   })
 })
 
@@ -158,6 +173,14 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
     console.error('Failed to send invite email', err)
   })
 
+  // Audit: admin invited user
+  await createAuditLog({
+    userId: req.user!.id,
+    action: 'auth.invite_user',
+    resourceId: user.id,
+    newValues: { email, roleId },
+  })
+
   res.status(201).json({
     success: true,
     data: {
@@ -245,6 +268,13 @@ export const completeInvite = asyncHandler(async (req: Request, res: Response) =
       email: user.email
     }
   })
+
+  // Audit: user completed invite
+  await createAuditLog({
+    userId: user.id,
+    action: 'auth.complete_invite',
+    resourceId: user.id,
+  })
 })
 
 export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
@@ -292,6 +322,13 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
   })
 
   res.json({ success: true, data: { resetLink } })
+
+  // Audit: password reset requested (do not log token)
+  await createAuditLog({
+    userId: user.id,
+    action: 'auth.request_password_reset',
+    resourceId: user.id,
+  })
 })
 
 export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
@@ -330,6 +367,13 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
   })
 
   res.json({ success: true, message: 'Password reset successfully' })
+
+  // Audit: password reset completed
+  await createAuditLog({
+    userId: tokenRecord.userId,
+    action: 'auth.reset_password',
+    resourceId: tokenRecord.userId,
+  })
 })
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
@@ -356,6 +400,12 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   const isPasswordValid = await comparePassword(password, user.password)
   if (!isPasswordValid) {
+    // Audit: failed login attempt
+    await createAuditLog({
+      userId: user.id,
+      action: 'auth.login_failed',
+      resourceId: user.id,
+    })
     throw new UnauthorizedError('Invalid credentials')
   }
 
@@ -368,6 +418,13 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   // Flatten permissions
   const permissions = user.role.permissions.map((rp: { permission: { resource: string; action: string } }) => `${rp.permission.resource}.${rp.permission.action}`)
+
+  // Audit: successful login
+  await createAuditLog({
+    userId: user.id,
+    action: 'auth.login',
+    resourceId: user.id,
+  })
 
   res.json({
     success: true,
@@ -391,38 +448,18 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
   const { refreshToken } = req.body
 
   if (!refreshToken) {
-    throw new UnauthorizedError('Refresh token required')
+    throw new BadRequestError('Refresh token is required')
   }
 
+  let payload: any
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: { role: true }
-    })
-
-    if (!user || user.status !== 'active') {
-      throw new UnauthorizedError('User not found or inactive')
-    }
-
-    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user.id, user.email, user.role.name)
-
-    res.json({
-      success: true,
-      data: {
-        accessToken,
-        refreshToken: newRefreshToken,
-      },
-    })
-  } catch (error) {
-    throw new UnauthorizedError('Invalid refresh token')
+    payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!)
+  } catch {
+    throw new UnauthorizedError('Invalid or expired refresh token')
   }
-})
 
-export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await prisma.user.findUnique({
-    where: { id: req.user!.id },
+    where: { id: (payload as any).userId },
     include: {
       role: {
         include: {
@@ -433,16 +470,63 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
           }
         }
       },
-      department: true,
-      employee: true
+      employee: true,
     }
   })
 
-  if (!user) {
-    throw new UnauthorizedError('User not found')
+  if (!user || user.status !== 'active') {
+    throw new UnauthorizedError('User not found or inactive')
   }
 
-  const permissions = user.role.permissions.map(rp => `${rp.permission.resource}.${rp.permission.action}`)
+  const { accessToken, refreshToken: newRefreshToken } = generateTokens(
+    user.id,
+    user.email,
+    user.role.name
+  )
+
+  const permissions = user.role.permissions.map(
+    (rp: { permission: { resource: string; action: string } }) =>
+      `${rp.permission.resource}.${rp.permission.action}`
+  )
+
+  res.json({
+    success: true,
+    data: {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role.name,
+        avatarUrl: user.avatarUrl,
+        employee: user.employee,
+        status: user.status,
+      },
+      permissions,
+    },
+  })
+})
+
+export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('User not authenticated')
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    include: {
+      role: true,
+      employee: true,
+    }
+  })
+
+  if (!user || user.status !== 'active') {
+    throw new UnauthorizedError('User not found or inactive')
+  }
+
+  const employee = user.employee
 
   res.json({
     success: true,
@@ -453,35 +537,60 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role.name,
-        department: user.department?.name,
         avatarUrl: user.avatarUrl,
-        lastLogin: user.lastLogin,
-        createdAt: user.createdAt,
-        employee: user.employee // Include employee details
+        phoneNumber: employee?.phoneNumber ?? null,
+        address: employee?.address ?? null,
+        dateOfBirth: employee?.dateOfBirth ?? null,
+        gender: employee?.gender ?? null,
+        maritalStatus: employee?.maritalStatus ?? null,
+        emergencyContact: employee?.emergencyContact ?? null,
+        employee,
+        status: user.status,
       },
-      permissions
+      employee,
+      permissions: req.user.permissions,
     },
   })
 })
 
 export const uploadAvatar = asyncHandler(async (req: AuthRequest, res: Response) => {
-  if (!req.file) {
+  if (!req.user) {
+    throw new UnauthorizedError('User not authenticated')
+  }
+
+  const file = (req as any).file as any
+
+  if (!file) {
     throw new BadRequestError('No file uploaded')
   }
 
-  // Cloudinary storage puts the URL in req.file.path
-  const avatarUrl = req.file.path
+  let avatarUrl: string
 
-  const user = await prisma.user.update({
-    where: { id: req.user!.id },
-    data: { avatarUrl }
+  if (file.path && typeof file.path === 'string' && /^https?:\/\//.test(file.path)) {
+    avatarUrl = file.path
+  } else {
+    const baseUrl = process.env.FILE_BASE_URL || `${req.protocol}://${req.get('host')}`
+    const filename =
+      file.filename ||
+      (typeof file.path === 'string' ? file.path.split(/[\\/]/).pop() : undefined)
+
+    if (!filename) {
+      throw new BadRequestError('Unable to determine uploaded file name')
+    }
+
+    avatarUrl = `${baseUrl}/uploads/${filename}`
+  }
+
+  await prisma.user.update({
+    where: { id: req.user.id },
+    data: { avatarUrl },
   })
 
   res.json({
     success: true,
     data: {
-      avatarUrl: user.avatarUrl
-    }
+      avatarUrl,
+    },
   })
 })
 
@@ -521,6 +630,13 @@ export const changePassword = asyncHandler(async (req: AuthRequest, res: Respons
     success: true,
     message: 'Password changed successfully'
   })
+
+  // Audit: password changed
+  await createAuditLog({
+    userId: req.user!.id,
+    action: 'auth.change_password',
+    resourceId: req.user!.id,
+  })
 })
 
 export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -535,9 +651,15 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
     emergencyContact
   } = req.body
 
+  const normalizedEmergencyContact =
+    emergencyContact &&
+    (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
+      ? emergencyContact
+      : null
+
   // Fetch current user to get existing details if not provided
-  const currentUser = await prisma.user.findUnique({ where: { id: req.user!.id } });
-  if (!currentUser) throw new UnauthorizedError('User not found');
+  const currentUser = await prisma.user.findUnique({ where: { id: req.user!.id } })
+  if (!currentUser) throw new UnauthorizedError('User not found')
 
   // Update User basic info if provided
   if (firstName || lastName) {
@@ -551,8 +673,8 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
   }
 
   // Use provided values or fallback to current user values
-  const finalFirstName = firstName || currentUser.firstName || '';
-  const finalLastName = lastName || currentUser.lastName || '';
+  const finalFirstName = firstName || currentUser.firstName || ''
+  const finalLastName = lastName || currentUser.lastName || ''
 
   // Upsert Employee record
   const employeeData: any = {
@@ -568,7 +690,7 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
     dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
     gender: gender || undefined,
     maritalStatus: maritalStatus || undefined,
-    emergencyContact
+    emergencyContact: normalizedEmergencyContact
   }
 
   const employee = await prisma.employee.upsert({
@@ -582,7 +704,7 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       gender: gender || undefined,
       maritalStatus: maritalStatus || undefined,
-      emergencyContact
+      emergencyContact: normalizedEmergencyContact
     }
   })
 

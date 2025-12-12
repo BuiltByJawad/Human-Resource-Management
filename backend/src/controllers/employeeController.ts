@@ -15,11 +15,37 @@ export const getEmployees = async (req: Request, res: Response, next: NextFuncti
         const where: any = {}
 
         if (search) {
-            where.OR = [
+            const numericSearch = Number(search)
+            const isNumeric = !isNaN(numericSearch)
+
+            const dateFromSearch = new Date(search)
+            const isValidDate = !isNaN(dateFromSearch.getTime())
+
+            const orConditions: any[] = [
                 { firstName: { contains: search, mode: 'insensitive' } },
                 { lastName: { contains: search, mode: 'insensitive' } },
                 { email: { contains: search, mode: 'insensitive' } },
             ]
+
+            if (isNumeric) {
+                orConditions.push({ salary: numericSearch })
+            }
+
+            if (isValidDate) {
+                const startOfDay = new Date(dateFromSearch)
+                startOfDay.setHours(0, 0, 0, 0)
+                const endOfDay = new Date(dateFromSearch)
+                endOfDay.setHours(23, 59, 59, 999)
+
+                orConditions.push({
+                    hireDate: {
+                        gte: startOfDay,
+                        lte: endOfDay,
+                    },
+                })
+            }
+
+            where.OR = orConditions
         }
 
         if (departmentId) {

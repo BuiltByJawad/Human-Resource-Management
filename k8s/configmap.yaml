@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hrm-config
+  namespace: hrm-system
+data:
+  NODE_ENV: "production"
+  PORT: "5000"
+  DATABASE_URL: "postgresql://hrm_user:${POSTGRES_PASSWORD}@postgres:5432/hrm_db"
+  REDIS_URL: "redis://redis:6379"
+  FRONTEND_URL: "https://hrm.yourdomain.com"
+  FILE_BASE_URL: "https://api.hrm.yourdomain.com"
+  
+  # Email Configuration (use external SMTP)
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  SMTP_SECURE: "false"
+  EMAIL_FROM: "noreply@hrm.yourdomain.com"
+  
+  # Feature Flags
+  ENABLE_GEOFENCING: "true"
+  ENABLE_2FA: "true"
+  
+  # Logging
+  LOG_LEVEL: "info"
+  
+  # Pagination
+  DEFAULT_PAGE_SIZE: "20"
+  MAX_PAGE_SIZE: "100"

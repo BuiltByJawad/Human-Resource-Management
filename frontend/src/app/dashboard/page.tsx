@@ -14,6 +14,8 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import api from '@/app/api/api'
+import { useQuery } from '@tanstack/react-query'
+import { useAuthStore } from '@/store/useAuthStore'
 
 interface DashboardStats {
   totalEmployees: number
@@ -34,32 +36,28 @@ interface RecentActivity {
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
-  const [stats, setStats] = useState<DashboardStats>({
-    totalEmployees: 0,
-    activeEmployees: 0,
-    totalDepartments: 0,
-    pendingLeaveRequests: 0,
-    totalPayroll: 0,
-    attendanceRate: 0
-  })
-  const [loading, setLoading] = useState(true)
+  const { token } = useAuthStore()
 
   useEffect(() => {
     setMounted(true)
-
-    const fetchStats = async () => {
-      try {
-        const response = await api.get('/dashboard/stats')
-        setStats(response.data.data)
-      } catch (error) {
-        console.error('Failed to fetch dashboard stats:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
   }, [])
+
+  const { data: stats, isLoading: loading } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const response = await api.get('/dashboard/stats')
+      return response.data.data as DashboardStats
+    },
+    enabled: !!token,
+    initialData: {
+      totalEmployees: 0,
+      activeEmployees: 0,
+      totalDepartments: 0,
+      pendingLeaveRequests: 0,
+      totalPayroll: 0,
+      attendanceRate: 0
+    }
+  })
 
   const [recentActivities] = useState<RecentActivity[]>([
     {

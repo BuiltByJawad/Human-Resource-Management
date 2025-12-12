@@ -1,0 +1,23 @@
+# ZAP Scanning Rules
+# This file defines custom rules for OWASP ZAP security scanning
+# Format: RULE_ID	THRESHOLD	[IGNORE_URL_PATTERN]
+
+# Ignore false positives for specific endpoints
+10021	IGNORE	/health
+10021	IGNORE	/api-docs
+
+# Set thresholds for specific vulnerabilities
+# 10021 - X-Content-Type-Options Header Missing
+10021	MEDIUM
+
+# 10020 - X-Frame-Options Header Not Set
+10020	MEDIUM
+
+# 10016 - Web Browser XSS Protection Not Enabled
+10016	MEDIUM
+
+# 10017 - Cross-Domain JavaScript Source File Inclusion
+10017	LOW
+
+# 10063 - Feature Policy Header Not Set (Permissions-Policy)
+10063	INFO

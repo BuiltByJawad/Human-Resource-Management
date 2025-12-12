@@ -42,7 +42,7 @@ export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = f
     };
 
     const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<ReviewFormData>({
-        resolver: yupResolver(reviewSchema),
+        resolver: yupResolver(reviewSchema) as any,
         defaultValues: {
             ratings: {
                 'Technical Proficiency': 0,

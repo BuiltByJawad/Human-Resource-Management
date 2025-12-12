@@ -57,10 +57,10 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
 
   return (
     <div
-      className={`bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow ${className}`}
+      className={`bg-white shadow rounded-xl border border-gray-100 p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow ${className}`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
             <span className="text-lg font-medium text-blue-600">
               {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
@@ -74,7 +74,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
             <p className="text-sm text-gray-500">#{employee.employeeNumber}</p>
           </div>
         </div>
-        <div className="flex flex-col items-end space-y-1">
+        <div className="flex flex-col items-start sm:items-end space-y-1">
           <Badge variant={getStatusColor(employee.status)}>
             {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
           </Badge>
@@ -102,7 +102,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <p className="text-sm font-medium text-gray-500">Department</p>
           <p className="text-sm text-gray-900">{employee.department?.name || 'N/A'}</p>
@@ -128,7 +128,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
           variant="outline"
           size="sm"
           onClick={() => onView?.(employee)}
-          className="flex items-center space-x-1"
+          className="flex items-center justify-center space-x-1 min-w-[96px]"
         >
           <EyeIcon className="h-4 w-4" />
           <span>View</span>
@@ -137,7 +137,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
           variant="outline"
           size="sm"
           onClick={() => onEdit?.(employee)}
-          className="flex items-center space-x-1"
+          className="flex items-center justify-center space-x-1 min-w-[96px]"
         >
           <PencilIcon className="h-4 w-4" />
           <span>Edit</span>
@@ -146,7 +146,7 @@ export function EmployeeCard({ employee, onEdit, onView, onDelete, onSendInvite,
           variant="danger"
           size="sm"
           onClick={() => onDelete?.(employee)}
-          className="flex items-center space-x-1"
+          className="flex items-center justify-center space-x-1 min-w-[96px]"
         >
           <TrashIcon className="h-4 w-4" />
           <span>Delete</span>

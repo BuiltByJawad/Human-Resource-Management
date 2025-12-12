@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import { Request, Response } from 'express'
-import { asyncHandler } from '../middleware/errorHandler'
-import { authenticate, authorize } from '../middleware/auth'
-import { prisma } from '../config/database'
+import { asyncHandler } from '../shared/middleware/errorHandler'
+import { authenticate, authorize } from '../shared/middleware/auth'
+import { prisma } from '../shared/config/database'
 import Joi from 'joi'
 
 const router = Router()
@@ -105,7 +105,7 @@ router.get(
     })
 
     if (format === 'csv') {
-      const csvData = employees.map(emp => ({
+      const csvData = employees.map((emp: any) => ({
         'Employee Number': emp.employeeNumber,
         'Name': `${emp.firstName} ${emp.lastName}`,
         'Email': emp.email,
@@ -166,11 +166,11 @@ router.get(
 
     const summary = {
       totalRecords: attendance.length,
-      presentDays: attendance.filter(a => a.status === 'present').length,
-      absentDays: attendance.filter(a => a.status === 'absent').length,
-      lateDays: attendance.filter(a => a.status === 'late').length,
-      totalWorkHours: attendance.reduce((sum, a) => sum + Number(a.workHours ?? 0), 0),
-      totalOvertimeHours: attendance.reduce((sum, a) => sum + Number(a.overtimeHours ?? 0), 0),
+      presentDays: attendance.filter((a: any) => a.status === 'present').length,
+      absentDays: attendance.filter((a: any) => a.status === 'absent').length,
+      lateDays: attendance.filter((a: any) => a.status === 'late').length,
+      totalWorkHours: attendance.reduce((sum: number, a: any) => sum + Number(a.workHours ?? 0), 0),
+      totalOvertimeHours: attendance.reduce((sum: number, a: any) => sum + Number(a.overtimeHours ?? 0), 0),
     }
 
     res.json({
@@ -218,6 +218,7 @@ router.get(
             id: true,
             firstName: true,
             lastName: true,
+            email: true,
           },
         },
       },
@@ -226,10 +227,10 @@ router.get(
 
     const summary = {
       totalRequests: leaveRequests.length,
-      approvedRequests: leaveRequests.filter(lr => lr.status === 'approved').length,
-      pendingRequests: leaveRequests.filter(lr => lr.status === 'pending').length,
-      rejectedRequests: leaveRequests.filter(lr => lr.status === 'rejected').length,
-      totalDaysRequested: leaveRequests.reduce((sum, lr) => sum + lr.daysRequested, 0),
+      approvedRequests: leaveRequests.filter((lr: any) => lr.status === 'approved').length,
+      pendingRequests: leaveRequests.filter((lr: any) => lr.status === 'pending').length,
+      rejectedRequests: leaveRequests.filter((lr: any) => lr.status === 'rejected').length,
+      totalDaysRequested: leaveRequests.reduce((sum: number, lr: any) => sum + lr.daysRequested, 0),
     }
 
     res.json({
@@ -278,10 +279,10 @@ router.get(
 
     const summary = {
       totalRecords: payrollRecords.length,
-      totalBaseSalary: payrollRecords.reduce((sum, pr) => sum + Number(pr.baseSalary), 0),
-      totalAllowances: payrollRecords.reduce((sum, pr) => sum + Number(pr.allowances), 0),
-      totalDeductions: payrollRecords.reduce((sum, pr) => sum + Number(pr.deductions), 0),
-      totalNetSalary: payrollRecords.reduce((sum, pr) => sum + Number(pr.netSalary), 0),
+      totalBaseSalary: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.baseSalary), 0),
+      totalAllowances: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.allowances), 0),
+      totalDeductions: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.deductions), 0),
+      totalNetSalary: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.netSalary), 0),
     }
 
     res.json({

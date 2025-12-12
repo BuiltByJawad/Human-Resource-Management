@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import MobileMenu from './MobileMenu'
@@ -18,7 +19,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isMounted, setIsMounted] = useState(false)
 
-  const { user, logout } = useAuthStore()
+  const { user, logout, isLoggingOut } = useAuthStore()
   const { siteName, tagline } = useOrgStore()
 
   const router = useRouter()
@@ -67,17 +68,25 @@ export default function Header() {
             </div>
           </div>
         </div>
+
+        {isLoggingOut && (
+          <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+            <div className="h-12 w-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-sm font-medium text-slate-700">Signing you out</p>
+          </div>
+        )}
       </header>
     )
   }
 
-  const initials = user.firstName && user.lastName
+  const initials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
     : 'U'
 
   return (
     <header className="bg-white/80 backdrop-blur border-b border-slate-200/80 sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
+
         {isMobileSearchOpen ? (
           <div className="flex items-center w-full gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
             <button
@@ -185,7 +194,15 @@ export default function Header() {
                   className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 text-sm text-slate-700 shadow-sm"
                 >
                   {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="Profile" className="h-8 w-8 rounded-full object-cover" />
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden">
+                      <Image
+                        src={user.avatarUrl}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
+                        sizes="32px"
+                      />
+                    </div>
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold">
                       {initials}
@@ -225,6 +242,13 @@ export default function Header() {
         )}
       </div>
       <MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={user} />
+
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="h-12 w-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-sm font-medium text-slate-700">Signing you out</p>
+        </div>
+      )}
     </header>
   )
 }

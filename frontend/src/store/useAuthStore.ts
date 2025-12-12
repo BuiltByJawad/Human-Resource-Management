@@ -26,6 +26,7 @@ interface AuthState {
     user: User | null
     token: string | null
     isAuthenticated: boolean
+    isLoggingOut: boolean
     login: (email: string, password: string) => Promise<void>
     logout: () => void
     updateUser: (updates: Partial<User>) => void
@@ -43,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             token: null,
             isAuthenticated: false,
+            isLoggingOut: false,
             login: async (email, password) => {
                 try {
                     const response = await axios.post(`${API_URL}/auth/login`, { email, password })
@@ -51,7 +53,7 @@ export const useAuthStore = create<AuthState>()(
                         ...user,
                         permissions: permissions ?? [],
                     }
-                    set({ user: normalizedUser, token: accessToken, isAuthenticated: true })
+                    set({ user: normalizedUser, token: accessToken, isAuthenticated: true, isLoggingOut: false })
                 } catch (error: any) {
                     const message =
                         error?.response?.data?.error?.message ||
@@ -61,7 +63,7 @@ export const useAuthStore = create<AuthState>()(
                     throw new Error(message)
                 }
             },
-            logout: () => set({ user: null, token: null, isAuthenticated: false }),
+            logout: () => set({ user: null, token: null, isAuthenticated: false, isLoggingOut: true }),
             updateUser: (updates) =>
                 set((state) => ({
                     user: state.user
@@ -76,6 +78,7 @@ export const useAuthStore = create<AuthState>()(
                 set({
                     user: user ? { ...user, permissions: user.permissions ?? [] } : null,
                     isAuthenticated: !!user,
+                    isLoggingOut: false,
                 }),
             hasPermission: (permission) => {
                 const { user } = get()
@@ -101,6 +104,11 @@ export const useAuthStore = create<AuthState>()(
         }),
         {
             name: 'auth-storage',
+            partialize: (state) => ({
+                user: state.user,
+                token: state.token,
+                isAuthenticated: state.isAuthenticated,
+            }),
         }
     )
 )

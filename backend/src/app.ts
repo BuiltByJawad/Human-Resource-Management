@@ -7,10 +7,11 @@ import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
-import { errorHandler } from './middleware/errorHandler';
-// import { initializePassport } from './config/passport';
-import { logger, stream } from './config/logger';
+import { errorHandler } from '@/shared/middleware/errorHandler';
+import { logger, stream } from '@/shared/config/logger';
 import routes from './routes';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from '@/shared/config/swagger';
 
 export const prisma = new PrismaClient();
 
@@ -31,8 +32,36 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.set('trust proxy', 1);
   app.set('io', io);
 
-  // Middleware
-  app.use(helmet());
+  // Security Middleware
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: {
+      action: 'deny',
+    },
+    noSniff: true,
+    xssFilter: true,
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
+  }));
+
   app.use(compression());
   app.use(cors({
     origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001'],
@@ -42,31 +71,78 @@ export const createApp = (): { app: Application; httpServer: any } => {
   // Request logging
   app.use(morgan('combined', { stream }));
 
-  // Rate limiting
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+
+  // Prometheus metrics endpoint
+  app.get('/metrics', async (req: Request, res: Response) => {
+    try {
+      const { register } = await import('@/shared/utils/metrics');
+      res.set('Content-Type', register.contentType);
+      res.end(await register.metrics());
+    } catch (error) {
+      res.status(500).end();
+    }
   });
 
-  app.use(limiter);
+  // API Documentation
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'HRM API Documentation',
+  }));
 
-  // Body parsing
-  app.use(express.json({ limit: '10kb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+  // Health check endpoints
+  app.get('/health', async (req: Request, res: Response) => {
+    try {
+      const health = await import('@/shared/utils/healthCheck');
+      const status = await health.aggregateHealth();
 
-  // Initialize Passport
-  // initializePassport(app);
+      const httpStatus = status.status === 'healthy' ? 200 :
+        status.status === 'degraded' ? 200 : 503;
 
-  // API routes
-  app.use('/api', routes);
-
-  // Serve static files
-  app.use('/uploads', express.static('uploads'));
-
-  // Health check endpoint
-  app.get('/health', (req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+      res.status(httpStatus).json(status);
+    } catch (error) {
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: 'Health check failed',
+      });
+    }
   });
+
+  // Liveness probe for Kubernetes
+  app.get('/health/live', (req: Request, res: Response) => {
+    res.status(200).json({
+      alive: true,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Readiness probe for Kubernetes
+  app.get('/health/ready', async (req: Request, res: Response) => {
+    try {
+      const health = await import('@/shared/utils/healthCheck');
+      const readiness = await health.checkReadiness();
+
+      if (readiness.ready) {
+        res.status(200).json({
+          ready: true,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        res.status(503).json({
+          ready: false,
+          reason: readiness.reason,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error: any) {
+      res.status(503).json({
+        ready: false,
+        reason: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
 
   // 404 handler
   app.use((req: Request, res: Response) => {
