@@ -1,8 +1,8 @@
 import { Router } from 'express'
-import { uploadBranding } from '../middleware/uploadMiddleware'
-import { authenticate, checkPermission } from '../middleware/auth'
+import { uploadBranding } from '@/shared/middleware/uploadMiddleware';
+import { authenticate, checkPermission } from '@/shared/middleware/auth';
 import { uploadBrandLogo, uploadBrandFavicon, getSettings, updateSettings, getPublicBranding } from '../controllers/orgController'
-import { validateRequest } from '../middleware/validation'
+import { validateRequest } from '@/shared/middleware/validation';
 import { orgSettingsSchema } from '../validators'
 
 const router = Router()

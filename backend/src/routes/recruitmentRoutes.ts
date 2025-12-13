@@ -1,5 +1,5 @@
 import express from 'express'
-import { authenticate, checkPermission } from '../middleware/auth'
+import { authenticate, checkPermission } from '@/shared/middleware/auth';
 import {
     getJobPostings,
     createJobPosting,

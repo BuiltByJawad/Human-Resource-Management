@@ -7,8 +7,8 @@ import {
   deleteRole,
   getPermissions
 } from '../controllers/roleController'
-import { authenticate, authorize } from '../middleware/auth'
-import { validateRequest } from '../middleware/validation'
+import { authenticate, authorize } from '@/shared/middleware/auth';
+import { validateRequest } from '@/shared/middleware/validation';
 import Joi from 'joi'
 
 const router = Router()

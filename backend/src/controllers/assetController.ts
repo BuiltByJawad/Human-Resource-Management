@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
-import { prisma } from '../config/database'
-import { NotFoundError, BadRequestError } from '../utils/errors'
+import { prisma } from '@/shared/config/database';
+import { NotFoundError, BadRequestError } from '@/shared/utils/errors';
 
 export const getAssets = async (req: Request, res: Response, next: NextFunction) => {
     try {

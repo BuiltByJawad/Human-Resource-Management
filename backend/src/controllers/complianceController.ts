@@ -1,7 +1,8 @@
+
 import { Request, Response } from 'express'
-import { asyncHandler } from '../middleware/errorHandler'
-import { prisma } from '../config/database'
-import { BadRequestError, NotFoundError } from '../utils/errors'
+import { asyncHandler } from '@/shared/middleware/errorHandler';
+import { prisma } from '@/shared/config/database';
+import { BadRequestError, NotFoundError } from '@/shared/utils/errors';
 import { startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 // @desc    Get all compliance rules
@@ -147,7 +148,7 @@ export const runComplianceCheck = asyncHandler(async (req: Request, res: Respons
                             ruleId: rule.id,
                             employeeId: record.employeeId,
                             violationDate: today,
-                            details: `Worked ${totalHours.toFixed(2)} hours (Limit: ${rule.threshold})`,
+                            details: `Worked ${ totalHours.toFixed(2) } hours(Limit: ${ rule.threshold })`,
                             status: 'open'
                         }
                     })
@@ -160,7 +161,7 @@ export const runComplianceCheck = asyncHandler(async (req: Request, res: Respons
 
     res.json({
         success: true,
-        message: `Compliance check completed. Found ${violations.length} violations.`,
+        message: `Compliance check completed.Found ${ violations.length } violations.`,
         data: violations
     })
 })
