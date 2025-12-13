@@ -4,10 +4,10 @@ import { asyncHandler } from '@/shared/middleware/errorHandler';
 import { authenticate, authorize, AuthRequest } from '@/shared/middleware/auth';
 import { prisma } from '@/shared/config/database';
 import { attendanceSchema } from '../validators'
-import { validateRequest, validateParams, validateQuery } from '../middleware/validation'
+import { validateRequest, validateParams, validateQuery } from '@/shared/middleware/validation';
 import { NotFoundError, ConflictError } from '@/shared/utils/errors';
 import Joi from 'joi'
-import { calculateDistance } from '@/shared/utils/geolocation';
+import { calculateDistance, validateLocation } from '@/shared/utils/geolocation';
 
 const router = Router()
 
