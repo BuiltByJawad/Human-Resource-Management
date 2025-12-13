@@ -2,13 +2,13 @@ import { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { addHours } from 'date-fns'
-import { asyncHandler } from '../middleware/errorHandler'
-import { prisma } from '../config/database'
-import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '../utils/auth'
-import { UnauthorizedError, BadRequestError, NotFoundError } from '../utils/errors'
-import { AuthRequest } from '../middleware/auth'
-import { sendEmail } from '../utils/email'
-import { createAuditLog } from '../utils/audit'
+import { asyncHandler } from '@/shared/middleware/errorHandler';
+import { prisma } from '@/shared/config/database';
+import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '@/shared/utils/auth';
+import { UnauthorizedError, BadRequestError, NotFoundError } from '@/shared/utils/errors';
+import { AuthRequest } from '@/shared/middleware/auth';
+import { sendEmail } from '@/shared/utils/email';
+import { createAuditLog } from '@/shared/utils/audit';
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex')
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
@@ -653,7 +653,7 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
 
   const normalizedEmergencyContact =
     emergencyContact &&
-    (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
+      (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
       ? emergencyContact
       : null
 

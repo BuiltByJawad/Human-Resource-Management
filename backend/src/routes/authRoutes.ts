@@ -1,10 +1,11 @@
+
 import { Router } from 'express'
 import { login, register, refreshToken, getProfile, uploadAvatar, changePassword, updateProfile, inviteUser, completeInvite, requestPasswordReset, resetPassword } from '../controllers/authController'
-import { protect, checkPermission } from '../middleware/auth'
-import { validateRequest } from '../middleware/validation'
+import { protect, checkPermission } from '@/shared/middleware/auth'
+import { validateRequest } from '@/shared/middleware/validation'
 import { loginSchema, registerSchema, changePasswordSchema, updateProfileSchema, inviteUserSchema, completeInviteSchema, passwordResetRequestSchema, resetPasswordSchema, refreshTokenSchema } from '../validators'
-import { authRateLimiter } from '../middleware/security'
-import { upload } from '../middleware/uploadMiddleware'
+import { authRateLimiter } from '@/shared/middleware/security';
+import { upload } from '@/shared/middleware/uploadMiddleware'
 
 const router = Router()
 

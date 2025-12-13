@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { prisma } from '../config/database'
+import { prisma } from '@/shared/config/database';
 
 export const getJobPostings = async (req: Request, res: Response) => {
     try {

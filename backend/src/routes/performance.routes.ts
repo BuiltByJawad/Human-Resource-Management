@@ -6,7 +6,7 @@ import {
     getEmployeeReviews,
     summarizeFeedback
 } from '../controllers/performance.controller';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize } from '@/shared/middleware/auth';
 
 const router = Router();
 console.log('Loading performance routes file...');

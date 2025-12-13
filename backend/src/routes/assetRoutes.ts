@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authenticate, authorize } from '../middleware/auth'
+import { authenticate, authorize } from '@/shared/middleware/auth';
 import {
     getAssets,
     createAsset,
