@@ -58,7 +58,7 @@ export function AtRiskList({ employees }: { employees: any[] }) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">At-Risk Employees</h3>
-                <p className="text-sm text-gray-500 mt-1">Showing {employees.length} employees requiring attention</p>
+                <p className="text-sm text-gray-500 mt-1">Showing {(Array.isArray(employees) ? employees : []).length} employees requiring attention</p>
             </div>
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -89,7 +89,7 @@ export function AtRiskList({ employees }: { employees: any[] }) {
                                 </td>
                             </tr>
                         ) : (
-                            employees.map((employee) => (
+                            (Array.isArray(employees) ? employees : []).map((employee) => (
                                 <tr key={employee.employeeId} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900">{employee.employeeName}</div>
@@ -105,7 +105,7 @@ export function AtRiskList({ employees }: { employees: any[] }) {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="text-xs text-gray-600 space-y-1">
-                                            {employee.flags.map((flag: string, idx: number) => (
+                                            {(Array.isArray(employee.flags) ? employee.flags : []).map((flag: string, idx: number) => (
                                                 <div key={idx} className="flex items-center">
                                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 mr-2"></span>
                                                     {flag}
@@ -125,7 +125,7 @@ export function AtRiskList({ employees }: { employees: any[] }) {
 
 export function WorkPatternChart({ employees }: { employees: any[] }) {
     // Group employees by risk level for visualization
-    const chartData = employees.reduce((acc: any, emp) => {
+    const chartData = (Array.isArray(employees) ? employees : []).reduce((acc: any, emp) => {
         if (!acc[emp.riskLevel]) {
             acc[emp.riskLevel] = {
                 count: 0,

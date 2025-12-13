@@ -57,12 +57,16 @@ export default function RolesPage() {
                 if (permsRes.data.success) {
                     // Correctly access data and grouped from response
                     // Response structure: { success: true, data: Permission[], grouped: Record<string, Permission[]> }
-                    setPermissions(permsRes.data.data)
-                    setGroupedPermissions(permsRes.data.grouped)
+                    setPermissions(Array.isArray(permsRes.data.data) ? permsRes.data.data : [])
+                    setGroupedPermissions(permsRes.data.grouped || {})
                 }
             } catch (error: any) {
-                console.error('Failed to fetch permissions', error)
-                // Permissions should generally exist, but handle gracefully
+                // Handle 404 or other errors gracefully - permissions may not be available
+                if (error.response?.status === 404) {
+                    console.warn('Permissions endpoint not available')
+                } else {
+                    console.error('Failed to fetch permissions', error)
+                }
                 setPermissions([])
                 setGroupedPermissions({})
             }

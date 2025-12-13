@@ -18,7 +18,12 @@ import {
   ChevronDoubleLeftIcon,
   UserGroupIcon,
   ComputerDesktopIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  CalendarDaysIcon,
+  DocumentTextIcon,
+  AcademicCapIcon,
+  FlagIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useOrgStore } from '@/store/useOrgStore'
@@ -33,16 +38,33 @@ type NavItem = {
   permissions?: Permission[]
 }
 
-const navigation: { label: string; items: NavItem[] }[] = [
+const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = [
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MY WORKSPACE - Self-service section (visible to ALL users, no permissions)
+  // Follows BambooHR pattern: "Home" / "My Info" at top
+  // ═══════════════════════════════════════════════════════════════════════════
   {
-    label: 'Workspace',
+    label: 'My Workspace',
+    isPersonal: true,
     items: [
-      { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+      { name: 'My Dashboard', href: '/portal', icon: UserCircleIcon },
+      { name: 'My Shifts', href: '/portal/shifts', icon: CalendarDaysIcon },
+      { name: 'My Documents', href: '/portal/documents', icon: DocumentTextIcon },
+      { name: 'My Training', href: '/portal/training', icon: AcademicCapIcon },
+      { name: 'My Goals', href: '/portal/goals', icon: FlagIcon },
+      { name: 'My Leave', href: '/leave', icon: ClipboardDocumentListIcon },
+    ],
+  },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ADMIN SECTIONS - Permission-gated (only visible to users with access)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    label: 'HR Management',
+    items: [
+      { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, permissions: [PERMISSIONS.VIEW_EMPLOYEES] },
       { name: 'Employees', href: '/employees', icon: UsersIcon, permissions: [PERMISSIONS.VIEW_EMPLOYEES] },
       { name: 'Departments', href: '/departments', icon: BuildingOfficeIcon, permissions: [PERMISSIONS.MANAGE_DEPARTMENTS] },
       { name: 'Attendance', href: '/attendance', icon: ClockIcon, permissions: [PERMISSIONS.VIEW_ATTENDANCE] },
-      // Leave is available to all authenticated users; fine-grained actions are permission-gated inside
-      { name: 'Leave', href: '/leave', icon: ClipboardDocumentListIcon },
     ],
   },
   {
@@ -52,7 +74,6 @@ const navigation: { label: string; items: NavItem[] }[] = [
       { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon, permissions: [PERMISSIONS.VIEW_ASSETS] },
       { name: 'Performance', href: '/performance', icon: SparklesIcon, permissions: [PERMISSIONS.VIEW_PERFORMANCE] },
       { name: 'Burnout Analytics', href: '/analytics/burnout', icon: ExclamationTriangleIcon, permissions: [PERMISSIONS.VIEW_ANALYTICS] },
-      // Recruitment typically for HR/recruiters; reuse MANAGE_EMPLOYEES as a reasonable gate
       { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon, permissions: [PERMISSIONS.MANAGE_EMPLOYEES] },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon, permissions: [PERMISSIONS.VIEW_REPORTS] },
       { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon, permissions: [PERMISSIONS.VIEW_COMPLIANCE] },
@@ -62,7 +83,6 @@ const navigation: { label: string; items: NavItem[] }[] = [
     label: 'System',
     items: [
       { name: 'Roles & Permissions', href: '/roles', icon: KeyIcon, permissions: [PERMISSIONS.MANAGE_ROLES] },
-      // Settings is visible to everyone; sections inside are permission-gated
       { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
     ],
   },
@@ -103,8 +123,12 @@ export default function Sidebar() {
   const { siteName, shortName, tagline, logoUrl } = useOrgStore()
   const pathname = usePathname()
 
+  // canSeeItem handles hydration: on server (not mounted), hide permission-gated items
+  // This ensures server and client render the same items
   const canSeeItem = (item: NavItem) => {
     if (!item.permissions || item.permissions.length === 0) return true
+    // Before mount, hide permission-gated items to prevent hydration mismatch
+    if (!isMounted) return false
     return hasAnyPermission(item.permissions)
   }
 
@@ -150,8 +174,8 @@ export default function Sidebar() {
   return (
     <aside
       className={`
-        hidden md:flex relative bg-[#0B1120] text-white min-h-screen transition-all duration-300 flex-col border-r border-white/5 shadow-2xl z-20
-        w-72 [.sidebar-collapsed_&]:w-20
+        hidden md:flex relative bg-slate-900 text-white min-h-screen transition-all duration-300 flex-col z-20
+        w-64 [.sidebar-collapsed_&]:w-20
       `}
     >
       {/* Header */}
@@ -204,15 +228,28 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 no-scrollbar">
-        {navigation.map((section) => {
+      <div className="flex-1 overflow-y-auto py-6 px-4 space-y-6 no-scrollbar">
+        {navigation.map((section, sectionIndex) => {
           const visibleItems = section.items.filter(canSeeItem)
           if (visibleItems.length === 0) return null
+
+          const isPersonalSection = section.isPersonal
+          const isFirstAdminSection = !section.isPersonal && navigation[sectionIndex - 1]?.isPersonal
+
           return (
             <div key={section.label}>
+              {/* Divider between personal and admin sections */}
+              {isFirstAdminSection && (
+                <div className="mb-6 pt-2 border-t border-white/10 [.sidebar-collapsed_&]:border-0">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500/70 px-2 mt-2 [.sidebar-collapsed_&]:hidden">
+                    Administration
+                  </p>
+                </div>
+              )}
               <p className={`
-                text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-4 px-2
+                text-[11px] font-bold uppercase tracking-wider mb-4 px-2
                 [.sidebar-collapsed_&]:hidden
+                ${isPersonalSection ? 'text-blue-400' : 'text-slate-500'}
               `}>
                 {section.label}
               </p>

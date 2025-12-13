@@ -36,7 +36,7 @@ export function CreatableSelect({
 
     // Initialize query with current value's label if it exists, otherwise value
     useEffect(() => {
-        const option = options.find(opt => opt.value === value)
+        const option = (Array.isArray(options) ? options : []).find(opt => opt.value === value)
         if (option) {
             setQuery(option.label)
         } else if (value) {
@@ -47,7 +47,7 @@ export function CreatableSelect({
     const filteredOptions =
         query === ''
             ? options
-            : options.filter((option) =>
+            : (Array.isArray(options) ? options : []).filter((option) =>
                 option.label.toLowerCase().includes(query.toLowerCase())
             )
 

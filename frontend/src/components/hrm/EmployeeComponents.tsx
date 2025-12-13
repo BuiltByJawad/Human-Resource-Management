@@ -264,7 +264,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
                 label="Department"
                 value={field.value}
                 onChange={field.onChange}
-                options={departments.map(d => ({ value: d.id, label: d.name }))}
+                options={(Array.isArray(departments) ? departments : []).map(d => ({ value: d.id, label: d.name }))}
                 placeholder="Select Department"
                 required
                 error={errors.departmentId?.message}
@@ -281,7 +281,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
                 label="Role"
                 value={field.value}
                 onChange={field.onChange}
-                options={roles.map(r => ({ value: r.id, label: r.name }))}
+                options={(Array.isArray(roles) ? roles : []).map(r => ({ value: r.id, label: r.name }))}
                 placeholder="Select Role"
                 required
                 error={errors.roleId?.message}

@@ -72,7 +72,7 @@ export default function RecruitmentPage() {
 
     const handleStatusChange = async (applicantId: string, newStatus: ApplicantStatus) => {
         const previousApplicants = [...applicants]
-        setApplicants(prev => prev.map(a =>
+        setApplicants(prev => (Array.isArray(prev) ? prev : []).map(a =>
             a.id === applicantId ? { ...a, status: newStatus } : a
         ))
 
@@ -108,7 +108,7 @@ export default function RecruitmentPage() {
                                         onChange={(value) => setSelectedJobId(value)}
                                         options={[
                                             { value: '', label: 'Select a Job Posting' },
-                                            ...jobs.map(job => ({ value: job.id, label: job.title }))
+                                            ...(Array.isArray(jobs) ? jobs : []).map(job => ({ value: job.id, label: job.title }))
                                         ]}
                                     />
                                 </div>

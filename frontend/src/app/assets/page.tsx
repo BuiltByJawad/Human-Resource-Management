@@ -160,10 +160,10 @@ export default function AssetPage() {
     }
 
     const stats = {
-        total: assets.length,
-        assigned: assets.filter(a => a.status === 'assigned').length,
-        available: assets.filter(a => a.status === 'available').length,
-        maintenance: assets.filter(a => a.status === 'maintenance').length
+        total: (Array.isArray(assets) ? assets : []).length,
+        assigned: (Array.isArray(assets) ? assets : []).filter(a => a.status === 'assigned').length,
+        available: (Array.isArray(assets) ? assets : []).filter(a => a.status === 'available').length,
+        maintenance: (Array.isArray(assets) ? assets : []).filter(a => a.status === 'maintenance').length
     }
 
     return (

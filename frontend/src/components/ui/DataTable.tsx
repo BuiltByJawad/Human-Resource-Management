@@ -41,8 +41,9 @@ export function DataTable<T extends { id: string }>({
     return path.split('.').reduce((acc, part) => acc && acc[part], obj)
   }
 
-  // Filter data based on search query
-  const filteredData = data.filter(item => {
+  // Filter data based on search query - with comprehensive array check
+  const safeData = Array.isArray(data) ? data : []
+  const filteredData = safeData.filter(item => {
     if (!searchQuery || searchKeys.length === 0) return true
     return searchKeys.some(key => {
       const value = getNestedValue(item, key)
@@ -50,11 +51,12 @@ export function DataTable<T extends { id: string }>({
     })
   })
 
-  const totalPages = Math.ceil(filteredData.length / pageSize)
+  const safeFilteredData = filteredData
+  const totalPages = Math.ceil(safeFilteredData.length / pageSize)
   const startIndex = (currentPage - 1) * pageSize
   const endIndex = startIndex + pageSize
 
-  const sortedData = [...filteredData].sort((a, b) => {
+  const sortedData = [...safeFilteredData].sort((a, b) => {
     if (!sortKey) return 0
 
     // Handle custom accessor keys if needed, for now simple property access
@@ -106,7 +108,7 @@ export function DataTable<T extends { id: string }>({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              {columns.map((column) => {
+              {(Array.isArray(columns) ? columns : []).map((column) => {
                 const key = column.accessorKey || column.key
                 return (
                   <th
@@ -147,7 +149,7 @@ export function DataTable<T extends { id: string }>({
                   className={`hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
                   onClick={() => onRowClick?.(item)}
                 >
-                  {columns.map((column) => {
+                  {(Array.isArray(columns) ? columns : []).map((column) => {
                     const key = column.accessorKey || column.key
                     return (
                       <td key={String(key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -188,8 +190,8 @@ export function DataTable<T extends { id: string }>({
             <div>
               <p className="text-sm text-gray-700">
                 Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
-                <span className="font-medium">{Math.min(endIndex, filteredData.length)}</span> of{' '}
-                <span className="font-medium">{filteredData.length}</span> results
+                <span className="font-medium">{Math.min(endIndex, safeFilteredData.length)}</span> of{' '}
+                <span className="font-medium">{safeFilteredData.length}</span> results
               </p>
             </div>
             <div>

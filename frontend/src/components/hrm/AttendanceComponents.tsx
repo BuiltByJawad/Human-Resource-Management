@@ -87,7 +87,7 @@ export function AttendanceHistory({ records, loading }: AttendanceHistoryProps) 
         return <div className="text-center py-8">Loading history...</div>
     }
 
-    if (records.length === 0) {
+    if ((Array.isArray(records) ? records : []).length === 0) {
         return (
             <Card title="Attendance History">
                 <div className="text-center py-8 text-gray-500">No attendance records found.</div>
@@ -109,7 +109,7 @@ export function AttendanceHistory({ records, loading }: AttendanceHistoryProps) 
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {records.map((record) => (
+                        {(Array.isArray(records) ? records : []).map((record) => (
                             <tr key={record.id}>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {new Date(record.checkIn).toLocaleDateString()}

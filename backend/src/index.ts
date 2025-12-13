@@ -28,6 +28,7 @@ import { timeTrackingRoutes } from './modules/time-tracking';
 import { shiftRoutes } from './modules/shift';
 import { documentsRoutes } from './modules/documents';
 import { trainingRoutes } from './modules/training';
+import { goalsRoutes } from './modules/goals';
 
 // Import legacy routes (if any still exist)
 import reportRoutes from './routes/reportRoutes';
@@ -72,6 +73,7 @@ app.use('/api/time-tracking', timeTrackingRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/training', trainingRoutes);
+app.use('/api/goals', goalsRoutes);
 
 // Legacy routes
 app.use('/api/reports', reportRoutes);

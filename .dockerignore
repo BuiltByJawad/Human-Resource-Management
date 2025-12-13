@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+build
+.env
+.env.local
+.git
+.github
+.vscode
+npm-debug.log
+yarn-error.log
+coverage
+tests
+test
