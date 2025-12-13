@@ -146,8 +146,8 @@ function KanbanColumn({ id, title, color, applicants }: { id: ApplicantStatus, t
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-[150px] scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent px-1 pb-2">
-                <SortableContext items={applicants.map(a => a.id)} strategy={verticalListSortingStrategy}>
-                    {applicants.map(applicant => (
+                <SortableContext items={(Array.isArray(applicants) ? applicants : []).map(a => a.id)} strategy={verticalListSortingStrategy}>
+                    {(Array.isArray(applicants) ? applicants : []).map(applicant => (
                         <SortableApplicantCard key={applicant.id} applicant={applicant} />
                     ))}
                 </SortableContext>
@@ -201,14 +201,14 @@ export function KanbanBoard({ applicants, onStatusChange }: KanbanBoardProps) {
         const activeId = active.id as string
         const overId = over.id as string
 
-        const applicant = applicants.find(a => a.id === activeId)
+        const applicant = (Array.isArray(applicants) ? applicants : []).find(a => a.id === activeId)
         if (!applicant) return
 
         let newStatus: ApplicantStatus | undefined
-        if (COLUMNS.some(c => c.id === overId)) {
+        if ((Array.isArray(COLUMNS) ? COLUMNS : []).some(c => c.id === overId)) {
             newStatus = overId as ApplicantStatus
         } else {
-            const overApplicant = applicants.find(a => a.id === overId)
+            const overApplicant = (Array.isArray(applicants) ? applicants : []).find(a => a.id === overId)
             if (overApplicant) {
                 newStatus = overApplicant.status
             }
@@ -236,7 +236,7 @@ export function KanbanBoard({ applicants, onStatusChange }: KanbanBoardProps) {
                         id={column.id}
                         title={column.title}
                         color={column.color}
-                        applicants={applicants.filter(a => a.status === column.id)}
+                        applicants={(Array.isArray(applicants) ? applicants : []).filter(a => a.status === column.id)}
                     />
                 ))}
             </div>

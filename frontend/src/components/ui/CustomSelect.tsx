@@ -30,7 +30,7 @@ export function Select({
     error,
     required = false
 }: SelectProps) {
-    const selectedOption = options.find(opt => opt.value === value)
+    const selectedOption = (Array.isArray(options) ? options : []).find(opt => opt.value === value)
 
     return (
         <div className={className}>
@@ -43,8 +43,8 @@ export function Select({
             <Listbox value={value} onChange={onChange} disabled={disabled}>
                 <div className="relative mt-1">
                     <Listbox.Button className={`relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-300 sm:text-sm ${error
-                            ? 'border-red-300 text-red-900 focus-visible:border-red-500'
-                            : 'border-gray-300 focus-visible:border-blue-500'
+                        ? 'border-red-300 text-red-900 focus-visible:border-red-500'
+                        : 'border-gray-300 focus-visible:border-blue-500'
                         }`}>
                         <span className={`block truncate ${!selectedOption ? 'text-gray-400' : 'text-gray-900'}`}>
                             {selectedOption ? selectedOption.label : placeholder}
@@ -63,7 +63,7 @@ export function Select({
                         leaveTo="opacity-0"
                     >
                         <Listbox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm">
-                            {options.map((option, personIdx) => (
+                            {(Array.isArray(options) ? options : []).map((option, personIdx) => (
                                 <Listbox.Option
                                     key={personIdx}
                                     className={({ active }) =>

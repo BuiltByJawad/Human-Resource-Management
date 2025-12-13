@@ -71,7 +71,7 @@ export const RoleForm = ({
             reset({
                 name: initialData.name,
                 description: initialData.description || '',
-                permissionIds: initialData.permissions?.map(p => p.permission.id) || []
+                permissionIds: Array.isArray(initialData.permissions) ? initialData.permissions.map(p => p.permission.id) : []
             })
         } else {
             reset({
@@ -107,7 +107,7 @@ export const RoleForm = ({
     }
 
     const toggleResource = (resource: string) => {
-        const resourcePerms = groupedPermissions[resource].map(p => p.id)
+        const resourcePerms = Array.isArray(groupedPermissions[resource]) ? groupedPermissions[resource].map(p => p.id) : []
         const allSelected = resourcePerms.every(id => selectedPermissionIds.includes(id))
 
         if (allSelected) {
@@ -164,8 +164,9 @@ export const RoleForm = ({
                             {/* Left Sidebar: Resources */}
                             <div className="w-1/3 border-r bg-gray-50 overflow-y-auto">
                                 {Object.entries(groupedPermissions).map(([resource, perms]) => {
-                                    const selectedCount = perms.filter(p => selectedPermissionIds.includes(p.id)).length
-                                    const totalCount = perms.length
+                                    const safePerms = Array.isArray(perms) ? perms : []
+                                    const selectedCount = safePerms.filter(p => selectedPermissionIds.includes(p.id)).length
+                                    const totalCount = safePerms.length
                                     const isComplete = selectedCount === totalCount
                                     const isActive = activeResource === resource
 
@@ -213,14 +214,14 @@ export const RoleForm = ({
                                                 onClick={() => toggleResource(activeResource)}
                                                 className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded transition-colors"
                                             >
-                                                {groupedPermissions[activeResource].every(p => selectedPermissionIds.includes(p.id))
+                                                {(Array.isArray(groupedPermissions[activeResource]) ? groupedPermissions[activeResource] : []).every(p => selectedPermissionIds.includes(p.id))
                                                     ? 'Deselect All'
                                                     : 'Select All'}
                                             </button>
                                         </div>
 
                                         <div className="space-y-3">
-                                            {groupedPermissions[activeResource].map(perm => {
+                                            {(Array.isArray(groupedPermissions[activeResource]) ? groupedPermissions[activeResource] : []).map(perm => {
                                                 const isSelected = selectedPermissionIds.includes(perm.id)
                                                 return (
                                                     <div

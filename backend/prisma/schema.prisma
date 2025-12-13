@@ -263,6 +263,7 @@ model Employee {
   sentSwapRequests   ShiftSwapRequest[] @relation("SwapRequestor")
   receivedSwapRequests ShiftSwapRequest[] @relation("SwapTarget")
   training           EmployeeTraining[]
+  goals              PerformanceGoal[]
 
   @@index([departmentId])
   @@index([managerId])
@@ -774,4 +775,31 @@ model EmployeeTraining {
   completionDate DateTime?
   
   @@unique([employeeId, courseId])
+}
+
+model PerformanceGoal {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  title       String
+  description String?
+  status      String   @default("in-progress") // not-started, in-progress, completed, cancelled
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  keyResults  KeyResult[]
+}
+
+model KeyResult {
+  id          String          @id @default(uuid())
+  goalId      String
+  goal        PerformanceGoal @relation(fields: [goalId], references: [id])
+  description String
+  targetValue Int             @default(100) // e.g., 100% or 10 sales
+  currentValue Int            @default(0)
+  unit        String          @default("percentage") // percentage, count, currency
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }

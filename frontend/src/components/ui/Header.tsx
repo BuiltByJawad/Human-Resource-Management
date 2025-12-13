@@ -44,7 +44,7 @@ export default function Header() {
   // Show skeleton if not mounted or user is not loaded
   if (!isMounted || !user) {
     return (
-      <header className="bg-white/80 backdrop-blur border-b border-slate-200/80 sticky top-0 z-30">
+      <header className="bg-white/95 backdrop-blur-sm shadow-sm sticky top-0 z-30">
         <div className="flex items-center justify-between px-4 sm:px-6 py-4">
           <div className="flex items-center flex-1 gap-3">
             <div className="hidden sm:flex flex-col">
@@ -68,13 +68,6 @@ export default function Header() {
             </div>
           </div>
         </div>
-
-        {isLoggingOut && (
-          <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
-            <div className="h-12 w-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm font-medium text-slate-700">Signing you out</p>
-          </div>
-        )}
       </header>
     )
   }
@@ -84,7 +77,7 @@ export default function Header() {
     : 'U'
 
   return (
-    <header className="bg-white/80 backdrop-blur border-b border-slate-200/80 sticky top-0 z-30">
+    <header className="glass-header sticky top-0 z-30">
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
 
         {isMobileSearchOpen ? (
@@ -99,7 +92,7 @@ export default function Header() {
               <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search employees..."
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -135,7 +128,7 @@ export default function Header() {
                 <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search people, teams, docs..."
+                  placeholder="Search employees..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {

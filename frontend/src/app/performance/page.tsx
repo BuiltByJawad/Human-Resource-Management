@@ -126,10 +126,10 @@ export default function PerformancePage() {
         { name: 'Avg. Rating', value: '4.8', icon: ChartBarIcon, color: 'text-blue-600', bg: 'bg-blue-100' },
     ];
 
-    const pendingCycles = cycles.filter((cycle: any) => !userReviews.some(r => r.cycleId === cycle.id));
-    const completedCycles = cycles.filter((cycle: any) => userReviews.some(r => r.cycleId === cycle.id));
+    const pendingCycles = (Array.isArray(cycles) ? cycles : []).filter((cycle: any) => !(Array.isArray(userReviews) ? userReviews : []).some(r => r.cycleId === cycle.id));
+    const completedCycles = (Array.isArray(cycles) ? cycles : []).filter((cycle: any) => (Array.isArray(userReviews) ? userReviews : []).some(r => r.cycleId === cycle.id));
 
-    const selectedReview = selectedCycle ? userReviews.find(r => r.cycleId === selectedCycle.id) : null;
+    const selectedReview = selectedCycle ? (Array.isArray(userReviews) ? userReviews : []).find(r => r.cycleId === selectedCycle.id) : null;
 
     if (isLoading) {
         return (

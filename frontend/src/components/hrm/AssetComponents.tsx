@@ -59,7 +59,7 @@ interface AssetCardProps {
 }
 
 export const AssetCard = ({ asset, onAssign, onReturn, onEdit }: AssetCardProps) => {
-    const currentAssignment = asset.assignments.find((a: any) => !a.returnedDate)
+    const currentAssignment = (Array.isArray(asset.assignments) ? asset.assignments : []).find((a: any) => !a.returnedDate)
 
     const getIcon = () => {
         switch (asset.type.toLowerCase()) {
@@ -354,7 +354,7 @@ export const AssignmentModal = ({ isOpen, onClose, onAssign, employees }: Assign
         }
     }
 
-    const employeeOptions = employees.map(emp => ({
+    const employeeOptions = (Array.isArray(employees) ? employees : []).map(emp => ({
         value: emp.id,
         label: `${emp.firstName} ${emp.lastName} (${emp.employeeNumber})`
     }))

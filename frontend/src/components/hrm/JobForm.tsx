@@ -123,7 +123,7 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
                                     onChange={field.onChange}
                                     options={[
                                         { value: '', label: 'Select Department' },
-                                        ...departments.map(dept => ({ value: dept.id, label: dept.name }))
+                                        ...(Array.isArray(departments) ? departments : []).map(dept => ({ value: dept.id, label: dept.name }))
                                     ]}
                                     required
                                     error={errors.departmentId?.message}

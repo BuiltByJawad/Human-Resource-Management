@@ -114,7 +114,7 @@ export const PayslipModal = ({ isOpen, onClose, payroll }: PayslipModalProps) =>
                                                     <span className="text-gray-600">Basic Salary</span>
                                                     <span className="font-medium">{Number(payroll.baseSalary).toFixed(2)}</span>
                                                 </div>
-                                                {payroll.allowancesBreakdown?.map((item: any, index: number) => (
+                                                {(Array.isArray(payroll.allowancesBreakdown) ? payroll.allowancesBreakdown : []).map((item: any, index: number) => (
                                                     <div key={index} className="flex justify-between">
                                                         <span className="text-gray-600">{item.name}</span>
                                                         <span className="font-medium">{Number(item.amount).toFixed(2)}</span>
@@ -131,7 +131,7 @@ export const PayslipModal = ({ isOpen, onClose, payroll }: PayslipModalProps) =>
                                         <div>
                                             <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Deductions</h4>
                                             <div className="space-y-2">
-                                                {payroll.deductionsBreakdown?.map((item: any, index: number) => (
+                                                {(Array.isArray(payroll.deductionsBreakdown) ? payroll.deductionsBreakdown : []).map((item: any, index: number) => (
                                                     <div key={index} className="flex justify-between">
                                                         <span className="text-gray-600">{item.name}</span>
                                                         <span className="font-medium text-red-600">-{Number(item.amount).toFixed(2)}</span>

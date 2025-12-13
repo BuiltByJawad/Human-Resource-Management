@@ -64,7 +64,7 @@ export function EmployeesToolbar({
               onChange={onFilterDepartmentChange}
               options={[
                 { value: 'all', label: 'All Departments' },
-                ...departments.map(d => ({ value: d.id, label: d.name })),
+                ...(Array.isArray(departments) ? departments : []).map(d => ({ value: d.id, label: d.name })),
               ]}
             />
           </div>
@@ -156,13 +156,12 @@ export function EmployeesListSection({
       accessorKey: 'status',
       cell: (employee) => (
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            employee.status === 'active'
-              ? 'bg-green-50 text-green-700 ring-1 ring-green-100'
-              : employee.status === 'inactive'
-                ? 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-100'
-                : 'bg-red-50 text-red-700 ring-1 ring-red-100'
-          }`}
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${employee.status === 'active'
+            ? 'bg-green-50 text-green-700 ring-1 ring-green-100'
+            : employee.status === 'inactive'
+              ? 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-100'
+              : 'bg-red-50 text-red-700 ring-1 ring-red-100'
+            }`}
         >
           {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
         </span>

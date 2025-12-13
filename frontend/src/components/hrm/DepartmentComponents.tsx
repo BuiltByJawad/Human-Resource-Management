@@ -94,11 +94,11 @@ export const DepartmentForm = ({
   }
 
   // Filter out the current department from parent options to prevent circular dependency
-  const parentOptions = departments
+  const parentOptions = (Array.isArray(departments) ? departments : [])
     .filter(d => d.id !== initialData?.id)
     .map(d => ({ value: d.id, label: d.name }))
 
-  const managerOptions = employees.map(e => ({
+  const managerOptions = (Array.isArray(employees) ? employees : []).map(e => ({
     value: e.id,
     label: `${e.firstName} ${e.lastName} (${e.email})`
   }))
