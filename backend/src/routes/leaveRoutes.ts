@@ -5,7 +5,7 @@ import { asyncHandler } from '@/shared/middleware/errorHandler';
 import { authenticate, authorize } from '@/shared/middleware/auth';
 import { prisma } from '@/shared/config/database';
 import { leaveRequestSchema } from '../validators'
-import { validateRequest, validateParams, validateQuery } from '../middleware/validation'
+import { validateRequest, validateParams, validateQuery } from '@/shared/middleware/validation';
 import { NotFoundError } from '@/shared/utils/errors';
 import { AuthRequest } from '../types'
 import Joi from 'joi'
