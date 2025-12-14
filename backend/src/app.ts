@@ -144,6 +144,10 @@ export const createApp = (): { app: Application; httpServer: any } => {
   });
 
 
+
+  // Mount API Routes
+  app.use('/api', routes); // Use the imported router
+
   // 404 handler
   app.use((req: Request, res: Response) => {
     res.status(404).json({
