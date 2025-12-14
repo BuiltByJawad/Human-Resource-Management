@@ -114,6 +114,9 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-startServer();
+// Only start server if not running in Vercel (Vercel handles serverless execution)
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 export default app;
