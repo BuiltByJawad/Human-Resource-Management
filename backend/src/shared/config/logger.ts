@@ -28,15 +28,25 @@ const logger = winston.createLogger({
   format: logFormat,
   defaultMeta: { service: 'hrm-backend' },
   transports: [
-    // Write all logs with level `error` and below to `error.log`
-    new winston.transports.File({
-      filename: path.join(logDirectory, 'error.log'),
-      level: 'error',
+    // Write logs to console in production and development (best for cloud/containers)
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      ),
     }),
-    // Write all logs to `combined.log`
-    new winston.transports.File({
-      filename: path.join(logDirectory, 'combined.log'),
-    }),
+    // Only write to files in development if needed
+    ...(process.env.NODE_ENV === 'development'
+      ? [
+        new winston.transports.File({
+          filename: path.join(logDirectory, 'error.log'),
+          level: 'error',
+        }),
+        new winston.transports.File({
+          filename: path.join(logDirectory, 'combined.log'),
+        }),
+      ]
+      : []),
   ],
   exitOnError: false, // Don't exit on handled exceptions
 });
