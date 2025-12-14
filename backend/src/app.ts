@@ -65,15 +65,20 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.use(compression());
   // CORS Configuration
   // CORS Configuration (Permissive for Demo)
-  app.use(cors({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  }));
-
-  // Explicitly handle OPTIONS
-  app.options('*', cors());
+  // Manual CORS Middleware (Nuclear Option)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin || '*';
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Intercept OPTIONS method
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    next();
+  });
 
   // Request logging
   app.use(morgan('combined', { stream }));
