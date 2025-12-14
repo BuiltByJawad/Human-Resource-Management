@@ -36,7 +36,7 @@ const logger = winston.createLogger({
       ),
     }),
     // Only write to files in development if needed
-    ...(process.env.NODE_ENV !== 'production'
+    ...(process.env.NODE_ENV === 'development'
       ? [
         new winston.transports.File({
           filename: path.join(logDirectory, 'error.log'),

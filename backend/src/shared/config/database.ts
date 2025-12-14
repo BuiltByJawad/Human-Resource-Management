@@ -45,7 +45,7 @@ export const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'hrm-backend' },
   transports: [
-    ...(process.env.NODE_ENV !== 'production'
+    ...(process.env.NODE_ENV === 'development'
       ? [
         new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
         new winston.transports.File({ filename: 'logs/combined.log' }),
