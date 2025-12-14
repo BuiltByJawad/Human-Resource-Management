@@ -10,8 +10,8 @@ const envVarsSchema = Joi.object()
   .keys({
     NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
     PORT: Joi.number().default(5000),
-    BACKEND_URL: Joi.string().required().description('Backend URL'),
-    FRONTEND_URL: Joi.string().required().description('Frontend URL'),
+    BACKEND_URL: Joi.string().allow('').default('http://localhost:5000').description('Backend URL'),
+    FRONTEND_URL: Joi.string().allow('').default('http://localhost:3000').description('Frontend URL'),
     DATABASE_URL: Joi.string().required().description('Database connection URL'),
     REDIS_URL: Joi.string().description('Redis connection URL'),
     JWT_SECRET: Joi.string().required().description('JWT secret key'),
