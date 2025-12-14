@@ -64,25 +64,15 @@ export const createApp = (): { app: Application; httpServer: any } => {
 
   app.use(compression());
   // CORS Configuration
+  // CORS Configuration (Permissive for Demo)
   app.use(cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      // Allow localhost and vercel apps
-      if (origin.includes('localhost') || origin.includes('vercel.app')) {
-        return callback(null, true);
-      }
-
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    },
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   }));
 
-  // Handle preflight requests explicitly
+  // Explicitly handle OPTIONS
   app.options('*', cors());
 
   // Request logging
