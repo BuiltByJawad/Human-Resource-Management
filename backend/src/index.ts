@@ -75,6 +75,11 @@ app.use('/api/documents', documentsRoutes);
 app.use('/api/training', trainingRoutes);
 app.use('/api/goals', goalsRoutes);
 
+// Root API Route
+app.get('/api', (req: express.Request, res: express.Response) => {
+  res.json({ success: true, message: 'HRM API is running', version: '1.0.0' });
+});
+
 // Legacy routes
 app.use('/api/reports', reportRoutes);
 
