@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import axios from 'axios'
+import api, { API_BASE_URL } from '@/lib/axios'
 import type { Permission } from '@/constants/permissions'
 
 interface User {
@@ -36,8 +36,6 @@ interface AuthState {
     hasAllPermissions: (permissions: Permission[]) => boolean
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-
 export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
@@ -47,7 +45,7 @@ export const useAuthStore = create<AuthState>()(
             isLoggingOut: false,
             login: async (email, password) => {
                 try {
-                    const response = await axios.post(`${API_URL}/auth/login`, { email, password })
+                    const response = await api.post(`/auth/login`, { email, password })
                     const { user, accessToken, permissions } = response.data.data
                     const normalizedUser: User = {
                         ...user,

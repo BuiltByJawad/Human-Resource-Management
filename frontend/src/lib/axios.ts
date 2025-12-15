@@ -1,8 +1,28 @@
 
 import axios from 'axios';
 
+const resolveApiBaseUrl = () => {
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    // Client-side: fall back to current origin to avoid localhost defaults in production
+    if (typeof window !== 'undefined') {
+        return `${window.location.origin}/api`;
+    }
+
+    // Server-side fallback (build time)
+    if (process.env.BACKEND_URL) {
+        return `${process.env.BACKEND_URL}/api`;
+    }
+
+    return 'http://localhost:5000/api';
+};
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
