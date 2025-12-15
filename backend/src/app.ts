@@ -33,40 +33,12 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.set('io', io);
 
   // Security Middleware
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
-        frameSrc: ["'none'"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
-      },
-    },
-    hsts: {
-      maxAge: 31536000, // 1 year
-      includeSubDomains: true,
-      preload: true,
-    },
-    frameguard: {
-      action: 'deny',
-    },
-    noSniff: true,
-    xssFilter: true,
-    referrerPolicy: {
-      policy: 'strict-origin-when-cross-origin',
-    },
-  }));
+  // app.use(helmet({ ... })); // Temporarily disabled to debug 500 error
 
   app.use(compression());
+
   // CORS Configuration
-  // CORS Configuration (Permissive for Demo)
-  // CORS Configuration
-  app.use(cors({
+  const corsOptions = {
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3001',
@@ -76,10 +48,12 @@ export const createApp = (): { app: Application; httpServer: any } => {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  }));
+  };
 
-  // Handle preflight requests
-  app.options('*', cors());
+  app.use(cors(corsOptions));
+
+  // Handle preflight requests using the SAME config
+  app.options('*', cors(corsOptions));
 
   // Request logging
   app.use(morgan('combined', { stream }));
