@@ -7,12 +7,10 @@ module.exports = {
   ],
   collectCoverageFrom: [
     'src/**/*.{js,ts}',
-    '!src/**/*.d.ts',
-    '!src/index.ts'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   transform: {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { shiftService, Shift } from '@/services/shiftService';
 import { ShiftCard } from '@/components/modules/shift/ShiftCard';
 import Sidebar from '@/components/ui/Sidebar';
@@ -18,7 +18,7 @@ export default function ShiftsPage() {
         setMounted(true);
     }, []);
 
-    const loadShifts = async () => {
+    const loadShifts = useCallback(async () => {
         setLoading(true);
         try {
             const start = startOfMonth(currentDate).toISOString();
@@ -30,13 +30,13 @@ export default function ShiftsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentDate]);
 
     useEffect(() => {
         if (mounted) {
             loadShifts();
         }
-    }, [currentDate, mounted]);
+    }, [currentDate, mounted, loadShifts]);
 
     const selectedDayShifts = shifts.filter(s =>
         new Date(s.startTime).getDate() === selectedDate.getDate() &&

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
-import { prisma } from '../config/database'
-import { asyncHandler } from '../middleware/errorHandler'
+import { prisma } from '@/shared/config/database'
+import { asyncHandler } from '@/shared/middleware/errorHandler'
 
 export const getDashboardStats = asyncHandler(async (req: Request, res: Response) => {
     const [

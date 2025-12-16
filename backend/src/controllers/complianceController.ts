@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
-import { asyncHandler } from '../middleware/errorHandler'
-import { prisma } from '../config/database'
-import { BadRequestError, NotFoundError } from '../utils/errors'
+import { asyncHandler } from '@/shared/middleware/errorHandler'
+import { prisma } from '@/shared/config/database'
+import { BadRequestError, NotFoundError } from '@/shared/utils/errors'
 import { startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 // @desc    Get all compliance rules

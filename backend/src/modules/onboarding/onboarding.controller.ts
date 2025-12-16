@@ -1,66 +1,46 @@
 
-import { Request, Response } from 'express';
-import { asyncHandler } from '../../shared/middleware/errorHandler';
-import { onboardingService } from './onboarding.service';
-import {
-    createTemplateSchema,
-    createTaskSchema,
-    startOnboardingSchema,
-    updateTaskStatusSchema
-} from './dto';
+import { Request, Response } from 'express'
+import { asyncHandler } from '../../shared/middleware/errorHandler'
+import { onboardingService } from './onboarding.service'
 
-export const createTemplate = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = createTemplateSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message); // middleware handles 400? or explicit throw
+const parseDate = (value?: any) => (value ? new Date(value) : undefined)
 
-    const template = await onboardingService.createTemplate(value);
-    res.status(201).json({ success: true, data: template });
-});
+export const startProcess = asyncHandler(async (req: Request, res: Response) => {
+  const employeeId = req.params.employeeId
+  const process = await onboardingService.startProcess(employeeId, (req as any).user?.id, {
+    startDate: parseDate(req.body.startDate),
+    dueDate: parseDate(req.body.dueDate)
+  })
+  res.status(201).json({ success: true, data: process })
+})
 
-export const getTemplates = asyncHandler(async (req: Request, res: Response) => {
-    const templates = await onboardingService.getTemplates();
-    res.json({ success: true, data: templates });
-});
+export const getProcess = asyncHandler(async (req: Request, res: Response) => {
+  const employeeId = req.params.employeeId
+  const process = await onboardingService.getProcess(employeeId)
+  res.json({ success: true, data: process })
+})
 
-export const addTaskToTemplate = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = createTaskSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+export const createTask = asyncHandler(async (req: Request, res: Response) => {
+  const employeeId = req.params.employeeId
+  const { title, description, assigneeUserId, dueDate } = req.body
+  if (!title) throw new Error('Title is required')
+  const task = await onboardingService.createTask(employeeId, {
+    title,
+    description,
+    assigneeUserId,
+    dueDate: parseDate(dueDate)
+  })
+  res.status(201).json({ success: true, data: task })
+})
 
-    const task = await onboardingService.addTaskToTemplate(value);
-    res.status(201).json({ success: true, data: task });
-});
+export const updateTask = asyncHandler(async (req: Request, res: Response) => {
+  const taskId = req.params.taskId
+  const updated = await onboardingService.updateTask(taskId, req.body)
+  res.json({ success: true, data: updated })
+})
 
-export const startOnboarding = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = startOnboardingSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
-
-    const process = await onboardingService.startOnboarding(value);
-    res.status(201).json({ success: true, data: process });
-});
-
-export const getMyOnboarding = asyncHandler(async (req: Request, res: Response) => {
-    // Assuming user id is attached to req.user and we can find employee from it
-    // For now, allow passing employeeId param for flexibility
-    const employeeId = req.params.employeeId;
-    const process = await onboardingService.getEmployeeOnboarding(employeeId);
-    res.json({ success: true, data: process });
-});
-
-export const updateTaskStatus = asyncHandler(async (req: Request, res: Response) => {
-    const taskId = req.params.taskId;
-    const { error, value } = updateTaskStatusSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
-
-    // Potentially add completedBy from logged in user
-    const updated = await onboardingService.updateTaskStatus(taskId, {
-        ...value,
-        completedBy: (req as any).user?.id || 'system',
-    });
-
-    res.json({ success: true, data: updated });
-});
-
-export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
-    const data = await onboardingService.getDashboard();
-    res.json({ success: true, data });
-});
+export const completeTask = asyncHandler(async (req: Request, res: Response) => {
+  const taskId = req.params.taskId
+  const updated = await onboardingService.completeTask(taskId, (req as any).user?.id)
+  res.json({ success: true, data: updated })
+})

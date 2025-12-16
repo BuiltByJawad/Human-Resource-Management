@@ -25,6 +25,7 @@ interface User {
 interface AuthState {
     user: User | null
     token: string | null
+    refreshToken: string | null
     isAuthenticated: boolean
     isLoggingOut: boolean
     login: (email: string, password: string) => Promise<void>
@@ -43,17 +44,28 @@ export const useAuthStore = create<AuthState>()(
         (set, get) => ({
             user: null,
             token: null,
+            refreshToken: null,
             isAuthenticated: false,
             isLoggingOut: false,
             login: async (email, password) => {
                 try {
                     const response = await axios.post(`${API_URL}/auth/login`, { email, password })
-                    const { user, accessToken, permissions } = response.data.data
+                    const { user, accessToken, refreshToken, permissions } = response.data.data
                     const normalizedUser: User = {
                         ...user,
                         permissions: permissions ?? [],
                     }
-                    set({ user: normalizedUser, token: accessToken, isAuthenticated: true, isLoggingOut: false })
+                    set({
+                        user: normalizedUser,
+                        token: accessToken,
+                        refreshToken: refreshToken ?? null,
+                        isAuthenticated: true,
+                        isLoggingOut: false
+                    })
+                    // Set cookie for middleware-based auth checks
+                    if (typeof document !== 'undefined' && accessToken) {
+                        document.cookie = `accessToken=${accessToken}; path=/; SameSite=Lax`
+                    }
                 } catch (error: any) {
                     const message =
                         error?.response?.data?.error?.message ||
@@ -63,7 +75,8 @@ export const useAuthStore = create<AuthState>()(
                     throw new Error(message)
                 }
             },
-            logout: () => set({ user: null, token: null, isAuthenticated: false, isLoggingOut: true }),
+            logout: () =>
+                set({ user: null, token: null, refreshToken: null, isAuthenticated: false, isLoggingOut: true }),
             updateUser: (updates) =>
                 set((state) => ({
                     user: state.user
@@ -107,6 +120,7 @@ export const useAuthStore = create<AuthState>()(
             partialize: (state) => ({
                 user: state.user,
                 token: state.token,
+                refreshToken: state.refreshToken,
                 isAuthenticated: state.isAuthenticated,
             }),
         }

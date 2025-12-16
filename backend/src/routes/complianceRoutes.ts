@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { getRules, createRule, toggleRule, getLogs, runComplianceCheck } from '../controllers/complianceController'
-import { authenticate, authorize } from '../middleware/auth'
+import { getRules, createRule, toggleRule, getLogs, runComplianceCheck } from '@/controllers/complianceController'
+import { authenticate, authorize } from '@/shared/middleware/auth'
 
 const router = Router()
 

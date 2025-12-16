@@ -2,13 +2,14 @@ import { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { addHours } from 'date-fns'
-import { asyncHandler } from '../middleware/errorHandler'
-import { prisma } from '../config/database'
-import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '../utils/auth'
-import { UnauthorizedError, BadRequestError, NotFoundError } from '../utils/errors'
-import { AuthRequest } from '../middleware/auth'
-import { sendEmail } from '../utils/email'
-import { createAuditLog } from '../utils/audit'
+import { asyncHandler } from '@/shared/middleware/errorHandler'
+import { prisma } from '@/shared/config/database'
+import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '@/shared/utils/auth'
+import { UnauthorizedError, BadRequestError, NotFoundError } from '@/shared/utils/errors'
+import { AuthRequest } from '@/shared/middleware/auth'
+import { sendEmail } from '@/shared/utils/email'
+import { createAuditLog } from '@/shared/utils/audit'
+import { authService } from '@/modules/auth/auth.service'
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex')
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
@@ -439,73 +440,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         role: user.role.name,
         avatarUrl: user.avatarUrl
       },
-      permissions,
-    },
+      permissions
+    }
   })
 })
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body
-
-  if (!refreshToken) {
-    throw new BadRequestError('Refresh token is required')
-  }
-
-  let payload: any
-  try {
-    payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!)
-  } catch {
-    throw new UnauthorizedError('Invalid or expired refresh token')
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: (payload as any).userId },
-    include: {
-      role: {
-        include: {
-          permissions: {
-            include: {
-              permission: true
-            }
-          }
-        }
-      },
-      employee: true,
-    }
-  })
-
-  if (!user || user.status !== 'active') {
-    throw new UnauthorizedError('User not found or inactive')
-  }
-
-  const { accessToken, refreshToken: newRefreshToken } = generateTokens(
-    user.id,
-    user.email,
-    user.role.name
-  )
-
-  const permissions = user.role.permissions.map(
-    (rp: { permission: { resource: string; action: string } }) =>
-      `${rp.permission.resource}.${rp.permission.action}`
-  )
-
+  const result = await authService.refreshAccessToken(req.body as any)
   res.json({
     success: true,
-    data: {
-      accessToken,
-      refreshToken: newRefreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role.name,
-        avatarUrl: user.avatarUrl,
-        employee: user.employee,
-        status: user.status,
-      },
-      permissions,
-    },
+    data: result
   })
 })
 

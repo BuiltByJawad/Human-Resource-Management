@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { generatePayroll, getPayrollRecords, updatePayrollStatus, getEmployeePayslips } from '../controllers/payrollController';
-import { authenticate, authorize } from '../middleware/auth';
+import { generatePayroll, getPayrollRecords, updatePayrollStatus, getEmployeePayslips } from '@/controllers/payrollController';
+import { authenticate, authorize } from '@/shared/middleware/auth';
 
 const router = Router();
 

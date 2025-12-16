@@ -1,9 +1,9 @@
 import { Router } from 'express'
 import Joi from 'joi'
-import { getEmployees, getEmployeeById, updateEmployee, deleteEmployee, createEmployee } from '../controllers/employeeController'
-import { authenticate, checkPermission } from '../middleware/auth'
-import { validateRequest, validateParams } from '../middleware/validation'
-import { employeeSchema, employeeUpdateSchema } from '../validators'
+import { getEmployees, getEmployeeById, updateEmployee, deleteEmployee, createEmployee } from '@/controllers/employeeController'
+import { authenticate, checkPermission } from '@/shared/middleware/auth'
+import { validateRequest, validateParams } from '@/shared/middleware/validation'
+import { employeeSchema, employeeUpdateSchema } from '@/validators'
 
 const router = Router()
 

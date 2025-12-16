@@ -418,8 +418,14 @@ export class AuthService {
             throw new UnauthorizedError('Invalid or expired refresh token');
         }
 
-        // Get user
-        const user = await authRepository.findUserByEmail(payload.email);
+        if (!payload || (!payload.userId && !payload.email)) {
+            throw new UnauthorizedError('Invalid refresh token payload');
+        }
+
+        // Get user (prefer userId from token, fallback to email)
+        const user = payload?.userId
+            ? await authRepository.findUserById(payload.userId)
+            : await authRepository.findUserByEmail(payload.email);
 
         if (!user || user.status !== 'active') {
             throw new UnauthorizedError('User not found or inactive');

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
-import { prisma } from '../config/database'
-import { NotFoundError } from '../utils/errors'
+import { prisma } from '@/shared/config/database'
+import { NotFoundError } from '@/shared/utils/errors'
 
 export const getEmployees = async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -1,115 +1,101 @@
 
-import { onboardingRepository } from './onboarding.repository';
-import { CreateTemplateDto, CreateTaskDto, StartOnboardingDto, UpdateTaskStatusDto } from './dto';
-import { NotFoundError, BadRequestError } from '../../shared/utils/errors';
+import { prisma } from '@/shared/config/database'
+import { NotFoundError, UnauthorizedError } from '@/shared/utils/errors'
+import { OnboardingTaskStatus, OnboardingStatus } from '@prisma/client'
 
-export class OnboardingService {
-    async createTemplate(data: CreateTemplateDto) {
-        return onboardingRepository.createTemplate(data);
+class OnboardingService {
+  async ensureEmployee(employeeId: string) {
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId } })
+    if (!employee) throw new NotFoundError('Employee not found')
+    return employee
+  }
+
+  async getProcess(employeeId: string) {
+    await this.ensureEmployee(employeeId)
+    return prisma.onboardingProcess.findUnique({
+      where: { employeeId },
+      include: { tasks: { orderBy: { createdAt: 'asc' } } }
+    })
+  }
+
+  async startProcess(employeeId: string, createdBy?: string, data?: { startDate?: Date; dueDate?: Date }) {
+    await this.ensureEmployee(employeeId)
+    const existing = await prisma.onboardingProcess.findUnique({ where: { employeeId } })
+    if (existing) {
+      return prisma.onboardingProcess.update({
+        where: { employeeId },
+        data: {
+          status: OnboardingStatus.active,
+          startDate: data?.startDate ?? existing.startDate,
+          dueDate: data?.dueDate ?? existing.dueDate
+        },
+        include: { tasks: { orderBy: { createdAt: 'asc' } } }
+      })
     }
 
-    async getTemplates() {
-        return onboardingRepository.getTemplates();
+    return prisma.onboardingProcess.create({
+      data: {
+        employeeId,
+        status: OnboardingStatus.active,
+        startDate: data?.startDate,
+        dueDate: data?.dueDate,
+        createdBy
+      },
+      include: { tasks: true }
+    })
+  }
+
+  async createTask(employeeId: string, payload: { title: string; description?: string; assigneeUserId?: string; dueDate?: Date }) {
+    await this.ensureEmployee(employeeId)
+    let process = await prisma.onboardingProcess.findUnique({ where: { employeeId } })
+    if (!process) {
+      process = await prisma.onboardingProcess.create({
+        data: { employeeId, status: OnboardingStatus.active, startDate: new Date() }
+      })
     }
+    return prisma.onboardingTask.create({
+      data: {
+        processId: process.id,
+        title: payload.title,
+        description: payload.description,
+        assigneeUserId: payload.assigneeUserId,
+        dueDate: payload.dueDate
+      }
+    })
+  }
 
-    async addTaskToTemplate(data: CreateTaskDto) {
-        const template = await onboardingRepository.getTemplateById(data.templateId);
-        if (!template) {
-            throw new NotFoundError('Onboarding template not found');
-        }
-        return onboardingRepository.createTask(data);
+  async updateTask(taskId: string, payload: Partial<{ title: string; description: string; assigneeUserId: string; dueDate: Date; status: OnboardingTaskStatus; notes: string; order: number }>) {
+    const task = await prisma.onboardingTask.findUnique({ where: { id: taskId } })
+    if (!task) throw new NotFoundError('Task not found')
+
+    return prisma.onboardingTask.update({
+      where: { id: taskId },
+      data: {
+        title: payload.title,
+        description: payload.description,
+        assigneeUserId: payload.assigneeUserId,
+        dueDate: payload.dueDate,
+        status: payload.status,
+        notes: payload.notes,
+        order: payload.order
+      }
+    })
+  }
+
+  async completeTask(taskId: string, userId?: string) {
+    const task = await prisma.onboardingTask.findUnique({
+      where: { id: taskId },
+      include: { assignee: true }
+    })
+    if (!task) throw new NotFoundError('Task not found')
+    if (task.assigneeUserId && userId && task.assigneeUserId !== userId) {
+      throw new UnauthorizedError('Only assignee can complete this task')
     }
-
-    async startOnboarding(data: StartOnboardingDto) {
-        const { employeeId, templateId, startDate } = data;
-
-        // Check if process already exists
-        const existing = await onboardingRepository.getProcessByEmployeeId(employeeId);
-        if (existing) {
-            throw new BadRequestError('Onboarding process already started for this employee');
-        }
-
-        const template = await onboardingRepository.getTemplateById(templateId);
-        if (!template) {
-            throw new NotFoundError('Onboarding template not found');
-        }
-
-        // Create process
-        const process = await onboardingRepository.createProcess({
-            employeeId,
-            templateId,
-            startDate: new Date(startDate),
-            status: 'pending',
-        });
-
-        // Create task instances
-        const taskInstances = (template as any).tasks.map((task: any) => ({
-            processId: process.id,
-            title: task.title,
-            description: task.description,
-            status: 'pending', // Explicitly pending
-            assigneeID: task.assigneeRole === 'Self' ? employeeId : undefined, // Assign to employee if Self
-            dueDate: addDays(new Date(startDate), task.dueInDays),
-        }));
-
-        if (taskInstances.length > 0) {
-            await onboardingRepository.createTaskInstances(taskInstances);
-        }
-
-        return onboardingRepository.getProcessById(process.id);
-    }
-
-    async getEmployeeOnboarding(employeeId: string) {
-        const process = await onboardingRepository.getProcessByEmployeeId(employeeId);
-        if (!process) {
-            throw new NotFoundError('Onboarding process not found');
-        }
-        return process;
-    }
-
-    async updateTaskStatus(taskId: string, data: UpdateTaskStatusDto) {
-        // 1. Update the task instance
-        // Assuming repository handles update correctly
-
-        // We need to fetch the task first to know the process ID, unless repo returns it
-        // The repository updateTaskInstance returns the updated record.
-        const updatedTask = await onboardingRepository.updateTaskInstance(taskId, {
-            status: data.status,
-            completedAt: data.status === 'completed' ? new Date() : null,
-            completedBy: data.completedBy,
-        });
-
-        // 2. Recalculate process progress
-        const process = await onboardingRepository.getProcessById(updatedTask.processId);
-        if (process) {
-            const totalTasks = (process as any).tasks.length;
-            const completedTasks = (process as any).tasks.filter((t: any) => t.status === 'completed' || t.status === 'skipped').length;
-
-            const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-            let status = process.status;
-            if (progress === 100) status = 'completed';
-            else if (progress > 0 && status === 'pending') status = 'in_progress';
-
-            await onboardingRepository.updateProcess(process.id, {
-                progress,
-                status,
-            });
-        }
-
-        return updatedTask;
-    }
-
-    async getDashboard() {
-        return onboardingRepository.getAllProcesses();
-    }
+    return prisma.onboardingTask.update({
+      where: { id: taskId },
+      data: { status: OnboardingTaskStatus.done, completedAt: new Date() }
+    })
+  }
 }
 
-export const onboardingService = new OnboardingService();
-
-// Helper 
-function addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-}
+export const onboardingService = new OnboardingService()

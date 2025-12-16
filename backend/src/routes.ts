@@ -14,6 +14,7 @@ import assetRoutes from './modules/asset/asset.routes';
 import complianceRoutes from './modules/compliance/compliance.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import organizationRoutes from './modules/organization/organization.routes';
+import onboardingRoutes from './modules/onboarding/onboarding.routes';
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use('/assets', assetRoutes);
 router.use('/compliance', complianceRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/org', organizationRoutes);
+router.use('/onboarding', onboardingRoutes);
 
 export default router;

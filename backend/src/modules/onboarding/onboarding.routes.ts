@@ -1,61 +1,45 @@
 
-import { Router } from 'express';
-import { authenticate, authorize } from '../../shared/middleware/auth';
-import * as onboardingController from './onboarding.controller';
+import { Router } from 'express'
+import { authenticate, authorize } from '../../shared/middleware/auth'
+import * as onboardingController from './onboarding.controller'
 
-const router = Router();
+const router = Router()
 
-// Templates (HR/Manager)
-router.get(
-    '/templates',
-    authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager']),
-    onboardingController.getTemplates
-);
-
+// Start or fetch process
 router.post(
-    '/templates',
-    authenticate,
-    authorize(['Super Admin', 'HR Admin']),
-    onboardingController.createTemplate
-);
-
-router.post(
-    '/templates/tasks',
-    authenticate,
-    authorize(['Super Admin', 'HR Admin']),
-    onboardingController.addTaskToTemplate
-);
-
-// Onboarding Process
-router.post(
-    '/process',
-    authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager']),
-    onboardingController.startOnboarding
-);
+  '/process/:employeeId/start',
+  authenticate,
+  authorize(['Super Admin', 'HR Admin', 'Manager']),
+  onboardingController.startProcess
+)
 
 router.get(
-    '/process/:employeeId',
-    authenticate,
-    // Authorize: Admin/Manager or the employee themselves. 
-    // For now, allow admins. Employee access might need check against req.user
-    authorize(['Super Admin', 'HR Admin', 'Manager', 'Employee']),
-    onboardingController.getMyOnboarding
-);
+  '/process/:employeeId',
+  authenticate,
+  authorize(['Super Admin', 'HR Admin', 'Manager', 'Employee']),
+  onboardingController.getProcess
+)
+
+// Tasks
+router.post(
+  '/process/:employeeId/tasks',
+  authenticate,
+  authorize(['Super Admin', 'HR Admin', 'Manager']),
+  onboardingController.createTask
+)
 
 router.patch(
-    '/tasks/:taskId',
-    authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager', 'Employee']),
-    onboardingController.updateTaskStatus
-);
+  '/tasks/:taskId',
+  authenticate,
+  authorize(['Super Admin', 'HR Admin', 'Manager']),
+  onboardingController.updateTask
+)
 
-router.get(
-    '/dashboard',
-    authenticate,
-    authorize(['Super Admin', 'HR Admin']),
-    onboardingController.getDashboard
-);
+router.post(
+  '/tasks/:taskId/complete',
+  authenticate,
+  authorize(['Super Admin', 'HR Admin', 'Manager', 'Employee']),
+  onboardingController.completeTask
+)
 
-export default router;
+export default router

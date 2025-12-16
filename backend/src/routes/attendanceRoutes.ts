@@ -1,14 +1,12 @@
-import { Router } from 'express'
-import { Request, Response } from 'express'
-import { asyncHandler } from '../middleware/errorHandler'
-import { authenticate, authorize } from '../middleware/auth'
-import { prisma } from '../config/database'
-import { attendanceSchema } from '../validators'
-import { validateRequest, validateParams, validateQuery } from '../middleware/validation'
-import { NotFoundError, ConflictError } from '../utils/errors'
-import { AuthRequest } from '../middleware/auth'
+import { Router, Request, Response } from 'express'
+import { asyncHandler } from '@/shared/middleware/errorHandler'
+import { authenticate, authorize, AuthRequest } from '@/shared/middleware/auth'
+import { prisma } from '@/shared/config/database'
+import { attendanceSchema } from '@/validators'
+import { validateRequest, validateParams, validateQuery } from '@/shared/middleware/validation'
+import { NotFoundError, ConflictError } from '@/shared/utils/errors'
 import Joi from 'joi'
-import { validateLocation } from '../utils/geolocation'
+import { validateLocation } from '@/shared/utils/geolocation'
 
 const router = Router()
 

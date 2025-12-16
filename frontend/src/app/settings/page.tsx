@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import api from '@/app/api/api'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -106,12 +106,12 @@ export default function SettingsPage() {
         setIsMounted(true)
     }, [])
 
-    const handleSaveNotifications = () => {
+    const handleSaveNotifications = useCallback(() => {
         // In a real app, this would save to backend
         showToast('Notification preferences saved', 'success')
-    }
+    }, [showToast])
 
-    const handleSaveOrgSettings = async () => {
+    const handleSaveOrgSettings = useCallback(async () => {
         setIsSavingSettings(true)
         try {
             const res = await api.put('/org/settings', orgSettings)
@@ -135,9 +135,9 @@ export default function SettingsPage() {
         } finally {
             setIsSavingSettings(false)
         }
-    }
+    }, [orgSettings, showToast, updateOrg])
 
-    const handleLogoUpload = async (file: File) => {
+    const handleLogoUpload = useCallback(async (file: File) => {
         const formData = new FormData()
         formData.append('logo', file)
 
@@ -160,9 +160,9 @@ export default function SettingsPage() {
                 'Failed to upload logo'
             showToast(message, 'error')
         }
-    }
+    }, [showToast, updateOrg])
 
-    const handleFaviconUpload = async (file: File) => {
+    const handleFaviconUpload = useCallback(async (file: File) => {
         const formData = new FormData()
         formData.append('favicon', file)
 
@@ -185,7 +185,7 @@ export default function SettingsPage() {
                 'Failed to upload favicon'
             showToast(message, 'error')
         }
-    }
+    }, [showToast, updateOrg])
 
     const adminSections = useMemo(() => ([
         {
@@ -315,7 +315,18 @@ export default function SettingsPage() {
                 </div>
             )
         }
-    ]), [notifications, handleSaveNotifications, orgSettings, isSavingSettings, logoUrl, faviconUrl, router])
+    ]), [
+        notifications,
+        handleSaveNotifications,
+        orgSettings,
+        isSavingSettings,
+        logoUrl,
+        faviconUrl,
+        router,
+        handleFaviconUpload,
+        handleLogoUpload,
+        handleSaveOrgSettings
+    ])
 
     const onSubmit = async (data: PasswordFormData) => {
         setIsChangingPassword(true)

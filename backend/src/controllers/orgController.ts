@@ -1,8 +1,8 @@
 import { Request, Response } from 'express'
-import { asyncHandler } from '../middleware/errorHandler'
-import { BadRequestError } from '../utils/errors'
-import { AuthRequest } from '../middleware/auth'
-import { prisma } from '../config/database'
+import { asyncHandler } from '@/shared/middleware/errorHandler'
+import { BadRequestError } from '@/shared/utils/errors'
+import { AuthRequest } from '@/shared/middleware/auth'
+import { prisma } from '@/shared/config/database'
 
 // Helper to get full URL for local uploads
 const getFileUrl = (req: Request, file: any) => {

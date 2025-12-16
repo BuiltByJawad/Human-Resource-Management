@@ -68,6 +68,20 @@ enum LeaveRequestStatus {
   rejected
 }
 
+enum OnboardingStatus {
+  draft
+  active
+  completed
+  archived
+}
+
+enum OnboardingTaskStatus {
+  todo
+  in_progress
+  blocked
+  done
+}
+
 model User {
   id           String     @id @default(uuid())
   email        String     @unique
@@ -83,13 +97,15 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  role                Role                 @relation(fields: [roleId], references: [id])
-  department          Department?          @relation(fields: [departmentId], references: [id])
-  auditLogs           AuditLog[]
-  passwordResetTokens PasswordResetToken[]
-  invites             UserInvite[]
+  role                    Role                 @relation(fields: [roleId], references: [id])
+  department              Department?          @relation(fields: [departmentId], references: [id])
+  auditLogs               AuditLog[]
+  passwordResetTokens     PasswordResetToken[]
+  invites                 UserInvite[]
+  complianceLogs          ComplianceLog[]
+  onboardingAssignedTasks OnboardingTask[]     @relation("OnboardingTaskAssignee")
 
-  // Employee relation (One-to-One optional, linking system user to employee record if needed)
+  // Backlink to Employee (Employee.userId)
   employee Employee?
 
   @@index([email])
@@ -237,38 +253,40 @@ model Employee {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  user               User?               @relation(fields: [userId], references: [id])
-  department         Department?         @relation(fields: [departmentId], references: [id])
-  role               Role?               @relation(fields: [roleId], references: [id])
-  manager            Employee?           @relation("EmployeeManager", fields: [managerId], references: [id])
-  subordinates       Employee[]          @relation("EmployeeManager")
-  managedDepartments Department[]        @relation("DepartmentManager")
-  approvedLeaves     LeaveRequest[]      @relation("LeaveApprover")
-  conductedReviews   PerformanceReview[] @relation("PerformanceReviewer")
-  attendance         Attendance[]
-  leaveRequests      LeaveRequest[]
-  payrollRecords     PayrollRecord[]
-  performanceReviews PerformanceReview[]
-  documents          Document[]
-  complianceLogs     ComplianceLog[]
-  assetAssignments   AssetAssignment[]
-  employeeDocuments  EmployeeDocument[]
-  emergencyContacts  EmergencyContact[]
-  onboarding         OnboardingProcess?
-  offboarding        OffboardingProcess?
-  benefits           EmployeeBenefit[]
-  expenses           ExpenseClaim[]
-  timeEntries        TimeEntry[]
-  shifts             Shift[]
-  sentSwapRequests   ShiftSwapRequest[] @relation("SwapRequestor")
-  receivedSwapRequests ShiftSwapRequest[] @relation("SwapTarget")
-  training           EmployeeTraining[]
-  goals              PerformanceGoal[]
+  user                 User?               @relation(fields: [userId], references: [id])
+  department           Department?         @relation(fields: [departmentId], references: [id])
+  role                 Role?               @relation(fields: [roleId], references: [id])
+  manager              Employee?           @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates         Employee[]          @relation("EmployeeManager")
+  managedDepartments   Department[]        @relation("DepartmentManager")
+  approvedLeaves       LeaveRequest[]      @relation("LeaveApprover")
+  conductedReviews     PerformanceReview[] @relation("PerformanceReviewer")
+  attendance           Attendance[]
+  leaveRequests        LeaveRequest[]
+  payrollRecords       PayrollRecord[]
+  performanceReviews   PerformanceReview[]
+  documents            Document[]
+  complianceLogs       ComplianceLog[]
+  assetAssignments     AssetAssignment[]
+  employeeDocuments    EmployeeDocument[]
+  emergencyContacts    EmergencyContact[]
+  onboarding           OnboardingProcess?
+  offboarding          OffboardingProcess?
+  benefits             EmployeeBenefit[]
+  expenses             ExpenseClaim[]
+  timeEntries          TimeEntry[]
+  shifts               Shift[]
+  sentSwapRequests     ShiftSwapRequest[]  @relation("SwapRequestor")
+  receivedSwapRequests ShiftSwapRequest[]  @relation("SwapTarget")
+  training             EmployeeTraining[]
+  goals                PerformanceGoal[]
 
   @@index([departmentId])
   @@index([managerId])
   @@index([userId])
 }
+
+//--- removed duplicate onboarding definitions (canonical models defined above) ---
 
 model Attendance {
   id            String           @id @default(uuid())
@@ -420,6 +438,8 @@ model ComplianceLog {
 
   rule     ComplianceRule @relation(fields: [ruleId], references: [id])
   employee Employee       @relation(fields: [employeeId], references: [id])
+  User     User?          @relation(fields: [userId], references: [id])
+  userId   String?
 
   @@index([ruleId])
   @@index([employeeId])
@@ -559,124 +579,113 @@ model PerformanceReview {
   @@index([cycleId])
 }
 
-model OnboardingTemplate {
-  id           String           @id @default(uuid())
-  name         String
-  description  String?
-  position     String?          // default position this applies to
-  departmentId String?          // default department
-  tasks        OnboardingTask[]
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+model OnboardingProcess {
+  id          String           @id @default(uuid())
+  employeeId  String           @unique
+  status      OnboardingStatus @default(active)
+  startDate   DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdBy   String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  employee Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  tasks    OnboardingTask[]
+
+  @@index([employeeId])
 }
 
 model OnboardingTask {
-  id           String             @id @default(uuid())
-  templateId   String
-  template     OnboardingTemplate @relation(fields: [templateId], references: [id])
-  title        String
-  description  String?
-  assigneeRole String?            // "HR", "Manager", "IT", "Self"
-  dueInDays    Int                // Days relative to start date
-  isRequired   Boolean            @default(true)
-  order        Int                @default(0)
-}
+  id             String               @id @default(uuid())
+  processId      String
+  title          String
+  description    String?
+  assigneeUserId String?
+  dueDate        DateTime?
+  status         OnboardingTaskStatus @default(todo)
+  completedAt    DateTime?
+  notes          String?
+  order          Int?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
-model OnboardingProcess {
-  id          String                   @id @default(uuid())
-  employeeId  String                   @unique
-  employee    Employee                 @relation(fields: [employeeId], references: [id])
-  templateId  String?
-  status      String                   @default("pending") // pending, in_progress, completed
-  startDate   DateTime
-  progress    Int                      @default(0) // percentage
-  tasks       OnboardingTaskInstance[]
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
-}
+  process  OnboardingProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  assignee User?             @relation("OnboardingTaskAssignee", fields: [assigneeUserId], references: [id])
 
-model OnboardingTaskInstance {
-  id          String            @id @default(uuid())
-  processId   String
-  process     OnboardingProcess @relation(fields: [processId], references: [id])
-  title       String
-  description String?
-  status      String            @default("pending") // pending, completed, skipped
-  assigneeID  String?           // Specific user ID if assigned
-  dueDate     DateTime?
-  completedAt DateTime?
-  completedBy String?
+  @@index([processId])
+  @@index([assigneeUserId])
 }
 
 model OffboardingProcess {
-  id          String            @id @default(uuid())
-  employeeId  String            @unique
-  employee    Employee          @relation(fields: [employeeId], references: [id])
-  reason      String            // "Resignation", "Termination", "Contract End", "Retirement"
-  notes       String?
-  exitDate    DateTime
-  status      String            @default("pending") // pending, in_progress, completed
-  tasks       OffboardingTask[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id         String            @id @default(uuid())
+  employeeId String            @unique
+  employee   Employee          @relation(fields: [employeeId], references: [id])
+  reason     String // "Resignation", "Termination", "Contract End", "Retirement"
+  notes      String?
+  exitDate   DateTime
+  status     String            @default("pending") // pending, in_progress, completed
+  tasks      OffboardingTask[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 }
 
 model OffboardingTask {
-  id          String             @id @default(uuid())
-  processId   String
-  process     OffboardingProcess @relation(fields: [processId], references: [id])
-  title       String
-  description String?
-  status      String             @default("pending") // pending, completed
-  assigneeRole String?           // "HR", "Manager", "IT"
-  completedAt DateTime?
-  completedBy String?
+  id           String             @id @default(uuid())
+  processId    String
+  process      OffboardingProcess @relation(fields: [processId], references: [id])
+  title        String
+  description  String?
+  status       String             @default("pending") // pending, completed
+  assigneeRole String? // "HR", "Manager", "IT"
+  completedAt  DateTime?
+  completedBy  String?
 }
 
 model BenefitPlan {
-  id          String   @id @default(uuid())
-  name        String
-  type        String   // "Health", "Dental", "Vision", "Retirement", "Other"
-  description String?
-  provider    String?
-  costToEmployee Decimal @default(0.00) @db.Decimal(10, 2) // Monthly deduction
-  costToCompany  Decimal @default(0.00) @db.Decimal(10, 2)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  enrollments EmployeeBenefit[]
+  id             String            @id @default(uuid())
+  name           String
+  type           String // "Health", "Dental", "Vision", "Retirement", "Other"
+  description    String?
+  provider       String?
+  costToEmployee Decimal           @default(0.00) @db.Decimal(10, 2) // Monthly deduction
+  costToCompany  Decimal           @default(0.00) @db.Decimal(10, 2)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  enrollments    EmployeeBenefit[]
 }
 
 model EmployeeBenefit {
-  id            String      @id @default(uuid())
-  employeeId    String
-  employee      Employee    @relation(fields: [employeeId], references: [id])
-  benefitPlanId String
-  benefitPlan   BenefitPlan @relation(fields: [benefitPlanId], references: [id])
-  enrollmentDate DateTime   @default(now())
+  id                String      @id @default(uuid())
+  employeeId        String
+  employee          Employee    @relation(fields: [employeeId], references: [id])
+  benefitPlanId     String
+  benefitPlan       BenefitPlan @relation(fields: [benefitPlanId], references: [id])
+  enrollmentDate    DateTime    @default(now())
   coverageStartDate DateTime
   coverageEndDate   DateTime? // Null if active
-  status        String      @default("active") // active, cancelled
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  status            String      @default("active") // active, cancelled
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   @@unique([employeeId, benefitPlanId])
 }
 
 model ExpenseClaim {
-  id          String   @id @default(uuid())
-  employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id])
-  amount      Decimal  @db.Decimal(10, 2)
-  currency    String   @default("USD")
-  category    String   // "Travel", "Meals", "Equipment", "Training", "Other"
-  date        DateTime
-  description String?
-  receiptUrl  String?
-  status      String   @default("pending") // pending, approved, rejected, reimbursed
-  approvedBy  String?  // Manager/Admin ID
+  id              String   @id @default(uuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  amount          Decimal  @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  category        String // "Travel", "Meals", "Equipment", "Training", "Other"
+  date            DateTime
+  description     String?
+  receiptUrl      String?
+  status          String   @default("pending") // pending, approved, rejected, reimbursed
+  approvedBy      String? // Manager/Admin ID
   rejectionReason String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Project {
@@ -701,7 +710,7 @@ model TimeEntry {
   date        DateTime
   startTime   DateTime
   endTime     DateTime? // Null if currently clocked in
-  duration    Int?      // In minutes, calculated on completion
+  duration    Int? // In minutes, calculated on completion
   description String?
   type        String    @default("work") // work, break, meeting
   status      String    @default("pending") // pending, approved
@@ -710,43 +719,43 @@ model TimeEntry {
 }
 
 model Shift {
-  id          String   @id @default(uuid())
-  employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id])
-  startTime   DateTime
-  endTime     DateTime
-  type        String   @default("Regular") // "Regular", "Overtime", "OnCall"
-  location    String?  // "Office", "Remote"
-  status      String   @default("scheduled") // scheduled, completed, cancelled
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  startTime  DateTime
+  endTime    DateTime
+  type       String   @default("Regular") // "Regular", "Overtime", "OnCall"
+  location   String? // "Office", "Remote"
+  status     String   @default("scheduled") // scheduled, completed, cancelled
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
   swapRequests ShiftSwapRequest[]
 }
 
 model ShiftSwapRequest {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   shiftId     String
-  shift       Shift    @relation(fields: [shiftId], references: [id])
+  shift       Shift     @relation(fields: [shiftId], references: [id])
   requestorId String
-  requestor   Employee @relation("SwapRequestor", fields: [requestorId], references: [id])
-  targetId    String?  // Optional: specific employee to swap with
+  requestor   Employee  @relation("SwapRequestor", fields: [requestorId], references: [id])
+  targetId    String? // Optional: specific employee to swap with
   target      Employee? @relation("SwapTarget", fields: [targetId], references: [id])
-  status      String   @default("pending") // pending, approved, rejected
+  status      String    @default("pending") // pending, approved, rejected
   reason      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model CompanyDocument {
   id          String   @id @default(uuid())
   title       String
   description String?
-  category    String   // "HR Policy", "IT Policy", "Handbook", "Form", "Other"
+  category    String // "HR Policy", "IT Policy", "Handbook", "Form", "Other"
   fileUrl     String
-  type        String   // "PDF", "DOCX", etc.
+  type        String // "PDF", "DOCX", etc.
   isVisible   Boolean  @default(true)
-  uploadedBy  String   // Admin User ID
+  uploadedBy  String // Admin User ID
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -755,8 +764,8 @@ model TrainingCourse {
   id          String   @id @default(uuid())
   title       String
   description String?
-  contentUrl  String?  // Link to video, PDF, or slide deck
-  duration    Int?     // Estimated distinct in minutes
+  contentUrl  String? // Link to video, PDF, or slide deck
+  duration    Int? // Estimated distinct in minutes
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -773,33 +782,33 @@ model EmployeeTraining {
   progress       Int            @default(0) // Percentage 0-100
   assignedDate   DateTime       @default(now())
   completionDate DateTime?
-  
+
   @@unique([employeeId, courseId])
 }
 
 model PerformanceGoal {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id])
   title       String
   description String?
-  status      String   @default("in-progress") // not-started, in-progress, completed, cancelled
-  startDate   DateTime @default(now())
+  status      String    @default("in-progress") // not-started, in-progress, completed, cancelled
+  startDate   DateTime  @default(now())
   endDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  keyResults  KeyResult[]
+  keyResults KeyResult[]
 }
 
 model KeyResult {
-  id          String          @id @default(uuid())
-  goalId      String
-  goal        PerformanceGoal @relation(fields: [goalId], references: [id])
-  description String
-  targetValue Int             @default(100) // e.g., 100% or 10 sales
-  currentValue Int            @default(0)
-  unit        String          @default("percentage") // percentage, count, currency
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id           String          @id @default(uuid())
+  goalId       String
+  goal         PerformanceGoal @relation(fields: [goalId], references: [id])
+  description  String
+  targetValue  Int             @default(100) // e.g., 100% or 10 sales
+  currentValue Int             @default(0)
+  unit         String          @default("percentage") // percentage, count, currency
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 }

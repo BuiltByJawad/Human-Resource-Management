@@ -68,6 +68,10 @@ export const createApp = (): { app: Application; httpServer: any } => {
     credentials: true,
   }));
 
+  // Body parsers
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
   // Request logging
   app.use(morgan('combined', { stream }));
 
@@ -88,6 +92,9 @@ export const createApp = (): { app: Application; httpServer: any } => {
     customCss: '.swagger-ui .topbar { display: none }',
     customSiteTitle: 'HRM API Documentation',
   }));
+
+  // Mount API routes
+  app.use('/api', routes);
 
   // Health check endpoints
   app.get('/health', async (req: Request, res: Response) => {

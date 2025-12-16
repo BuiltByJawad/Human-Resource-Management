@@ -1,9 +1,9 @@
-import 'module-alias/register';
+import './module-alias';
 import 'reflect-metadata';
 import { createApp } from './app';
 import { prisma } from './app';
-import { logger } from './config/logger';
-import { PORT, NODE_ENV } from './config/config';
+import { logger } from '@/shared/config/logger';
+import { PORT, NODE_ENV } from '@/shared/config/config';
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err: Error) => {

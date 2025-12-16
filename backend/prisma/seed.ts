@@ -55,6 +55,9 @@ async function main() {
     { resource: 'performance', action: 'manage_cycles', description: 'Manage performance cycles' },
     { resource: 'performance', action: 'review', description: 'Submit performance reviews' },
 
+    { resource: 'onboarding', action: 'view', description: 'View onboarding processes and tasks' },
+    { resource: 'onboarding', action: 'manage', description: 'Manage onboarding processes and tasks' },
+
     { resource: 'settings', action: 'manage_system_settings', description: 'Manage system settings and branding' },
   ]
 
@@ -125,7 +128,8 @@ async function main() {
         'settings.manage_system_settings',
         'assets.*',
         'analytics.*',
-        'compliance.*'
+        'compliance.*',
+        'onboarding.*'
       ]
     },
     {
@@ -141,7 +145,9 @@ async function main() {
         'reports.view',
         'performance.view',
         'performance.review',
-        'assets.view'
+        'assets.view',
+        'onboarding.view',
+        'onboarding.manage'
       ]
     },
     {
