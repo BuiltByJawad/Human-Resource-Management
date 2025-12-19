@@ -1,49 +1,55 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftIcon, ExclamationTriangleIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/axios';
 import { RiskScoreCard, AtRiskList, WorkPatternChart } from '@/components/analytics/BurnoutComponents';
 import { Select } from '@/components/ui/CustomSelect';
 import { PERMISSIONS } from '@/constants/permissions';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import { handleCrudError } from '@/lib/apiError';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export default function BurnoutAnalyticsPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { user, token, hasPermission } = useAuthStore();
-    const [analyticsData, setAnalyticsData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [period, setPeriod] = useState(30);
+    const initialPeriod = useMemo(() => {
+        const param = searchParams.get('period');
+        const parsed = param ? parseInt(param, 10) : 30;
+        return Number.isNaN(parsed) ? 30 : parsed;
+    }, [searchParams]);
+    const [period, setPeriod] = useState(initialPeriod);
+    const { showToast } = useToast();
 
     const canViewAnalytics = !!user && hasPermission(PERMISSIONS.VIEW_ANALYTICS);
 
-    useEffect(() => {
-        const fetchAnalytics = async () => {
-            setIsLoading(true);
-            try {
-                const response = await axios.get(`${API_URL}/analytics/burnout?period=${period}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setAnalyticsData(response.data);
-            } catch (error) {
-                console.error('Error fetching burnout analytics:', error);
-                setAnalyticsData(null);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    const analyticsQuery = useQuery({
+        queryKey: ['burnout-analytics', period, token],
+        queryFn: async () => {
+            const response = await api.get(`/analytics/burnout`, { params: { period } });
+            return response.data;
+        },
+        enabled: !!token && !!user && canViewAnalytics,
+        retry: false,
+        staleTime: 5 * 60 * 1000,
+    });
 
-        if (token && user) {
-            if (!canViewAnalytics) {
-                setIsLoading(false);
-                return;
-            }
-            fetchAnalytics();
+    useEffect(() => {
+        if (analyticsQuery.isError && analyticsQuery.error) {
+            handleCrudError({ error: analyticsQuery.error, resourceLabel: 'Burnout analytics', showToast });
         }
-    }, [token, user, period, canViewAnalytics]);
+    }, [analyticsQuery.isError, analyticsQuery.error, showToast]);
+
+    const handlePeriodChange = (value: string) => {
+        const next = Number(value);
+        setPeriod(next);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('period', value);
+        router.replace(`/analytics/burnout?${params.toString()}`);
+    };
 
     if (user && !canViewAnalytics) {
         return (
@@ -71,7 +77,7 @@ export default function BurnoutAnalyticsPage() {
         );
     }
 
-    if (isLoading) {
+    if (analyticsQuery.isLoading) {
         return (
             <div className="min-h-screen bg-gray-50/50 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -91,7 +97,7 @@ export default function BurnoutAnalyticsPage() {
     }
 
     // If no data after loading, show empty state
-    if (!analyticsData) {
+    if (!analyticsQuery.data) {
         return (
             <div className="min-h-screen bg-gray-50/50 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -105,7 +111,7 @@ export default function BurnoutAnalyticsPage() {
         );
     }
 
-    const { summary, employees } = analyticsData;
+    const { summary, employees } = analyticsQuery.data;
 
     const stats = [
         { name: 'Total Employees', value: summary.totalEmployees, icon: UserGroupIcon, color: 'text-blue-600', bg: 'bg-blue-100' },

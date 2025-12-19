@@ -1,174 +1,163 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
-import { AttendanceCard, AttendanceHistory, AttendanceRecord } from '@/components/hrm/AttendanceComponents'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useToast } from '@/components/ui/ToastProvider'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+import { useEffect, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Sidebar from "@/components/ui/Sidebar";
+import Header from "@/components/ui/Header";
+import { AttendanceCard, AttendanceHistory, AttendanceRecord } from "@/components/hrm/AttendanceComponents";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useToast } from "@/components/ui/ToastProvider";
+import api from "@/lib/axios";
+import { handleCrudError } from "@/lib/apiError";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function AttendancePage() {
-    const { token, user } = useAuthStore()
-    const { showToast } = useToast()
+  const { token } = useAuthStore();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
-    const [records, setRecords] = useState<AttendanceRecord[]>([])
-    const [loading, setLoading] = useState(true)
-    const [actionLoading, setActionLoading] = useState(false)
-    const [currentStatus, setCurrentStatus] = useState<'checked_in' | 'checked_out'>('checked_out')
-    const [currentRecordId, setCurrentRecordId] = useState<string | null>(null)
-    const [lastActionTime, setLastActionTime] = useState<Date | undefined>(undefined)
+  const attendanceQuery = useQuery<AttendanceRecord[], Error>({
+    queryKey: ["attendance", token],
+    queryFn: async () => {
+      const response = await api.get("/attendance", {
+        params: { limit: 30 },
+      });
+      return Array.isArray(response.data?.data) ? response.data.data : [];
+    },
+    enabled: !!token,
+    retry: false,
+    initialData: [] as AttendanceRecord[],
+  });
 
-    const fetchAttendance = useCallback(async () => {
-        if (!token) return
+  useEffect(() => {
+    if (attendanceQuery.isError && attendanceQuery.error) {
+      handleCrudError({
+        error: attendanceQuery.error,
+        resourceLabel: "Attendance",
+        showToast,
+      });
+    }
+  }, [attendanceQuery.isError, attendanceQuery.error, showToast]);
 
-        setLoading(true)
-        try {
-            const response = await axios.get(`${API_URL}/attendance`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params: {
-                    limit: 30 // Get last 30 records
-                }
-            })
+  const { currentStatus, currentRecordId, lastActionTime } = useMemo(() => {
+    const fetchedRecords = attendanceQuery.data || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-            if (response.data.success) {
-                const fetchedRecords: AttendanceRecord[] = response.data.data
-                setRecords(fetchedRecords)
+    const todayRecords = fetchedRecords.filter((record) => {
+      const recordDate = new Date(record.checkIn);
+      recordDate.setHours(0, 0, 0, 0);
+      return recordDate.getTime() === today.getTime();
+    });
 
-                // Determine current status based on today's most recent record
-                const today = new Date()
-                today.setHours(0, 0, 0, 0)
+    const todayRecord = todayRecords.length > 0 ? todayRecords[0] : null;
 
-                const todayRecords = fetchedRecords.filter(record => {
-                    const recordDate = new Date(record.checkIn)
-                    recordDate.setHours(0, 0, 0, 0)
-                    return recordDate.getTime() === today.getTime()
-                })
-
-                // Get the most recent record (first one since API returns DESC order)
-                const todayRecord = todayRecords.length > 0 ? todayRecords[0] : null
-
-                if (todayRecord) {
-                    if (!todayRecord.checkOut) {
-                        setCurrentStatus('checked_in')
-                        setCurrentRecordId(todayRecord.id)
-                        setLastActionTime(new Date(todayRecord.checkIn))
-                    } else {
-                        setCurrentStatus('checked_out')
-                        setCurrentRecordId(null)
-                        setLastActionTime(new Date(todayRecord.checkOut))
-                    }
-                } else {
-                    setCurrentStatus('checked_out')
-                    setCurrentRecordId(null)
-                    setLastActionTime(undefined)
-                }
-            }
-        } catch (error: any) {
-            console.error('Failed to fetch attendance', error)
-            setRecords([])
-            setCurrentStatus('checked_out')
-            setCurrentRecordId(null)
-            setLastActionTime(undefined)
-        } finally {
-            setLoading(false)
-        }
-    }, [token])
-
-    useEffect(() => {
-        fetchAttendance()
-    }, [fetchAttendance])
-
-    const getPosition = () => {
-        return new Promise<GeolocationPosition>((resolve, reject) => {
-            if (!navigator.geolocation) {
-                reject(new Error('Geolocation is not supported by your browser'))
-            } else {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                })
-            }
-        })
+    if (todayRecord) {
+      if (!todayRecord.checkOut) {
+        return {
+          currentStatus: "checked_in" as const,
+          currentRecordId: todayRecord.id,
+          lastActionTime: new Date(todayRecord.checkIn),
+        };
+      }
+      return {
+        currentStatus: "checked_out" as const,
+        currentRecordId: null,
+        lastActionTime: new Date(todayRecord.checkOut),
+      };
     }
 
-    const handleClockIn = async () => {
-        setActionLoading(true)
-        try {
-            // Get location first
-            let locationData = {}
-            try {
-                showToast('Acquiring location...', 'info')
-                const position = await getPosition()
-                locationData = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                }
-            } catch (geoError) {
-                console.error('Geolocation failed', geoError)
-                showToast('Location access is required to clock in. Please enable it.', 'error')
-                setActionLoading(false)
-                return
-            }
+    return {
+      currentStatus: "checked_out" as const,
+      currentRecordId: null,
+      lastActionTime: undefined,
+    };
+  }, [attendanceQuery.data]);
 
-            const response = await axios.post(`${API_URL}/attendance/clock-in`, locationData, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
+  const getPosition = () => {
+    return new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by your browser"));
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (position) =>
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            }),
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          }
+        );
+      }
+    });
+  };
 
-            if (response.data.success) {
-                showToast('Clocked in successfully', 'success')
-                fetchAttendance()
-            }
-        } catch (error: any) {
-            console.error('Clock in failed', error)
-            const errorMessage = typeof error.response?.data?.error === 'string'
-                ? error.response.data.error
-                : 'Failed to clock in'
-            showToast(errorMessage, 'error')
-        } finally {
-            setActionLoading(false)
-        }
+  const clockInMutation = useMutation({
+    mutationFn: async (locationData: { latitude: number; longitude: number }) => {
+      const response = await api.post("/attendance/clock-in", locationData);
+      return response.data;
+    },
+    onSuccess: () => {
+      showToast("Clocked in successfully", "success");
+      queryClient.invalidateQueries({ queryKey: ["attendance", token] });
+    },
+    onError: (error) => {
+      handleCrudError({ error, resourceLabel: "Clock in", showToast });
+    },
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: async ({
+      attendanceId,
+      locationData,
+    }: {
+      attendanceId: string;
+      locationData: { latitude?: number; longitude?: number };
+    }) => {
+      const response = await api.put(`/attendance/clock-out/${attendanceId}`, locationData);
+      return response.data;
+    },
+    onSuccess: () => {
+      showToast("Clocked out successfully", "success");
+      queryClient.invalidateQueries({ queryKey: ["attendance", token] });
+    },
+    onError: (error) => {
+      handleCrudError({ error, resourceLabel: "Clock out", showToast });
+    },
+  });
+
+  const actionLoading = clockInMutation.isPending || clockOutMutation.isPending;
+
+  const handleClockIn = async () => {
+    try {
+      showToast("Acquiring location...", "info");
+      const locationData = await getPosition();
+      await clockInMutation.mutateAsync(locationData);
+    } catch (geoError) {
+      console.error("Geolocation failed", geoError);
+      showToast("Location access is required to clock in. Please enable it.", "error");
+    }
+  };
+
+  const handleClockOut = async () => {
+    if (!currentRecordId) {
+      showToast("No active attendance record to clock out.", "error");
+      return;
     }
 
-    const handleClockOut = async () => {
-        if (!currentRecordId) return
-
-        setActionLoading(true)
-        try {
-            // Get location (optional for clock out, but good to have)
-            let locationData = {}
-            try {
-                const position = await getPosition()
-                locationData = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                }
-            } catch (geoError) {
-                console.warn('Geolocation failed for clock out', geoError)
-                // We allow clock out even without location if it fails, to avoid trapping users
-            }
-
-            const response = await axios.put(`${API_URL}/attendance/clock-out/${currentRecordId}`, locationData, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-
-            if (response.data.success) {
-                showToast('Clocked out successfully', 'success')
-                fetchAttendance()
-            }
-        } catch (error: any) {
-            console.error('Clock out failed', error)
-            const errorMessage = typeof error.response?.data?.error === 'string'
-                ? error.response.data.error
-                : 'Failed to clock out'
-            showToast(errorMessage, 'error')
-        } finally {
-            setActionLoading(false)
-        }
+    let locationData: { latitude?: number; longitude?: number } = {};
+    try {
+      locationData = await getPosition();
+    } catch (geoError) {
+      console.warn("Geolocation failed for clock out", geoError);
     }
+
+    await clockOutMutation.mutateAsync({ attendanceId: currentRecordId, locationData });
+  };
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -193,10 +182,21 @@ export default function AttendancePage() {
                                 />
                             </div>
                             <div className="lg:col-span-2">
-                                <AttendanceHistory
-                                    records={records}
-                                    loading={loading}
-                                />
+                                {attendanceQuery.isLoading ? (
+                                    <div className="space-y-3">
+                                        <Skeleton className="h-4 w-1/4" />
+                                        <Skeleton className="h-4 w-1/3" />
+                                        <Skeleton className="h-32 w-full" />
+                                    </div>
+                                ) : attendanceQuery.isError ? (
+                                    <div className="text-red-600 text-sm">Failed to load attendance records. Please try again.</div>
+                                ) : (attendanceQuery.data?.length ?? 0) === 0 ? (
+                                    <div className="rounded-lg border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">
+                                        No attendance records yet.
+                                    </div>
+                                ) : (
+                                    <AttendanceHistory records={attendanceQuery.data || []} loading={attendanceQuery.isLoading} />
+                                )}
                             </div>
                         </div>
                     </div>

@@ -107,6 +107,7 @@ model User {
 
   // Backlink to Employee (Employee.userId)
   employee Employee?
+  notifications Notification[]
 
   @@index([email])
   @@index([roleId])
@@ -799,6 +800,21 @@ model PerformanceGoal {
   updatedAt   DateTime  @updatedAt
 
   keyResults KeyResult[]
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String?
+  type      String? // e.g., "leave", "system", "payroll"
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, readAt])
 }
 
 model KeyResult {

@@ -36,6 +36,14 @@ async function main() {
     { resource: 'payroll', action: 'manage', description: 'Manage payroll' },
     { resource: 'payroll', action: 'generate', description: 'Generate payroll' },
     { resource: 'payroll', action: 'configure', description: 'Configure payroll settings' },
+    { resource: 'benefits', action: 'view', description: 'View benefit plans and enrollments' },
+    { resource: 'benefits', action: 'manage', description: 'Manage benefit plans' },
+    { resource: 'benefits', action: 'enroll', description: 'Enroll employees in benefits' },
+    { resource: 'expenses', action: 'view', description: 'View expense claims' },
+    { resource: 'expenses', action: 'manage', description: 'Submit or edit expense claims' },
+    { resource: 'expenses', action: 'approve', description: 'Approve or reject expense claims' },
+    { resource: 'offboarding', action: 'view', description: 'View offboarding processes' },
+    { resource: 'offboarding', action: 'manage', description: 'Initiate or manage offboarding tasks' },
 
     { resource: 'assets', action: 'view', description: 'View assets' },
     { resource: 'assets', action: 'manage', description: 'Manage assets' },
@@ -129,7 +137,10 @@ async function main() {
         'assets.*',
         'analytics.*',
         'compliance.*',
-        'onboarding.*'
+        'onboarding.*',
+        'benefits.*',
+        'expenses.*',
+        'offboarding.*'
       ]
     },
     {
@@ -147,7 +158,13 @@ async function main() {
         'performance.review',
         'assets.view',
         'onboarding.view',
-        'onboarding.manage'
+        'onboarding.manage',
+        'benefits.view',
+        'benefits.enroll',
+        'expenses.view',
+        'expenses.approve',
+        'offboarding.view',
+        'offboarding.manage'
       ]
     },
     {
@@ -162,7 +179,9 @@ async function main() {
         'leave_requests.view',
         'leave_requests.manage',
         'payroll.view',
-        'performance.review'
+        'performance.review',
+        'benefits.view',
+        'expenses.view'
       ]
     }
   ]

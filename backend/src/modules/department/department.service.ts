@@ -1,5 +1,5 @@
 import { departmentRepository } from './department.repository';
-import { NotFoundError } from '../../shared/utils/errors';
+import { NotFoundError, ConflictError } from '../../shared/utils/errors';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto';
 
 export class DepartmentService {
@@ -18,6 +18,11 @@ export class DepartmentService {
     }
 
     async create(data: CreateDepartmentDto) {
+        const existing = await departmentRepository.findByName(data.name);
+        if (existing) {
+            throw new ConflictError('Department with this name already exists');
+        }
+
         const department = await departmentRepository.create({
             name: data.name,
             description: data.description,
@@ -28,7 +33,14 @@ export class DepartmentService {
     }
 
     async update(id: string, data: UpdateDepartmentDto) {
-        await this.getById(id); // Verify exists
+        const existing = await this.getById(id); // Verify exists
+
+        if (data.name && data.name !== existing.name) {
+            const duplicate = await departmentRepository.findByName(data.name);
+            if (duplicate) {
+                throw new ConflictError('Department with this name already exists');
+            }
+        }
 
         const updateData: any = {};
         if (data.name) updateData.name = data.name;

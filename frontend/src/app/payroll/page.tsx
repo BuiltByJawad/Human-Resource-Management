@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { PayslipModal } from '@/components/hrm/PayslipModal'
 import GeneratePayrollModal from '@/components/hrm/GeneratePayrollModal'
@@ -10,55 +11,55 @@ import { useToast } from '@/components/ui/ToastProvider'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const STALE_TIME = 10 * 60 * 1000
+const GC_TIME = 15 * 60 * 1000
+
 export default function PayrollPage() {
     const { token } = useAuthStore()
     const { showToast } = useToast()
-    const [records, setRecords] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+    const queryClient = useQueryClient()
     const [selectedPayroll, setSelectedPayroll] = useState<any>(null)
     const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
     const [isModalOpen, setIsModalOpen] = useState(false)
-    const [stats, setStats] = useState({ totalCost: 0, pendingCount: 0, processedCount: 0 })
 
-    const fetchPayroll = useCallback(async () => {
-        if (!token) {
-            console.log('No token available yet, skipping fetch')
-            setLoading(false)
-            return
-        }
-
-        try {
-            setLoading(true)
-            const res = await fetch('http://localhost:5000/api/payroll', {
+    const payrollQuery = useQuery({
+        queryKey: ['payroll', 'list'],
+        queryFn: async () => {
+            const res = await fetch(`${API_URL}/payroll`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             const data = await res.json()
-
-            if (Array.isArray(data)) {
-                setRecords(data)
-                const total = data.reduce((acc: number, curr: any) => acc + Number(curr.netSalary), 0)
-                const pending = data.filter((r: any) => r.status === 'draft').length
-                const processed = data.filter((r: any) => r.status === 'paid').length
-                setStats({ totalCost: total, pendingCount: pending, processedCount: processed })
-            } else {
-                console.error('Invalid payroll data:', data)
-                setRecords([])
+            if (!res.ok) {
+                const message = data?.error || data?.message || 'Failed to fetch payroll'
+                throw new Error(message)
             }
-        } catch (error) {
-            console.error('Failed to fetch payroll', error)
-            setRecords([])
-        } finally {
-            setLoading(false)
-        }
-    }, [token])
+            const listCandidates = [
+                Array.isArray(data) ? data : null,
+                Array.isArray(data?.data) ? data.data : null,
+                Array.isArray((data as any)?.items) ? (data as any).items : null,
+                Array.isArray((data as any)?.payrolls) ? (data as any).payrolls : null,
+            ]
+            const list = listCandidates.find((c) => Array.isArray(c)) ?? []
+            return list
+        },
+        enabled: !!token,
+        staleTime: STALE_TIME,
+        gcTime: GC_TIME,
+        refetchOnWindowFocus: false,
+    })
 
-    useEffect(() => {
-        fetchPayroll()
-    }, [fetchPayroll])
+    const stats = useMemo(() => {
+        const list = Array.isArray(payrollQuery.data) ? payrollQuery.data : []
+        const total = list.reduce((acc: number, curr: any) => acc + Number(curr.netSalary ?? 0), 0)
+        const pending = list.filter((r: any) => r.status === 'draft').length
+        const processed = list.filter((r: any) => r.status === 'paid').length
+        return { totalCost: total, pendingCount: pending, processedCount: processed }
+    }, [payrollQuery.data])
 
-    const handleGenerate = async (payPeriod: string) => {
-        try {
-            const res = await fetch('http://localhost:5000/api/payroll/generate', {
+    const generateMutation = useMutation({
+        mutationFn: async (payPeriod: string) => {
+            const res = await fetch(`${API_URL}/payroll/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -66,25 +67,24 @@ export default function PayrollPage() {
                 },
                 body: JSON.stringify({ payPeriod })
             })
-
-            if (res.ok) {
-                showToast('Payroll generated successfully!', 'success')
-                fetchPayroll()
-            } else {
-                const errData = await res.json()
-                showToast(`Failed: ${errData.details || 'Unknown error'}`, 'error')
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                throw new Error(errData?.details || errData?.message || 'Failed to generate payroll')
             }
-        } catch (error) {
-            console.error('Error generating payroll', error)
-            showToast('An error occurred while generating payroll', 'error')
+            return res.json()
+        },
+        onSuccess: () => {
+            showToast('Payroll generated successfully!', 'success')
+            queryClient.invalidateQueries({ queryKey: ['payroll', 'list'] })
+        },
+        onError: (error: any) => {
+            showToast(error?.message || 'An error occurred while generating payroll', 'error')
         }
-    }
+    })
 
-    const handleStatusUpdate = async (id: string, status: string) => {
-        if (!confirm(`Mark this record as ${status}?`)) return
-
-        try {
-            await fetch(`http://localhost:5000/api/payroll/${id}/status`, {
+    const statusMutation = useMutation({
+        mutationFn: async ({ id, status }: { id: string, status: string }) => {
+            const res = await fetch(`${API_URL}/payroll/${id}/status`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -92,11 +92,19 @@ export default function PayrollPage() {
                 },
                 body: JSON.stringify({ status })
             })
-            fetchPayroll()
-        } catch (error) {
-            console.error('Error updating status', error)
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                throw new Error(errData?.message || 'Failed to update status')
+            }
+            return res.json()
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['payroll', 'list'] })
+        },
+        onError: (error: any) => {
+            showToast(error?.message || 'Error updating status', 'error')
         }
-    }
+    })
 
     const columns: Column<any>[] = [
         {
@@ -150,8 +158,9 @@ export default function PayrollPage() {
                     </button>
                     {record.status === 'draft' && (
                         <button
-                            onClick={() => handleStatusUpdate(record.id, 'paid')}
-                            className="text-green-600 hover:text-green-900 p-1"
+                            onClick={() => statusMutation.mutate({ id: record.id, status: 'paid' })}
+                            disabled={statusMutation.isPending}
+                            className="text-green-600 hover:text-green-900 p-1 disabled:opacity-50"
                             title="Mark as Paid"
                         >
                             <CheckCircleIcon className="h-5 w-5" />
@@ -176,10 +185,11 @@ export default function PayrollPage() {
                             </div>
                             <button
                                 onClick={() => setIsGenerateModalOpen(true)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95"
+                                disabled={generateMutation.isPending}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-60"
                             >
                                 <BanknotesIcon className="h-5 w-5 mr-2" />
-                                Generate Payroll
+                                {generateMutation.isPending ? 'Generating...' : 'Generate Payroll'}
                             </button>
                         </div>
 
@@ -188,9 +198,9 @@ export default function PayrollPage() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-sm font-medium text-gray-500">Total Cost (Period)</p>
-                                        <p className="text-2xl font-bold text-gray-900 mt-1">${stats.totalCost.toFixed(2)}</p>
+                                        <p className="text-2xl font-bold text-gray-900 mt-2">${stats.totalCost.toFixed(2)}</p>
                                     </div>
-                                    <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
+                                    <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
                                         <BanknotesIcon className="h-6 w-6" />
                                     </div>
                                 </div>
@@ -198,10 +208,10 @@ export default function PayrollPage() {
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-500">Pending Approvals</p>
-                                        <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.pendingCount}</p>
+                                        <p className="text-sm font-medium text-gray-500">Pending (Draft)</p>
+                                        <p className="text-2xl font-bold text-gray-900 mt-2">{stats.pendingCount}</p>
                                     </div>
-                                    <div className="p-3 bg-yellow-50 rounded-xl text-yellow-600">
+                                    <div className="h-10 w-10 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center">
                                         <ClockIcon className="h-6 w-6" />
                                     </div>
                                 </div>
@@ -209,42 +219,26 @@ export default function PayrollPage() {
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-500">Processed</p>
-                                        <p className="text-2xl font-bold text-green-600 mt-1">{stats.processedCount}</p>
+                                        <p className="text-sm font-medium text-gray-500">Processed (Paid)</p>
+                                        <p className="text-2xl font-bold text-gray-900 mt-2">{stats.processedCount}</p>
                                     </div>
-                                    <div className="p-3 bg-green-50 rounded-xl text-green-600">
+                                    <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
                                         <CheckCircleIcon className="h-6 w-6" />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-6 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-                                <h3 className="font-semibold text-gray-900">Payroll Records</h3>
-                                <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">
-                                    {records.length} records found
-                                </span>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                                <h2 className="text-lg font-semibold text-gray-900">Payroll Records</h2>
+                                <div className="text-sm text-gray-500">
+                                    {payrollQuery.isLoading ? 'Loading...' : `${payrollQuery.data?.length ?? 0} records`}
+                                </div>
                             </div>
-                            <DataTable
-                                data={records}
-                                columns={columns}
-                                loading={loading}
-                                searchKeys={['payPeriod', 'employee.firstName', 'employee.lastName', 'employee.employeeNumber']}
-                            />
+
+                            <DataTable columns={columns} data={payrollQuery.data ?? []} loading={payrollQuery.isLoading} />
                         </div>
-
-                        <PayslipModal
-                            isOpen={isModalOpen}
-                            onClose={() => setIsModalOpen(false)}
-                            payroll={selectedPayroll}
-                        />
-
-                        <GeneratePayrollModal
-                            isOpen={isGenerateModalOpen}
-                            onClose={() => setIsGenerateModalOpen(false)}
-                            onGenerate={handleGenerate}
-                        />
                     </div>
                 </main>
             </div>

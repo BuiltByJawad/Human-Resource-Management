@@ -1,51 +1,60 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { shiftService, Shift } from '@/services/shiftService';
 import { ShiftCard } from '@/components/modules/shift/ShiftCard';
 import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { DatePicker } from '@/components/ui/FormComponents';
+import { handleCrudError } from '@/lib/apiError';
+import { useToast } from '@/components/ui/ToastProvider';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function ShiftsPage() {
-    const [mounted, setMounted] = useState(false);
-    const [shifts, setShifts] = useState<Shift[]>([]);
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [loading, setLoading] = useState(true);
+    const { showToast } = useToast();
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
+    const monthRange = useMemo(() => {
+        const start = startOfMonth(selectedDate).toISOString();
+        const end = endOfMonth(selectedDate).toISOString();
+        return { start, end };
+    }, [selectedDate]);
+
+    const {
+        data: shifts = [],
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useQuery<Shift[], Error>({
+        queryKey: ['shifts', monthRange.start, monthRange.end],
+        queryFn: () => shiftService.getShifts(monthRange.start, monthRange.end),
+        retry: false,
+        initialData: [] as Shift[],
+    });
+
+    // surface errors via shared handler
     useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    const loadShifts = useCallback(async () => {
-        setLoading(true);
-        try {
-            const start = startOfMonth(currentDate).toISOString();
-            const end = endOfMonth(currentDate).toISOString();
-            const data = await shiftService.getShifts(start, end);
-            setShifts(data || []);
-        } catch (error) {
-            console.error('Failed to load shifts:', error);
-        } finally {
-            setLoading(false);
+        if (isError && error) {
+            handleCrudError({
+                error,
+                resourceLabel: 'Shifts',
+                showToast,
+            });
         }
-    }, [currentDate]);
+    }, [isError, error, showToast]);
 
-    useEffect(() => {
-        if (mounted) {
-            loadShifts();
-        }
-    }, [currentDate, mounted, loadShifts]);
-
-    const selectedDayShifts = shifts.filter(s =>
-        new Date(s.startTime).getDate() === selectedDate.getDate() &&
-        new Date(s.startTime).getMonth() === selectedDate.getMonth()
+    const selectedDayShifts = useMemo(
+        () =>
+            (shifts ?? []).filter((s: Shift) => {
+                const d = new Date(s.startTime);
+                return d.getDate() === selectedDate.getDate() && d.getMonth() === selectedDate.getMonth();
+            }),
+        [shifts, selectedDate]
     );
-
-    if (!mounted) {
-        return null;
-    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -64,15 +73,10 @@ export default function ShiftsPage() {
                             <div className="md:col-span-4 lg:col-span-3">
                                 <div className="border rounded-lg p-4 bg-white shadow-sm">
                                     <h3 className="font-medium text-gray-900 mb-4">Select Date</h3>
-                                    <input
-                                        type="date"
-                                        value={format(selectedDate, 'yyyy-MM-dd')}
-                                        onChange={(e) => {
-                                            const newDate = new Date(e.target.value);
-                                            setSelectedDate(newDate);
-                                            setCurrentDate(newDate);
-                                        }}
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                    <DatePicker
+                                        value={selectedDate}
+                                        onChange={(date) => date && setSelectedDate(date)}
+                                        placeholder="Select a date"
                                     />
                                 </div>
                             </div>
@@ -85,12 +89,29 @@ export default function ShiftsPage() {
                                     </h2>
                                 </div>
 
-                                {loading ? (
-                                    <div className="text-gray-500">Loading shifts...</div>
+                                {isLoading ? (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {[1, 2].map((i) => (
+                                            <Card key={i} className="bg-white">
+                                                <CardContent className="space-y-3 py-4">
+                                                    <Skeleton className="h-4 w-1/2" />
+                                                    <Skeleton className="h-4 w-1/3" />
+                                                    <Skeleton className="h-3 w-full" />
+                                                    <Skeleton className="h-10 w-full" />
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                ) : isError ? (
+                                    <div className="text-red-600 text-sm">Failed to load shifts. Please try again.</div>
                                 ) : selectedDayShifts.length > 0 ? (
                                     <div className="grid gap-4 md:grid-cols-2">
-                                        {selectedDayShifts.map(shift => (
-                                            <ShiftCard key={shift.id} shift={shift} onSwapRequest={loadShifts} />
+                                        {selectedDayShifts.map((shift: Shift) => (
+                                            <ShiftCard
+                                                key={shift.id}
+                                                shift={shift}
+                                                onSwapRequest={() => refetch()}
+                                            />
                                         ))}
                                     </div>
                                 ) : (

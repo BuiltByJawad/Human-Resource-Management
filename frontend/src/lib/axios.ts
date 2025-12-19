@@ -1,61 +1,56 @@
 
-import axios from 'axios'
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/store/useAuthStore'
 
+const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+
+axios.defaults.baseURL = baseURL
+axios.defaults.headers.common['Content-Type'] = 'application/json'
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  baseURL,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
 })
 
-api.interceptors.request.use((config) => {
-  // Client-side only - read token from zustand persist storage
-  if (typeof window !== 'undefined') {
-    const { token } = useAuthStore.getState()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-  }
-  return config
-})
+type RetriableRequestConfig = AxiosRequestConfig & { _retry?: boolean }
 
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config
-    // Attempt refresh once when 401 and refresh token is available
-    if (error.response?.status === 401 && typeof window !== 'undefined' && !originalRequest?._retry) {
-      const { refreshToken, token, setUser, logout } = useAuthStore.getState() as any
-      if (refreshToken) {
-        originalRequest._retry = true
-        try {
-          const refreshResponse = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/refresh`,
-            { refreshToken }
-          )
-          const data = refreshResponse.data.data || refreshResponse.data
-          const newAccessToken = data?.accessToken || data?.token
-          const newRefreshToken = data?.refreshToken
-
-          useAuthStore.setState({
-            token: newAccessToken ?? token,
-            refreshToken: newRefreshToken ?? refreshToken,
-            user: data?.user ? { ...(data.user || {}), permissions: data.permissions ?? data.user?.permissions ?? [] } : useAuthStore.getState().user,
-            isAuthenticated: !!newAccessToken
-          })
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-          return api(originalRequest)
-        } catch (refreshError) {
-          logout?.()
-          return Promise.reject(refreshError)
-        }
+const attachInterceptors = (instance: AxiosInstance) => {
+  instance.interceptors.request.use((config) => {
+    if (typeof window !== 'undefined') {
+      const { token } = useAuthStore.getState()
+      if (token) {
+        config.headers = config.headers ?? {}
+        config.headers.Authorization = `Bearer ${token}`
       }
     }
-    return Promise.reject(error)
-  }
-)
+    return config
+  })
+
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config as RetriableRequestConfig
+      if (error.response?.status === 401 && typeof window !== 'undefined' && !originalRequest?._retry) {
+        const { refreshSession } = useAuthStore.getState()
+        originalRequest._retry = true
+        const refreshed = await refreshSession({ silent: true })
+        if (refreshed) {
+          const { token } = useAuthStore.getState()
+          originalRequest.headers = originalRequest.headers ?? {}
+          if (token) {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+          }
+          return instance(originalRequest)
+        }
+      }
+      return Promise.reject(error)
+    }
+  )
+}
+
+attachInterceptors(api)
+attachInterceptors(axios)
 
 export default api

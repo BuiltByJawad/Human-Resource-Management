@@ -10,6 +10,8 @@ import {
   OnboardingTaskPayload
 } from '@/services/onboardingService'
 import { useAuthStore } from '@/store/useAuthStore'
+import { DatePicker } from '@/components/ui/FormComponents'
+import { format } from 'date-fns'
 
 interface OnboardingTask {
   id: string
@@ -128,11 +130,9 @@ export default function OnboardingEmployeePage() {
           value={newTask.description}
           onChange={(e) => setNewTask((prev) => ({ ...prev, description: e.target.value }))}
         />
-        <input
-          className="border rounded px-3 py-2 text-sm"
-          type="date"
+        <DatePicker
           value={newTask.dueDate || ''}
-          onChange={(e) => setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))}
+          onChange={(date) => setNewTask((prev) => ({ ...prev, dueDate: date ? format(date, 'yyyy-MM-dd') : '' }))}
         />
         <button
           type="submit"

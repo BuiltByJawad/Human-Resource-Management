@@ -14,14 +14,9 @@ export interface CompanyDocument {
 
 export const documentService = {
     getDocuments: async (category?: string) => {
-        try {
-            const query = category ? `?category=${category}` : '';
-            const response = await api.get<{ data: CompanyDocument[] }>(`/documents${query}`);
-            return Array.isArray(response.data?.data) ? response.data.data : [];
-        } catch (error) {
-            console.error('Failed to fetch documents:', error);
-            return [];
-        }
+        const query = category ? `?category=${category}` : '';
+        const response = await api.get<{ data: CompanyDocument[] }>(`/documents${query}`);
+        return Array.isArray(response.data?.data) ? response.data.data : [];
     },
 
     uploadDocument: async (data: any) => {

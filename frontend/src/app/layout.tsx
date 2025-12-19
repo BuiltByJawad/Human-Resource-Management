@@ -4,6 +4,8 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { FaviconManager } from "@/components/ui/FaviconManager";
 import QueryProvider from "@/components/providers/QueryProvider";
+import { AuthTransitionOverlay } from "@/components/ui/AuthTransitionOverlay";
+import { PostLoginPrefetcher } from "@/components/providers/PostLoginPrefetcher";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -64,6 +66,9 @@ export default function RootLayout({
           <ToastProvider>
             <div className="min-h-screen">
               {children}
+              {/* Warm up core dashboard/employee queries right after login so sidebar navigation feels instant */}
+              <PostLoginPrefetcher />
+              <AuthTransitionOverlay />
             </div>
           </ToastProvider>
         </QueryProvider>

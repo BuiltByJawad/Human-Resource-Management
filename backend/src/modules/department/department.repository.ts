@@ -33,6 +33,12 @@ export class DepartmentRepository {
         });
     }
 
+    async findByName(name: string) {
+        return prisma.department.findUnique({
+            where: { name },
+        });
+    }
+
     async create(data: Prisma.DepartmentCreateInput) {
         return prisma.department.create({ data });
     }

@@ -34,6 +34,8 @@ interface RoleFormProps {
     permissions: Permission[]
     groupedPermissions: Record<string, Permission[]>
     loading?: boolean
+    apiErrors?: Partial<Record<RoleFormField, string>>
+    onClearApiErrors?: (field: RoleFormField) => void
 }
 
 const roleSchema = yup.object().shape({
@@ -43,6 +45,7 @@ const roleSchema = yup.object().shape({
 })
 
 type RoleFormData = yup.InferType<typeof roleSchema>
+export type RoleFormField = keyof RoleFormData
 
 export const RoleForm = ({
     isOpen,
@@ -51,11 +54,13 @@ export const RoleForm = ({
     initialData,
     permissions,
     groupedPermissions,
-    loading
+    loading,
+    apiErrors,
+    onClearApiErrors
 }: RoleFormProps) => {
     const [activeResource, setActiveResource] = useState<string>('')
 
-    const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
+    const { register, handleSubmit, setValue, watch, reset, formState: { errors }, setError, clearErrors } = useForm({
         resolver: yupResolver(roleSchema),
         defaultValues: {
             name: '',
@@ -81,6 +86,22 @@ export const RoleForm = ({
             })
         }
     }, [initialData, isOpen, reset])
+
+    useEffect(() => {
+        if (!apiErrors) return
+        (Object.entries(apiErrors) as [RoleFormField, string | undefined][]).forEach(([field, message]) => {
+            if (message) {
+                setError(field, { type: 'server', message })
+            } else {
+                clearErrors(field)
+            }
+        })
+    }, [apiErrors, setError, clearErrors])
+
+    const handleFieldFocus = (field: RoleFormField) => {
+        clearErrors(field)
+        onClearApiErrors?.(field)
+    }
 
     // Set initial active resource
     useEffect(() => {
@@ -141,13 +162,19 @@ export const RoleForm = ({
                             placeholder="e.g. HR Manager"
                             disabled={initialData?.isSystem}
                             error={errors.name?.message}
-                            {...register('name')}
+                            {...register('name', {
+                                onChange: () => handleFieldFocus('name')
+                            })}
+                            onBlur={() => handleFieldFocus('name')}
                         />
                         <TextArea
                             label="Description"
                             placeholder="What is this role for?"
                             error={errors.description?.message}
-                            {...register('description')}
+                            {...register('description', {
+                                onChange: () => handleFieldFocus('description')
+                            })}
+                            onBlur={() => handleFieldFocus('description')}
                         />
                     </div>
 
@@ -226,7 +253,10 @@ export const RoleForm = ({
                                                 return (
                                                     <div
                                                         key={perm.id}
-                                                        onClick={() => togglePermission(perm.id)}
+                                                        onClick={() => {
+                                                    handleFieldFocus('permissionIds')
+                                                    togglePermission(perm.id)
+                                                }}
                                                         className={`
                                                             flex items-start p-3 rounded-lg border cursor-pointer transition-all
                                                             ${isSelected

@@ -6,19 +6,19 @@ import { useAuthStore } from '@/store/useAuthStore'
 import AvatarUpload from '@/components/ui/AvatarUpload'
 import api from '@/app/api/api'
 import { UserCircleIcon, BriefcaseIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
-import DatePicker from 'react-datepicker'
-import "react-datepicker/dist/react-datepicker.css"
+import { DatePicker } from '@/components/ui/FormComponents'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import { useToast } from '@/components/ui/ToastProvider'
+import { format } from 'date-fns'
 
 const profileSchema = yup.object().shape({
     firstName: yup.string().required('First name is required'),
     lastName: yup.string().required('Last name is required'),
     phoneNumber: yup.string().required('Phone number is required'),
     address: yup.string().required('Address is required'),
-    dateOfBirth: yup.date().nullable().required('Date of birth is required'),
+    dateOfBirth: yup.string().required('Date of birth is required'),
     gender: yup.string().required('Gender is required'),
     maritalStatus: yup.string().required('Marital status is required'),
     emergencyContactName: yup.string().default(''),
@@ -43,7 +43,7 @@ export default function ProfilePage() {
             lastName: '',
             phoneNumber: '',
             address: '',
-            dateOfBirth: null as Date | null,
+            dateOfBirth: '',
             gender: '',
             maritalStatus: '',
             emergencyContactName: '',
@@ -59,7 +59,7 @@ export default function ProfilePage() {
                 lastName: user.lastName || '',
                 phoneNumber: user.employee?.phoneNumber || user.phoneNumber || '',
                 address: user.employee?.address || user.address || '',
-                dateOfBirth: user.employee?.dateOfBirth ? new Date(user.employee.dateOfBirth) : null,
+                dateOfBirth: user.employee?.dateOfBirth || '',
                 gender: user.employee?.gender || user.gender || '',
                 maritalStatus: user.employee?.maritalStatus || user.maritalStatus || '',
                 emergencyContactName: user.employee?.emergencyContact?.name || '',
@@ -104,11 +104,35 @@ export default function ProfilePage() {
                 }
             }
 
-            await api.put('/auth/profile', payload)
+            const response = await api.put('/auth/profile', payload)
+            const result = response?.data?.data || {}
+            const updatedBasic = result.user || {}
+            const updatedEmployee = result.employee || {}
 
-            // Refresh profile to get updated data
-            const response = await api.get('/auth/profile')
-            updateUser(response.data.data.user)
+            const nextUser = {
+                ...(user || {}),
+                ...updatedBasic,
+                employee: {
+                    ...((user || {}).employee || {}),
+                    ...updatedEmployee
+                }
+            }
+
+            updateUser(nextUser)
+            reset({
+                firstName: nextUser.firstName || '',
+                lastName: nextUser.lastName || '',
+                phoneNumber: nextUser.employee?.phoneNumber || nextUser.phoneNumber || '',
+                address: nextUser.employee?.address || nextUser.address || '',
+                dateOfBirth: nextUser.employee?.dateOfBirth
+                    ? format(new Date(nextUser.employee.dateOfBirth), 'yyyy-MM-dd')
+                    : '',
+                gender: nextUser.employee?.gender || nextUser.gender || '',
+                maritalStatus: nextUser.employee?.maritalStatus || nextUser.maritalStatus || '',
+                emergencyContactName: nextUser.employee?.emergencyContact?.name || '',
+                emergencyContactRelation: nextUser.employee?.emergencyContact?.relationship || '',
+                emergencyContactPhone: nextUser.employee?.emergencyContact?.phone || ''
+            })
 
             setIsEditing(false)
             showToast('Profile updated successfully', 'success')
@@ -234,26 +258,21 @@ export default function ProfilePage() {
                                             <label className="block text-sm font-medium text-gray-700">
                                                 Date of Birth <span className="text-red-500">*</span>
                                             </label>
-                                            <div className="mt-1">
-                                                <Controller
-                                                    control={control}
-                                                    name="dateOfBirth"
-                                                    render={({ field }) => (
-                                                        <DatePicker
-                                                            selected={field.value}
-                                                            onChange={(date) => field.onChange(date)}
-                                                            disabled={!isEditing}
-                                                            dateFormat="yyyy-MM-dd"
-                                                            className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2 disabled:bg-gray-50 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
-                                                            placeholderText="Select date"
-                                                            showYearDropdown
-                                                            scrollableYearDropdown
-                                                            yearDropdownItemNumber={100}
-                                                        />
-                                                    )}
-                                                />
-                                                {errors.dateOfBirth && <p className="mt-1 text-sm text-red-600">{errors.dateOfBirth.message}</p>}
-                                            </div>
+                                            <Controller
+                                                control={control}
+                                                name="dateOfBirth"
+                                                render={({ field }) => (
+                                                    <DatePicker
+                                                        value={field.value || ''}
+                                                        onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                                                        disabled={!isEditing}
+                                                        className="mt-1 block w-full"
+                                                        inputClassName={`w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 disabled:bg-gray-50 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
+                                                        placeholder="Select date"
+                                                    />
+                                                )}
+                                            />
+                                            {errors.dateOfBirth && <p className="mt-1 text-sm text-red-600">{errors.dateOfBirth.message}</p>}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700">

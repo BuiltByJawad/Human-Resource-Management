@@ -1,55 +1,57 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { documentService, CompanyDocument } from '@/services/documentService';
 import { DocumentCard } from '@/components/modules/documents/DocumentCard';
 import { UploadDocumentDialog } from '@/components/modules/documents/UploadDocumentDialog';
 import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/ToastProvider';
+import { handleCrudError } from '@/lib/apiError';
 
 const categories = ['All', 'HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other'];
 
 export default function DocumentsPage() {
-    const [mounted, setMounted] = useState(false);
-    const [documents, setDocuments] = useState<CompanyDocument[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { showToast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
     const isAdmin = true;
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    const loadDocuments = async () => {
-        setLoading(true);
-        try {
-            const data = await documentService.getDocuments();
-            setDocuments(data || []);
-        } catch (error) {
-            console.error('Failed to load documents:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (mounted) {
-            loadDocuments();
-        }
-    }, [mounted]);
-
-    const filteredDocs = documents.filter(doc => {
-        const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            doc.category.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = selectedCategory === 'All' || doc.category === selectedCategory;
-        return matchesSearch && matchesCategory;
+    const {
+        data: documents = [],
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useQuery<CompanyDocument[], Error>({
+        queryKey: ['documents', selectedCategory],
+        queryFn: () => documentService.getDocuments(selectedCategory === 'All' ? undefined : selectedCategory),
+        retry: false,
+        initialData: [] as CompanyDocument[],
     });
 
-    if (!mounted) {
-        return null;
-    }
+    useEffect(() => {
+        if (isError && error) {
+            handleCrudError({
+                error,
+                resourceLabel: 'Documents',
+                showToast,
+            });
+        }
+    }, [isError, error, showToast]);
+
+    const filteredDocs = useMemo(() => {
+        const term = searchTerm.toLowerCase();
+        return (documents || []).filter((doc) => {
+            const matchesSearch =
+                doc.title.toLowerCase().includes(term) || doc.category.toLowerCase().includes(term);
+            const matchesCategory = selectedCategory === 'All' || doc.category === selectedCategory;
+            return matchesSearch && matchesCategory;
+        });
+    }, [documents, searchTerm, selectedCategory]);
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -63,7 +65,7 @@ export default function DocumentsPage() {
                                 <h1 className="text-2xl font-bold text-gray-900">Company Documents</h1>
                                 <p className="text-gray-600">Access policies, handbooks, and forms.</p>
                             </div>
-                            {isAdmin && <UploadDocumentDialog onSuccess={loadDocuments} />}
+                            {isAdmin && <UploadDocumentDialog onSuccess={() => refetch()} />}
                         </div>
 
                         <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -93,20 +95,22 @@ export default function DocumentsPage() {
                             </div>
                         </div>
 
-                        {loading ? (
+                        {isLoading ? (
                             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                {[1, 2, 3, 4].map(i => (
-                                    <div key={i} className="h-40 bg-gray-100 rounded-lg animate-pulse" />
+                                {[1, 2, 3, 4].map((i) => (
+                                    <Skeleton key={i} className="h-40 w-full rounded-lg" />
                                 ))}
                             </div>
+                        ) : isError ? (
+                            <div className="text-red-600 text-sm">Failed to load documents. Please try again.</div>
                         ) : filteredDocs.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                {filteredDocs.map(doc => (
+                                {filteredDocs.map((doc: CompanyDocument) => (
                                     <DocumentCard
                                         key={doc.id}
                                         doc={doc}
                                         isAdmin={isAdmin}
-                                        onDelete={loadDocuments}
+                                        onDelete={() => refetch()}
                                     />
                                 ))}
                             </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import api from '@/app/api/api'
+import api from '@/lib/axios'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -56,6 +56,7 @@ export default function SettingsPage() {
         companyName: '',
         companyAddress: ''
     })
+    const [orgErrors, setOrgErrors] = useState<Partial<Record<'siteName' | 'companyName' | 'companyAddress', string>>>({})
     const [isSavingSettings, setIsSavingSettings] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
 
@@ -69,14 +70,14 @@ export default function SettingsPage() {
     })
 
     const { user, hasPermission } = useAuthStore()
-    const { updateOrg, logoUrl, faviconUrl } = useOrgStore()
+    const { updateOrg, logoUrl, faviconUrl, loaded: orgLoaded, setLoaded } = useOrgStore()
     const { showToast } = useToast()
 
     // Fetch settings on mount
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const res = await api.get('/org/settings')
+                const res = await api.get('/organization/settings')
                 if (res.data.success) {
                     const data = res.data.data
                     setOrgSettings({
@@ -94,13 +95,14 @@ export default function SettingsPage() {
                         logoUrl: data.logoUrl,
                         faviconUrl: data.faviconUrl
                     })
+                    setLoaded(true)
                 }
             } catch (error) {
                 console.error('Failed to fetch settings', error)
             }
         }
         fetchSettings()
-    }, [updateOrg])
+    }, [updateOrg, setLoaded])
 
     useEffect(() => {
         setIsMounted(true)
@@ -112,9 +114,21 @@ export default function SettingsPage() {
     }, [showToast])
 
     const handleSaveOrgSettings = useCallback(async () => {
+        const errors: Partial<Record<'siteName' | 'companyName' | 'companyAddress', string>> = {}
+        if (!orgSettings.siteName.trim()) errors.siteName = 'Site name is required'
+        if (!orgSettings.companyName.trim()) errors.companyName = 'Company name is required'
+        if (!orgSettings.companyAddress.trim()) errors.companyAddress = 'Company address is required'
+
+        if (Object.keys(errors).length > 0) {
+            setOrgErrors(errors)
+            const firstError = Object.values(errors).find(Boolean)
+            if (firstError) showToast(firstError, 'error')
+            return
+        }
+
         setIsSavingSettings(true)
         try {
-            const res = await api.put('/org/settings', orgSettings)
+            const res = await api.put('/organization/settings', orgSettings)
             if (res.data.success) {
                 const data = res.data.data
                 updateOrg({
@@ -142,7 +156,7 @@ export default function SettingsPage() {
         formData.append('logo', file)
 
         try {
-            const res = await api.post('/org/branding/logo', formData, {
+            const res = await api.post('/organization/branding/logo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             })
             const url = res.data?.data?.logoUrl || res.data?.logoUrl
@@ -167,7 +181,7 @@ export default function SettingsPage() {
         formData.append('favicon', file)
 
         try {
-            const res = await api.post('/org/branding/favicon', formData, {
+            const res = await api.post('/organization/branding/favicon', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             })
             const url = res.data?.data?.faviconUrl || res.data?.faviconUrl
@@ -282,8 +296,13 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input
                             label="Site Name"
+                            required
+                            error={orgErrors.siteName}
                             value={orgSettings.siteName}
-                            onChange={(e) => setOrgSettings({ ...orgSettings, siteName: e.target.value })}
+                            onChange={(e) => {
+                                if (orgErrors.siteName) setOrgErrors((prev) => ({ ...prev, siteName: undefined }))
+                                setOrgSettings({ ...orgSettings, siteName: e.target.value })
+                            }}
                         />
                         <Input
                             label="Tagline"
@@ -294,13 +313,23 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input
                             label="Company Name (for payslips)"
+                            required
+                            error={orgErrors.companyName}
                             value={orgSettings.companyName}
-                            onChange={(e) => setOrgSettings({ ...orgSettings, companyName: e.target.value })}
+                            onChange={(e) => {
+                                if (orgErrors.companyName) setOrgErrors((prev) => ({ ...prev, companyName: undefined }))
+                                setOrgSettings({ ...orgSettings, companyName: e.target.value })
+                            }}
                         />
                         <Input
                             label="Company Address (for payslips)"
+                            required
+                            error={orgErrors.companyAddress}
                             value={orgSettings.companyAddress}
-                            onChange={(e) => setOrgSettings({ ...orgSettings, companyAddress: e.target.value })}
+                            onChange={(e) => {
+                                if (orgErrors.companyAddress) setOrgErrors((prev) => ({ ...prev, companyAddress: undefined }))
+                                setOrgSettings({ ...orgSettings, companyAddress: e.target.value })
+                            }}
                         />
                     </div>
                     <div className="flex justify-end">

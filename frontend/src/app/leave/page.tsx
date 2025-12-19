@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { LeaveRequestCard, LeaveRequestForm, LeaveRequest } from '@/components/hrm/LeaveComponents'
@@ -10,16 +11,15 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { PlusIcon, FunnelIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import { PERMISSIONS } from '@/constants/permissions'
-import axios from 'axios'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+import api from '@/lib/axios'
+import { handleCrudError } from '@/lib/apiError'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 export default function LeavePage() {
     const { token, hasAnyPermission } = useAuthStore()
     const { showToast } = useToast()
+    const queryClient = useQueryClient()
 
-    const [requests, setRequests] = useState<LeaveRequest[]>([])
-    const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [filterStatus, setFilterStatus] = useState<string>('all')
 
@@ -29,79 +29,80 @@ export default function LeavePage() {
         PERMISSIONS.MANAGE_LEAVE_POLICIES,
     ])
 
-    const fetchRequests = useCallback(async () => {
-        setLoading(true)
-        try {
-            const params: any = {}
+    const leaveQuery = useQuery<LeaveRequest[], Error>({
+        queryKey: ['leave', filterStatus, token],
+        queryFn: async () => {
+            const params: Record<string, string> = {}
             if (filterStatus !== 'all') params.status = filterStatus
-
-            const response = await axios.get(`${API_URL}/leave`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params
-            })
-
-            if (response.data.success) {
-                setRequests(response.data.data)
-            }
-        } catch (error: any) {
-            console.error('Failed to fetch leave requests', error)
-            setRequests([])
-        } finally {
-            setLoading(false)
-        }
-    }, [token, filterStatus])
+            const response = await api.get('/leave', { params })
+            return response.data?.data ?? []
+        },
+        enabled: !!token,
+        retry: false,
+        initialData: [] as LeaveRequest[],
+    })
 
     useEffect(() => {
-        if (token) {
-            fetchRequests()
+        if (leaveQuery.isError && leaveQuery.error) {
+            handleCrudError({
+                error: leaveQuery.error,
+                resourceLabel: 'Leave requests',
+                showToast,
+            })
         }
-    }, [token, fetchRequests])
+    }, [leaveQuery.isError, leaveQuery.error, showToast])
+
+    const createMutation = useMutation({
+        mutationFn: (payload: any) => api.post('/leave', payload),
+        onSuccess: async () => {
+            showToast('Leave request submitted successfully', 'success')
+            await queryClient.invalidateQueries({ queryKey: ['leave'] })
+            setIsModalOpen(false)
+        },
+        onError: (error: any) =>
+            handleCrudError({
+                error,
+                resourceLabel: 'Leave request',
+                showToast,
+            }),
+    })
+
+    const approveMutation = useMutation({
+        mutationFn: (id: string) => api.put(`/leave/${id}/approve`),
+        onSuccess: () => {
+            showToast('Leave request approved', 'success')
+            queryClient.invalidateQueries({ queryKey: ['leave'] })
+        },
+        onError: (error: any) =>
+            handleCrudError({
+                error,
+                resourceLabel: 'Leave request',
+                showToast,
+            }),
+    })
+
+    const rejectMutation = useMutation({
+        mutationFn: (id: string) => api.put(`/leave/${id}/reject`),
+        onSuccess: () => {
+            showToast('Leave request rejected', 'success')
+            queryClient.invalidateQueries({ queryKey: ['leave'] })
+        },
+        onError: (error: any) =>
+            handleCrudError({
+                error,
+                resourceLabel: 'Leave request',
+                showToast,
+            }),
+    })
 
     const handleCreateRequest = async (data: any) => {
-        try {
-            console.log('Submitting leave request:', data)
-            const response = await axios.post(`${API_URL}/leave`, data, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            console.log('Leave request submitted:', response.data)
-            showToast('Leave request submitted successfully', 'success')
-
-            // Force a small delay to ensure backend consistency
-            await new Promise(resolve => setTimeout(resolve, 500))
-
-            await fetchRequests()
-            setIsModalOpen(false)
-        } catch (error: any) {
-            console.error('Failed to submit leave request', error)
-            showToast(error.response?.data?.message || 'Failed to submit request', 'error')
-        }
+        await createMutation.mutateAsync(data)
     }
 
-    const handleApprove = async (id: string) => {
-        try {
-            await axios.put(`${API_URL}/leave/${id}/approve`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            showToast('Leave request approved', 'success')
-            fetchRequests()
-        } catch (error: any) {
-            console.error('Failed to approve request', error)
-            showToast('Failed to approve request', 'error')
-        }
-    }
+    const handleApprove = (id: string) => approveMutation.mutate(id)
+    const handleReject = (id: string) => rejectMutation.mutate(id)
 
-    const handleReject = async (id: string) => {
-        try {
-            await axios.put(`${API_URL}/leave/${id}/reject`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            showToast('Leave request rejected', 'success')
-            fetchRequests()
-        } catch (error: any) {
-            console.error('Failed to reject request', error)
-            showToast('Failed to reject request', 'error')
-        }
-    }
+    const requests = useMemo(() => leaveQuery.data || [], [leaveQuery.data])
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -142,10 +143,20 @@ export default function LeavePage() {
                             </div>
                         </div>
 
-                        {loading ? (
-                            <div className="flex justify-center items-center h-64">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                        {leaveQuery.isLoading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
+                                        <Skeleton className="h-4 w-1/2" />
+                                        <Skeleton className="h-4 w-1/3" />
+                                        <Skeleton className="h-3 w-full" />
+                                        <Skeleton className="h-3 w-2/3" />
+                                        <Skeleton className="h-10 w-full" />
+                                    </div>
+                                ))}
                             </div>
+                        ) : leaveQuery.isError ? (
+                            <div className="text-red-600 text-sm">Failed to load leave requests. Please try again.</div>
                         ) : (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

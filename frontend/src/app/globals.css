@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f7fb;
+  --background: #f7f9fc;
   --foreground: #0f172a;
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
+  --primary: #0ea5e9; /* sky */
+  --primary-dark: #0369a1;
+  --accent: #2563eb; /* blue to match loader */
   --card: #ffffff;
 }
 
@@ -17,7 +18,11 @@
 
 body {
   min-height: 100vh;
-  background: var(--background);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(59, 130, 246, 0.10), transparent 32%),
+    radial-gradient(circle at 78% 12%, rgba(59, 130, 246, 0.12), transparent 28%),
+    radial-gradient(circle at 50% 85%, rgba(37, 99, 235, 0.07), transparent 38%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -142,4 +147,59 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Auth transition loader animations */
+@keyframes workspace-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+}
+
+@keyframes workspace-slide {
+  0% {
+    transform: translateX(-60%);
+  }
+  50% {
+    transform: translateX(20%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes workspace-wave {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.2;
+    transform: scale(0.9);
+  }
+}
+
+.animate-workspace-pulse {
+  animation: workspace-pulse 3s ease-in-out infinite;
+}
+
+.animate-workspace-slide {
+  animation: workspace-slide 1.4s ease-in-out infinite;
+}
+
+.animate-workspace-wave {
+  animation: workspace-wave 3.4s ease-in-out infinite;
 }

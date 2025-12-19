@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { goalsService, PerformanceGoal } from '@/services/goalsService';
 import { CreateGoalDialog } from '@/components/modules/goals/CreateGoalDialog';
 import { KeyResultList } from '@/components/modules/goals/KeyResultList';
@@ -8,46 +9,42 @@ import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { FlagIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
+import { handleCrudError } from '@/lib/apiError';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export default function GoalsPage() {
-    const [mounted, setMounted] = useState(false);
-    const [goals, setGoals] = useState<PerformanceGoal[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { showToast } = useToast();
+
+    const {
+        data: goals = [],
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useQuery<PerformanceGoal[], Error>({
+        queryKey: ['goals', 'my'],
+        queryFn: goalsService.getMyGoals,
+        retry: false,
+        initialData: [] as PerformanceGoal[],
+    });
 
     useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    const loadGoals = async () => {
-        setLoading(true);
-        try {
-            const data = await goalsService.getMyGoals();
-            setGoals(data || []);
-        } catch (error) {
-            console.error('Failed to load goals:', error);
-        } finally {
-            setLoading(false);
+        if (isError && error) {
+            handleCrudError({
+                error,
+                resourceLabel: 'Goals',
+                showToast,
+            });
         }
-    };
-
-    useEffect(() => {
-        if (mounted) {
-            loadGoals();
-        }
-    }, [mounted]);
+    }, [isError, error, showToast]);
 
     const calculateProgress = (goal: PerformanceGoal) => {
         if (!goal.keyResults || goal.keyResults.length === 0) return 0;
-        const total = goal.keyResults.reduce((acc, kr) => {
-            return acc + Math.min((kr.currentValue / kr.targetValue) * 100, 100);
-        }, 0);
+        const total = goal.keyResults.reduce((acc, kr) => acc + Math.min((kr.currentValue / kr.targetValue) * 100, 100), 0);
         return Math.round(total / goal.keyResults.length);
     };
-
-    if (!mounted) {
-        return null;
-    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -61,14 +58,33 @@ export default function GoalsPage() {
                                 <h1 className="text-2xl font-bold text-gray-900">My Goals & OKRs</h1>
                                 <p className="text-gray-600">Track your performance objectives and key results.</p>
                             </div>
-                            <CreateGoalDialog onSuccess={loadGoals} />
+                            <CreateGoalDialog onSuccess={() => refetch()} />
                         </div>
 
-                        {loading ? (
-                            <div className="text-gray-500">Loading...</div>
+                        {isLoading ? (
+                            <div className="grid gap-6 md:grid-cols-2">
+                                {[1, 2].map((i) => (
+                                    <Card key={i} className="bg-white">
+                                        <CardContent className="space-y-3 py-5">
+                                            <div className="flex gap-3">
+                                                <Skeleton className="h-10 w-10 rounded-lg" />
+                                                <div className="flex-1 space-y-2">
+                                                    <Skeleton className="h-4 w-1/2" />
+                                                    <Skeleton className="h-4 w-1/3" />
+                                                </div>
+                                                <Skeleton className="h-6 w-12" />
+                                            </div>
+                                            <Skeleton className="h-4 w-full" />
+                                            <Skeleton className="h-4 w-2/3" />
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : isError ? (
+                            <div className="text-red-600 text-sm">Failed to load goals. Please try again.</div>
                         ) : goals.length > 0 ? (
                             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
-                                {goals.map(goal => {
+                                {goals.map((goal: PerformanceGoal) => {
                                     const progress = calculateProgress(goal);
                                     return (
                                         <Card key={goal.id} className="group hover:border-blue-200 transition-colors bg-white">
@@ -91,10 +107,12 @@ export default function GoalsPage() {
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
-                                                <KeyResultList keyResults={goal.keyResults || []} onUpdate={loadGoals} />
+                                                <KeyResultList keyResults={goal.keyResults || []} onUpdate={() => refetch()} />
                                             </CardContent>
                                             <CardFooter className="pt-2 border-t bg-gray-50 flex justify-between">
-                                                <span className="text-xs text-gray-500">Due: {goal.endDate ? new Date(goal.endDate).toLocaleDateString() : 'No date'}</span>
+                                                <span className="text-xs text-gray-500">
+                                                    Due: {goal.endDate ? new Date(goal.endDate).toLocaleDateString() : 'No date'}
+                                                </span>
                                             </CardFooter>
                                         </Card>
                                     );

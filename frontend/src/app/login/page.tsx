@@ -1,129 +1,96 @@
-"use client"
+import LoginClient, { LoginBranding, LoginHighlight } from './LoginClient'
 
-import { useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { useAuthStore } from '@/store/useAuthStore'
-import { Button, Input } from '@/components/ui/FormComponents'
-import { useToast } from '@/components/ui/ToastProvider'
-import { useForm } from 'react-hook-form'
-import { yupResolver } from '@hookform/resolvers/yup'
-import * as yup from 'yup'
+const FALLBACK_HIGHLIGHTS: LoginHighlight[] = [
+  {
+    title: 'Unified HR operations',
+    description: 'Manage employees, payroll, leaves and performance from a single hub.'
+  },
+  {
+    title: 'Enterprise-grade security',
+    description: 'Single sign-on ready with full audit trails and SOC aligned controls.'
+  },
+  {
+    title: 'Real-time insights',
+    description: 'Live dashboards help HR partners respond faster to workforce changes.'
+  }
+]
 
-const loginSchema = yup.object().shape({
-  email: yup.string().email('Invalid email address').required('Email is required'),
-  password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
-})
+const FALLBACK_BRANDING: LoginBranding = {
+  siteName: 'Nimbus HR',
+  tagline: 'Modern HR infrastructure for growing teams',
+  heroTitle: 'Welcome back',
+  heroSubtitle: 'Securely access your organization workspace',
+  highlights: FALLBACK_HIGHLIGHTS,
+  logoUrl: null,
+  companyName: 'Nimbus HR',
+  companyAddress: 'Global HQ'
+}
 
-type LoginFormData = yup.InferType<typeof loginSchema>
+function deriveHeroTitle(siteName?: string | null, fallback = FALLBACK_BRANDING.heroTitle) {
+  if (!siteName) return fallback
+  return `Welcome back to ${siteName}`
+}
 
-export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-  const { login } = useAuthStore()
-  const { showToast } = useToast()
-  const isSubmittingRef = useRef(false)
-
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
-    resolver: yupResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: ''
-    }
-  })
-
-  const onSubmit = async (data: LoginFormData) => {
-    if (isSubmittingRef.current) return
-    isSubmittingRef.current = true
-    setIsLoading(true)
-
-    try {
-      await login(data.email, data.password)
-      showToast('Successfully logged in', 'success')
-      router.push('/employees')
-    } catch (error: any) {
-      showToast(error.message || 'Failed to login', 'error')
-    } finally {
-      setIsLoading(false)
-      isSubmittingRef.current = false
-    }
+function buildHighlights(data: any): LoginHighlight[] {
+  const highlights: LoginHighlight[] = []
+  if (data?.tagline) {
+    highlights.push({
+      title: 'Why teams choose us',
+      description: data.tagline
+    })
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-xl">N</span>
-          </div>
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-          Sign in to your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Or{' '}
-          <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
-            contact your administrator
-          </a>
-        </p>
-      </div>
+  if (data?.companyName) {
+    highlights.push({
+      title: data.companyName,
+      description: data?.companyAddress || 'People operations HQ'
+    })
+  }
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <Input
-              label="Email address"
-              type="email"
-              placeholder="you@example.com"
-              required
-              showRequiredIndicator={false}
-              error={errors.email?.message}
-              {...register('email')}
-            />
+  if (highlights.length === 0) {
+    return FALLBACK_HIGHLIGHTS
+  }
 
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              required
-              showRequiredIndicator={false}
-              error={errors.password?.message}
-              {...register('password')}
-            />
+  return highlights
+}
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                  Remember me
-                </label>
-              </div>
+async function fetchBranding(): Promise<LoginBranding> {
+  const apiBase =
+    process.env.BACKEND_URL ||
+    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '') : null) ||
+    'http://localhost:5000'
 
-              <div className="text-sm">
-                <Link href="/auth/request-password-reset" className="font-medium text-blue-600 hover:text-blue-500">
-                  Forgot your password?
-                </Link>
-              </div>
-            </div>
+  try {
+    const response = await fetch(`${apiBase}/api/organization/branding/public`, {
+      cache: 'no-store'
+    })
 
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                className="w-full justify-center"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Signing in...' : 'Sign in'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  )
+    if (!response.ok) {
+      return FALLBACK_BRANDING
+    }
+
+    const payload = await response.json().catch(() => null)
+    const data = payload?.data ?? payload
+    if (!data) {
+      return FALLBACK_BRANDING
+    }
+
+    return {
+      siteName: data.siteName || FALLBACK_BRANDING.siteName,
+      tagline: data.tagline || FALLBACK_BRANDING.tagline,
+      heroTitle: deriveHeroTitle(data.siteName),
+      heroSubtitle: data.tagline || data.companyName || FALLBACK_BRANDING.heroSubtitle,
+      highlights: buildHighlights(data),
+      logoUrl: data.logoUrl ?? null,
+      companyName: data.companyName,
+      companyAddress: data.companyAddress
+    }
+  } catch {
+    return FALLBACK_BRANDING
+  }
+}
+
+export default async function LoginPage() {
+  const branding = await fetchBranding()
+  return <LoginClient branding={branding} />
 }

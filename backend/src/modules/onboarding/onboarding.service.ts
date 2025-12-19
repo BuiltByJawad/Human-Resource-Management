@@ -1,6 +1,6 @@
 
-import { prisma } from '@/shared/config/database'
-import { NotFoundError, UnauthorizedError } from '@/shared/utils/errors'
+import { prisma } from '../../shared/config/database'
+import { NotFoundError, UnauthorizedError } from '../../shared/utils/errors'
 import { OnboardingTaskStatus, OnboardingStatus } from '@prisma/client'
 
 class OnboardingService {

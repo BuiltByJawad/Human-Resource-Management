@@ -215,7 +215,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
   }
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-32">
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-6">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Input
@@ -339,12 +339,12 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
         />
       </div>
 
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button variant="outline" onClick={onCancel}>
+      <div className="sticky bottom-0 left-0 right-0 bg-white pt-4 pb-2 flex justify-end gap-3 border-t">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="primary">
-          {employee ? 'Update Employee' : 'Create Employee'}
+          {employee ? 'Save Changes' : 'Create Employee'}
         </Button>
       </div>
     </form>

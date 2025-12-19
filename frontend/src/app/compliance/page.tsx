@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import api from '@/lib/axios'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -11,90 +12,128 @@ import {
     ComplianceLog,
     RuleList,
     ViolationLog,
-    RuleForm
+    RuleForm,
+    RuleFormField
 } from '@/components/hrm/ComplianceComponents'
 import { PlusIcon, PlayIcon } from '@heroicons/react/24/outline'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+import { handleCrudError } from '@/lib/apiError'
 
 export default function CompliancePage() {
     const { token } = useAuthStore()
     const { showToast } = useToast()
+    const queryClient = useQueryClient()
 
-    const [rules, setRules] = useState<ComplianceRule[]>([])
-    const [logs, setLogs] = useState<ComplianceLog[]>([])
-    const [loading, setLoading] = useState(true)
     const [isModalOpen, setIsModalOpen] = useState(false)
-    const [actionLoading, setActionLoading] = useState(false)
+    const [formErrors, setFormErrors] = useState<Partial<Record<RuleFormField, string>>>({})
 
-    const fetchData = useCallback(async () => {
-        if (!token) return
-        setLoading(true)
-        try {
-            const [rulesRes, logsRes] = await Promise.all([
-                axios.get(`${API_URL}/compliance/rules`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get(`${API_URL}/compliance/logs`, { headers: { Authorization: `Bearer ${token}` } })
-            ])
+    const {
+        data: rules = [],
+        isLoading: isLoadingRules,
+        isError: isRulesError,
+        error: rulesError,
+    } = useQuery<ComplianceRule[], Error>({
+        queryKey: ['compliance', 'rules', token],
+        queryFn: async () => {
+            const res = await api.get('/compliance/rules')
+            return res.data?.data ?? []
+        },
+        enabled: !!token,
+        retry: false,
+        initialData: [] as ComplianceRule[],
+    })
 
-            if (rulesRes.data.success) setRules(rulesRes.data.data)
-            if (logsRes.data.success) setLogs(logsRes.data.data)
-        } catch (error) {
-            console.error('Failed to fetch compliance data', error)
-            // showToast('Failed to load compliance data', 'error')
-        } finally {
-            setLoading(false)
-        }
-    }, [token])
+    const {
+        data: logs = [],
+        isLoading: isLoadingLogs,
+        isError: isLogsError,
+        error: logsError,
+    } = useQuery<ComplianceLog[], Error>({
+        queryKey: ['compliance', 'logs', token],
+        queryFn: async () => {
+            const res = await api.get('/compliance/logs')
+            return res.data?.data ?? []
+        },
+        enabled: !!token,
+        retry: false,
+        initialData: [] as ComplianceLog[],
+    })
 
     useEffect(() => {
-        fetchData()
-    }, [fetchData])
+        if (isRulesError && rulesError) {
+            handleCrudError({
+                error: rulesError,
+                resourceLabel: 'Compliance rules',
+                showToast,
+            })
+        }
+    }, [isRulesError, rulesError, showToast])
+
+    useEffect(() => {
+        if (isLogsError && logsError) {
+            handleCrudError({
+                error: logsError,
+                resourceLabel: 'Compliance logs',
+                showToast,
+            })
+        }
+    }, [isLogsError, logsError, showToast])
+
+    const createRuleMutation = useMutation({
+        mutationFn: (data: Partial<ComplianceRule>) => api.post('/compliance/rules', data),
+        onSuccess: () => {
+            showToast('Rule created successfully', 'success')
+            setFormErrors({})
+            setIsModalOpen(false)
+            queryClient.invalidateQueries({ queryKey: ['compliance', 'rules'] })
+        },
+        onError: (error: any) =>
+            handleCrudError({
+                error,
+                resourceLabel: 'Compliance rule',
+                showToast,
+                setFieldError: (field, message) => {
+                    setFormErrors((prev) => ({ ...prev, [field as RuleFormField]: message }))
+                },
+                defaultField: 'name',
+                onUnauthorized: () => console.warn('Not authorized to manage compliance rules'),
+            }),
+    })
+
+    const toggleRuleMutation = useMutation({
+        mutationFn: (id: string) => api.patch(`/compliance/rules/${id}/toggle`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['compliance', 'rules'] })
+        },
+        onError: (error: any) =>
+            handleCrudError({
+                error,
+                resourceLabel: 'Compliance rule',
+                showToast,
+            }),
+    })
+
+    const runCheckMutation = useMutation({
+        mutationFn: () => api.post('/compliance/run'),
+        onSuccess: (res) => {
+            showToast(res?.data?.message || 'Compliance check completed', 'success')
+            queryClient.invalidateQueries({ queryKey: ['compliance', 'logs'] })
+        },
+        onError: (error: any) =>
+            handleCrudError({
+                error,
+                resourceLabel: 'Compliance check',
+                showToast,
+            }),
+    })
+
+    const actionLoading =
+        createRuleMutation.isPending || toggleRuleMutation.isPending || runCheckMutation.isPending
 
     const handleCreateRule = async (data: Partial<ComplianceRule>) => {
-        if (!token) return
-        setActionLoading(true)
-        try {
-            await axios.post(`${API_URL}/compliance/rules`, data, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            showToast('Rule created successfully', 'success')
-            setIsModalOpen(false)
-            fetchData()
-        } catch (error: any) {
-            const msg = error.response?.data?.message || 'Failed to create rule'
-            showToast(msg, 'error')
-        } finally {
-            setActionLoading(false)
-        }
+        await createRuleMutation.mutateAsync(data)
     }
-
-    const handleToggleRule = async (id: string) => {
-        if (!token) return
-        try {
-            await axios.patch(`${API_URL}/compliance/rules/${id}/toggle`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            fetchData()
-        } catch (error) {
-            showToast('Failed to update rule status', 'error')
-        }
-    }
-
-    const handleRunCheck = async () => {
-        if (!token) return
-        setActionLoading(true)
-        try {
-            const res = await axios.post(`${API_URL}/compliance/run`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            showToast(res.data.message, 'success')
-            fetchData()
-        } catch (error) {
-            showToast('Compliance check failed', 'error')
-        } finally {
-            setActionLoading(false)
-        }
-    }
+    const handleToggleRule = (id: string) => toggleRuleMutation.mutate(id)
+    const handleRunCheck = () => runCheckMutation.mutate()
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -151,6 +190,15 @@ export default function CompliancePage() {
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleCreateRule}
                 loading={actionLoading}
+                apiErrors={formErrors}
+                onClearApiErrors={(field) => {
+                    setFormErrors((prev) => {
+                        if (!prev[field]) return prev
+                        const next = { ...prev }
+                        delete next[field]
+                        return next
+                    })
+                }}
             />
         </div>
     )

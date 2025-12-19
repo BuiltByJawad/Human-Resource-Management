@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import { useMemo, useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KanbanBoard, Applicant, JobPosting, ApplicantStatus } from '@/components/hrm/RecruitmentComponents'
 import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -9,85 +9,90 @@ import { useAuthStore } from '@/store/useAuthStore'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import JobForm from '@/components/hrm/JobForm'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+import { fetchRecruitmentJobs, fetchApplicantsByJob, updateApplicantStatus } from '@/lib/hrmData'
+import { LoadingSpinner } from '@/components/ui/CommonComponents'
+import { handleCrudError } from '@/lib/apiError'
 
 export default function RecruitmentPage() {
-    const [applicants, setApplicants] = useState<Applicant[]>([])
-    const [jobs, setJobs] = useState<JobPosting[]>([])
-    const [selectedJobId, setSelectedJobId] = useState<string>('')
-    const [loading, setLoading] = useState(true)
-    const [isJobFormOpen, setIsJobFormOpen] = useState(false)
     const { showToast } = useToast()
     const { token } = useAuthStore()
+    const queryClient = useQueryClient()
 
-    const fetchJobs = useCallback(async () => {
-        try {
-            const res = await axios.get(`${API_URL}/recruitment/jobs`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (res.data.success) {
-                setJobs(res.data.data)
-                if (res.data.data.length > 0 && !selectedJobId) {
-                    setSelectedJobId(res.data.data[0].id)
-                }
-            }
-        } catch (error) {
-            console.error('Failed to fetch jobs', error)
-            // showToast('Failed to fetch job postings', 'error')
-        }
-    }, [token, selectedJobId])
+    const [selectedJobId, setSelectedJobId] = useState<string>('')
+    const [isJobFormOpen, setIsJobFormOpen] = useState(false)
 
-    const fetchApplicants = useCallback(async (jobId: string) => {
-        setLoading(true)
-        try {
-            const res = await axios.get(`${API_URL}/recruitment/applicants?jobId=${jobId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (res.data.success) {
-                setApplicants(res.data.data)
-            }
-        } catch (error) {
-            console.error('Failed to fetch applicants', error)
-            // showToast('Failed to fetch applicants', 'error')
-        } finally {
-            setLoading(false)
-        }
-    }, [token])
+    const {
+        data: jobs = [],
+        isLoading: jobsLoading,
+    } = useQuery<JobPosting[]>({
+        queryKey: ['recruitment', 'jobs', token],
+        queryFn: () => fetchRecruitmentJobs(token ?? undefined),
+        enabled: !!token,
+    })
 
     useEffect(() => {
-        if (token) {
-            fetchJobs()
+        if (!jobsLoading && jobs.length > 0 && !selectedJobId) {
+            setSelectedJobId(jobs[0].id)
         }
-    }, [token, fetchJobs])
+    }, [jobs, jobsLoading, selectedJobId])
 
-    useEffect(() => {
-        if (selectedJobId && token) {
-            fetchApplicants(selectedJobId)
-        } else {
-            setApplicants([])
-            setLoading(false)
-        }
-    }, [selectedJobId, token, fetchApplicants])
+    const normalizedApplicantsKey = ['recruitment', 'applicants', selectedJobId, token]
 
-    const handleStatusChange = async (applicantId: string, newStatus: ApplicantStatus) => {
-        const previousApplicants = [...applicants]
-        setApplicants(prev => (Array.isArray(prev) ? prev : []).map(a =>
-            a.id === applicantId ? { ...a, status: newStatus } : a
-        ))
+    const {
+        data: applicants = [],
+        isLoading: applicantsLoading,
+        isFetching: applicantsFetching,
+    } = useQuery<Applicant[]>({
+        queryKey: normalizedApplicantsKey,
+        queryFn: () => fetchApplicantsByJob(selectedJobId, token ?? undefined),
+        enabled: !!token && !!selectedJobId,
+    })
 
-        try {
-            await axios.patch(`${API_URL}/recruitment/applicants/${applicantId}/status`,
-                { status: newStatus },
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
+    const statusMutation = useMutation<void, unknown, { id: string, status: ApplicantStatus }, { previousData?: Applicant[] }>({
+        mutationFn: async ({ id, status }) => {
+            await updateApplicantStatus(id, status)
+        },
+        onMutate: async ({ id, status }) => {
+            await queryClient.cancelQueries({ queryKey: normalizedApplicantsKey })
+            const previousData = queryClient.getQueryData<Applicant[]>(normalizedApplicantsKey)
+            if (previousData) {
+                queryClient.setQueryData<Applicant[]>(normalizedApplicantsKey, prev =>
+                    (prev || []).map(applicant =>
+                        applicant.id === id ? { ...applicant, status } : applicant
+                    )
+                )
+            }
+            return { previousData }
+        },
+        onError: (error, _variables, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(normalizedApplicantsKey, context.previousData)
+            }
+            handleCrudError({
+                error,
+                resourceLabel: 'Applicant',
+                showToast,
+                onUnauthorized: () => console.warn('Not authorized to update applicants'),
+            })
+        },
+        onSuccess: () => {
             showToast('Applicant status updated', 'success')
-        } catch (error) {
-            console.error('Failed to update status', error)
-            showToast('Failed to update status', 'error')
-            setApplicants(previousApplicants)
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: normalizedApplicantsKey })
         }
+    })
+
+    const handleStatusChange = (applicantId: string, newStatus: ApplicantStatus) => {
+        statusMutation.mutate({ id: applicantId, status: newStatus })
     }
+
+    const jobOptions = useMemo(() => [
+        { value: '', label: jobsLoading ? 'Loading...' : 'Select a Job Posting' },
+        ...(Array.isArray(jobs) ? jobs : []).map(job => ({ value: job.id, label: job.title })),
+    ], [jobs, jobsLoading])
+
+    const loadingBoard = (applicantsLoading || applicantsFetching) && !!selectedJobId
 
     return (
         <div className="flex h-screen bg-gray-50">
@@ -106,10 +111,8 @@ export default function RecruitmentPage() {
                                     <Select
                                         value={selectedJobId}
                                         onChange={(value) => setSelectedJobId(value)}
-                                        options={[
-                                            { value: '', label: 'Select a Job Posting' },
-                                            ...(Array.isArray(jobs) ? jobs : []).map(job => ({ value: job.id, label: job.title }))
-                                        ]}
+                                        options={jobOptions}
+                                        disabled={jobsLoading}
                                     />
                                 </div>
                                 <Button onClick={() => setIsJobFormOpen(true)}>
@@ -119,9 +122,13 @@ export default function RecruitmentPage() {
                         </div>
 
                         <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                            {loading ? (
+                            {!selectedJobId ? (
+                                <div className="flex flex-col items-center justify-center h-full text-sm text-gray-500">
+                                    <p>Select a job posting to view its applicants.</p>
+                                </div>
+                            ) : loadingBoard ? (
                                 <div className="flex justify-center items-center h-full">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                    <LoadingSpinner size="lg" />
                                 </div>
                             ) : (
                                 <KanbanBoard applicants={applicants} onStatusChange={handleStatusChange} />
@@ -133,7 +140,7 @@ export default function RecruitmentPage() {
                         isOpen={isJobFormOpen}
                         onClose={() => setIsJobFormOpen(false)}
                         onSuccess={() => {
-                            fetchJobs()
+                            queryClient.invalidateQueries({ queryKey: ['recruitment', 'jobs', token] })
                             setIsJobFormOpen(false)
                         }}
                     />

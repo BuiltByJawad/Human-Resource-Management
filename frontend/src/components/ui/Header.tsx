@@ -1,15 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import MobileMenu from './MobileMenu'
 import { useOrgStore } from '@/store/useOrgStore'
+import api from '@/lib/axios'
+import { cn } from '@/lib/utils'
+import { useToast } from './ToastProvider'
+
+type NotificationItem = {
+  id: string
+  title: string
+  message: string
+  time: string
+  read: boolean
+  link?: string
+}
 
 export default function Header() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
@@ -17,39 +31,108 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [isMounted, setIsMounted] = useState(false)
+  const [dismissedIds, setDismissedIds] = useState<string[]>([])
+  const [notificationsError, setNotificationsError] = useState<string | null>(null)
 
-  const { user, logout, isLoggingOut } = useAuthStore()
-  const { siteName, tagline } = useOrgStore()
+  const { user, logout } = useAuthStore()
+  const { siteName, tagline, loaded: orgLoaded } = useOrgStore()
 
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const { showToast } = useToast()
 
   const profileRef = useClickOutside<HTMLDivElement>(() => setIsProfileOpen(false))
   const notificationsRef = useClickOutside<HTMLDivElement>(() => setIsNotificationsOpen(false))
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   const handleLogout = () => {
     logout()
     router.push('/login')
   }
 
-  const notifications = [
-    { id: 1, title: 'New leave request', message: 'John Doe requested 3 days leave', time: '2 hours ago' },
-    { id: 2, title: 'Payroll processed', message: 'Monthly payroll has been processed', time: '1 day ago' },
-  ]
+  const { data: notificationData = [], isLoading: notificationsLoading } = useQuery({
+    queryKey: ['notifications'],
+    enabled: !!user,
+    queryFn: async (): Promise<NotificationItem[]> => {
+      const res = await api.get('/notifications')
+      const raw = res.data?.data ?? []
+      return (Array.isArray(raw) ? raw : []).map((n: any) => ({
+        id: n.id ?? crypto.randomUUID(),
+        title: n.title ?? 'Notification',
+        message: n.message ?? '',
+        time: n.createdAt ? new Date(n.createdAt).toLocaleString() : 'Just now',
+        read: !!n.readAt,
+        link: n.link,
+      }))
+    },
+    staleTime: 60_000,
+    onError: (err: any) => {
+      if (err?.response?.status === 403) {
+        setNotificationsError('You do not have permission to view notifications.')
+      } else {
+        setNotificationsError('Failed to load notifications.')
+      }
+    },
+  })
 
-  // Show skeleton if not mounted or user is not loaded
-  if (!isMounted || !user) {
+  const markAllReadMutation = useMutation({
+    mutationFn: () => api.post('/notifications/mark-all-read'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: (err: any) => {
+      if (err?.response?.status === 403) {
+        showToast('You do not have permission to modify notifications.', 'error')
+      } else {
+        showToast('Failed to update notifications.', 'error')
+      }
+    },
+  })
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: (err: any) => {
+      if (err?.response?.status === 403) {
+        showToast('You do not have permission to modify notifications.', 'error')
+      } else {
+        showToast('Failed to update notification.', 'error')
+      }
+    },
+  })
+
+  const notifications = useMemo(
+    () => notificationData.filter((n) => !dismissedIds.includes(n.id)),
+    [notificationData, dismissedIds]
+  )
+
+  const unreadCount = notificationsError ? 0 : notifications.filter((n) => !n.read).length
+
+  const handleMarkAllRead = () => {
+    if (!notifications.length) return
+    setDismissedIds((prev) => Array.from(new Set([...prev, ...notifications.map((n) => n.id)])))
+    markAllReadMutation.mutate()
+  }
+
+  const handleNotificationClick = (notification: NotificationItem) => {
+    if (!notification.read) {
+      markReadMutation.mutate(notification.id)
+    }
+    setDismissedIds((prev) => (prev.includes(notification.id) ? prev : [...prev, notification.id]))
+    if (notification.link) {
+      router.push(notification.link)
+      setIsNotificationsOpen(false)
+    }
+  }
+
+  // Show skeleton if we don't have user yet, or org not loaded and no cached branding
+  const shouldShowOrgSkeleton = !orgLoaded && !siteName && !tagline
+  if (!user || shouldShowOrgSkeleton) {
+
     return (
       <header className="bg-white/95 backdrop-blur-sm shadow-sm sticky top-0 z-30">
         <div className="flex items-center justify-between px-4 sm:px-6 py-4">
           <div className="flex items-center flex-1 gap-3">
-            <div className="hidden sm:flex flex-col">
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{tagline}</p>
-              <h1 className="text-lg font-semibold text-slate-900">{siteName}</h1>
+            <div className="hidden sm:flex flex-col gap-2">
+              <div className="h-3 w-28 bg-slate-100 rounded animate-pulse" />
+              <div className="h-4 w-36 bg-slate-100 rounded animate-pulse" />
             </div>
 
             <div className="flex-1"></div>
@@ -74,7 +157,9 @@ export default function Header() {
 
   const initials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
-    : 'U'
+    : (user?.email?.[0]?.toUpperCase() ?? 'U')
+  const userFullName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email : 'User'
+  const userRole = user?.role ?? 'Member'
 
   return (
     <header className="glass-header sticky top-0 z-30">
@@ -153,26 +238,55 @@ export default function Header() {
               <div className="relative" ref={notificationsRef}>
                 <button
                   onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                  className="h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 flex items-center justify-center"
+                  className="relative h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 flex items-center justify-center"
                 >
                   <BellIcon className="h-5 w-5" />
-                  <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-rose-500"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </button>
 
                 {isNotificationsOpen && (
                   <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-slate-800">Notifications</h3>
-                      <button className="text-xs text-blue-600">Mark all read</button>
+                      <button
+                        onClick={handleMarkAllRead}
+                        disabled={!notifications.length}
+                        className={cn(
+                          'text-xs font-medium',
+                          notifications.length ? 'text-blue-600 hover:text-blue-700' : 'text-slate-400 cursor-not-allowed'
+                        )}
+                      >
+                        Mark all read
+                      </button>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
-                      {notifications.map((notification) => (
-                        <div key={notification.id} className="px-4 py-3 hover:bg-slate-50 transition">
-                          <p className="text-sm font-medium text-slate-900">{notification.title}</p>
-                          <p className="text-xs text-slate-500">{notification.message}</p>
-                          <p className="text-xs text-slate-400 mt-1">{notification.time}</p>
+                      {notificationsError ? (
+                        <div className="px-4 py-6 text-sm text-rose-500 text-center">{notificationsError}</div>
+                      ) : notificationsLoading && notifications.length === 0 ? (
+                        <div className="px-4 py-3 space-y-2">
+                          <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+                          <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
+                          <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
                         </div>
-                      ))}
+                      ) : notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-sm text-slate-500 text-center">No new notifications</div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className="px-4 py-3 hover:bg-slate-50 transition cursor-pointer"
+                            onClick={() => handleNotificationClick(notification)}
+                          >
+                            <p className="text-sm font-medium text-slate-900">{notification.title}</p>
+                            <p className="text-xs text-slate-500">{notification.message}</p>
+                            <p className="text-xs text-slate-400 mt-1">{notification.time}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
                     <div className="px-4 py-2 border-t border-slate-100">
                       <button className="text-sm text-blue-600 hover:text-blue-700">View all updates</button>
@@ -186,7 +300,7 @@ export default function Header() {
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 text-sm text-slate-700 shadow-sm"
                 >
-                  {user.avatarUrl ? (
+                  {user?.avatarUrl ? (
                     <div className="relative h-8 w-8 rounded-full overflow-hidden">
                       <Image
                         src={user.avatarUrl}
@@ -202,16 +316,16 @@ export default function Header() {
                     </div>
                   )}
                   <div className="hidden md:flex flex-col text-left">
-                    <span className="text-sm font-semibold">{user.firstName} {user.lastName}</span>
-                    <span className="text-xs text-slate-400">{user.role}</span>
+                    <span className="text-sm font-semibold">{userFullName}</span>
+                    <span className="text-xs text-slate-400">{userRole}</span>
                   </div>
                   <ChevronDownIcon className="h-4 w-4 text-slate-400" />
                 </button>
 
-                {isProfileOpen && (
+                {user && isProfileOpen && (
                   <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
                     <div className="px-4 py-3 border-b border-slate-100">
-                      <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
+                      <p className="text-sm font-semibold text-slate-900">{userFullName}</p>
                       <p className="text-xs text-slate-500">{user.email}</p>
                     </div>
                     <div className="py-1">
@@ -235,13 +349,6 @@ export default function Header() {
         )}
       </div>
       <MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={user} />
-
-      {isLoggingOut && (
-        <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
-          <div className="h-12 w-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-sm font-medium text-slate-700">Signing you out</p>
-        </div>
-      )}
     </header>
   )
 }

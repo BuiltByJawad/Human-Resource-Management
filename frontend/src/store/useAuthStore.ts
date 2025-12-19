@@ -28,8 +28,13 @@ interface AuthState {
     refreshToken: string | null
     isAuthenticated: boolean
     isLoggingOut: boolean
+    isAuthTransition: boolean
+    lastRefreshedAt: number | null
     login: (email: string, password: string) => Promise<void>
-    logout: () => void
+    logout: () => Promise<void>
+    endAuthTransition: () => void
+    clearAuth: () => void
+    refreshSession: (options?: { silent?: boolean }) => Promise<boolean>
     updateUser: (updates: Partial<User>) => void
     setUser: (user: User | null) => void
     hasPermission: (permission: Permission) => boolean
@@ -47,7 +52,10 @@ export const useAuthStore = create<AuthState>()(
             refreshToken: null,
             isAuthenticated: false,
             isLoggingOut: false,
+            isAuthTransition: false,
+            lastRefreshedAt: null,
             login: async (email, password) => {
+                set({ isAuthTransition: true })
                 try {
                     const response = await axios.post(`${API_URL}/auth/login`, { email, password })
                     const { user, accessToken, refreshToken, permissions } = response.data.data
@@ -60,13 +68,16 @@ export const useAuthStore = create<AuthState>()(
                         token: accessToken,
                         refreshToken: refreshToken ?? null,
                         isAuthenticated: true,
-                        isLoggingOut: false
+                        isLoggingOut: false,
+                        lastRefreshedAt: Date.now(),
+                        isAuthTransition: false,
                     })
                     // Set cookie for middleware-based auth checks
                     if (typeof document !== 'undefined' && accessToken) {
                         document.cookie = `accessToken=${accessToken}; path=/; SameSite=Lax`
                     }
                 } catch (error: any) {
+                    set({ isAuthTransition: false })
                     const message =
                         error?.response?.data?.error?.message ||
                         error?.response?.data?.message ||
@@ -75,8 +86,77 @@ export const useAuthStore = create<AuthState>()(
                     throw new Error(message)
                 }
             },
-            logout: () =>
-                set({ user: null, token: null, refreshToken: null, isAuthenticated: false, isLoggingOut: true }),
+            logout: async () => {
+                set({ isAuthTransition: true, isLoggingOut: true })
+                if (typeof document !== 'undefined') {
+                    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+                }
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.removeItem('auth-storage')
+                    } catch (error) {
+                        console.warn('Failed to clear auth storage', error)
+                    }
+                }
+                set({
+                    user: null,
+                    token: null,
+                    refreshToken: null,
+                    isAuthenticated: false,
+                    isLoggingOut: true,
+                    isAuthTransition: true,
+                    lastRefreshedAt: null,
+                })
+                // Allow the overlay to remain visible during the transition; clear after a short delay
+                setTimeout(() => {
+                    set({ isLoggingOut: false, isAuthTransition: false })
+                }, 1200)
+            },
+            endAuthTransition: () => set({ isAuthTransition: false, isLoggingOut: false }),
+            clearAuth: () => set({
+                user: null,
+                token: null,
+                refreshToken: null,
+                isAuthenticated: false,
+                isLoggingOut: false,
+                isAuthTransition: false,
+                lastRefreshedAt: null,
+            }),
+            refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
+                const { refreshToken, token, user } = get()
+                if (!refreshToken) {
+                    return false
+                }
+                try {
+                    const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken })
+                    const data = response.data.data || response.data
+                    const newAccessToken = data?.accessToken || data?.token || token
+                    const newRefreshToken = data?.refreshToken || refreshToken
+                    const nextUser = data?.user
+                        ? { ...(data.user || {}), permissions: data.permissions ?? data.user?.permissions ?? user?.permissions ?? [] }
+                        : user
+
+                    set({
+                        token: newAccessToken,
+                        refreshToken: newRefreshToken,
+                        user: nextUser,
+                        isAuthenticated: !!newAccessToken,
+                        lastRefreshedAt: Date.now(),
+                    })
+
+                    if (typeof document !== 'undefined' && newAccessToken) {
+                        document.cookie = `accessToken=${newAccessToken}; path=/; SameSite=Lax`
+                    }
+
+                    return true
+                } catch (error) {
+                    if (!silent) {
+                        console.warn('Session refresh failed', error)
+                    }
+                    get().logout()
+                    return false
+                }
+            },
             updateUser: (updates) =>
                 set((state) => ({
                     user: state.user
@@ -122,6 +202,7 @@ export const useAuthStore = create<AuthState>()(
                 token: state.token,
                 refreshToken: state.refreshToken,
                 isAuthenticated: state.isAuthenticated,
+                lastRefreshedAt: state.lastRefreshedAt,
             }),
         }
     )

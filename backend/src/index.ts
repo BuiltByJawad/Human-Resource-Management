@@ -1,3 +1,4 @@
+import './module-alias'
 import { config } from 'dotenv';
 import express from 'express';
 import cors from 'cors';

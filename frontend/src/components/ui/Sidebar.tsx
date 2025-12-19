@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   HomeIcon,
   UsersIcon,
@@ -23,7 +23,10 @@ import {
   DocumentTextIcon,
   AcademicCapIcon,
   FlagIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  HeartIcon,
+  CreditCardIcon,
+  ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useOrgStore } from '@/store/useOrgStore'
@@ -52,6 +55,9 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
       { name: 'My Documents', href: '/portal/documents', icon: DocumentTextIcon },
       { name: 'My Training', href: '/portal/training', icon: AcademicCapIcon },
       { name: 'My Goals', href: '/portal/goals', icon: FlagIcon },
+      { name: 'My Benefits', href: '/portal/benefits', icon: HeartIcon },
+      { name: 'My Expenses', href: '/portal/expenses', icon: CreditCardIcon },
+      { name: 'My Offboarding', href: '/portal/offboarding', icon: ArrowTrendingDownIcon },
       { name: 'My Leave', href: '/leave', icon: ClipboardDocumentListIcon },
     ],
   },
@@ -71,6 +77,9 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
     label: 'Operations',
     items: [
       { name: 'Payroll', href: '/payroll', icon: BanknotesIcon, permissions: [PERMISSIONS.VIEW_PAYROLL] },
+      { name: 'Benefits', href: '/benefits', icon: HeartIcon, permissions: [PERMISSIONS.VIEW_BENEFITS] },
+      { name: 'Expenses', href: '/expenses', icon: CreditCardIcon, permissions: [PERMISSIONS.VIEW_EXPENSES] },
+      { name: 'Offboarding', href: '/offboarding', icon: ArrowTrendingDownIcon, permissions: [PERMISSIONS.VIEW_OFFBOARDING] },
       { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon, permissions: [PERMISSIONS.VIEW_ASSETS] },
       { name: 'Performance', href: '/performance', icon: SparklesIcon, permissions: [PERMISSIONS.VIEW_PERFORMANCE] },
       { name: 'Burnout Analytics', href: '/analytics/burnout', icon: ExclamationTriangleIcon, permissions: [PERMISSIONS.VIEW_ANALYTICS] },
@@ -118,9 +127,10 @@ function useSidebarState() {
 
 export default function Sidebar() {
   const { toggle, isMounted } = useSidebarState()
+  const router = useRouter()
   const user = useAuthStore((state) => state.user)
   const hasAnyPermission = useAuthStore((state) => state.hasAnyPermission)
-  const { siteName, shortName, tagline, logoUrl } = useOrgStore()
+  const { siteName, shortName, tagline, logoUrl, loaded: orgLoaded } = useOrgStore()
   const pathname = usePathname()
 
   // canSeeItem handles hydration: on server (not mounted), hide permission-gated items
@@ -143,6 +153,19 @@ export default function Sidebar() {
     : ''
   const userEmail = hasUser ? user!.email : ''
 
+  // Prefetch visible routes to make sidebar navigation feel instant
+  useEffect(() => {
+    if (!isMounted) return
+    const visibleItems = navigation.flatMap(section => section.items).filter(canSeeItem)
+    visibleItems.forEach(item => {
+      try {
+        router.prefetch(item.href)
+      } catch {
+        // ignore prefetch errors (e.g., during rapid mounts/unmounts)
+      }
+    })
+  }, [isMounted, router, user, hasAnyPermission])
+
   const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
 
@@ -150,6 +173,7 @@ export default function Sidebar() {
       <Link
         key={item.name}
         href={item.href}
+        prefetch
         className={`
           group flex items-center rounded-xl transition-all duration-200
           ${isActive
@@ -171,6 +195,9 @@ export default function Sidebar() {
     )
   }
 
+  // Keep server/client markup aligned: while not mounted, always show skeleton even if org store is hydrated
+  const showOrgSkeleton = !isMounted || !orgLoaded
+
   return (
     <aside
       className={`
@@ -184,32 +211,50 @@ export default function Sidebar() {
         h-20 [.sidebar-collapsed_&]:h-32 [.sidebar-collapsed_&]:flex-col [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:gap-4 [.sidebar-collapsed_&]:px-0
       `}>
         <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full`}>
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20 flex-shrink-0 overflow-hidden">
-            {logoUrl ? (
-              <div className="relative h-full w-full">
-                <Image
-                  src={logoUrl}
-                  alt={siteName}
-                  fill
-                  className="object-cover"
-                  priority
-                  sizes="36px"
-                />
+          {showOrgSkeleton ? (
+            <>
+              <div className="h-9 w-9 rounded-xl bg-slate-800 animate-pulse flex-shrink-0" />
+              <div
+                className={`
+                  transition-all duration-300 origin-left
+                  opacity-100 max-w-[200px] translate-x-0
+                  [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
+                `}
+              >
+                <div className="h-4 w-24 bg-slate-800 rounded animate-pulse mb-1" />
+                <div className="h-3 w-16 bg-slate-800 rounded animate-pulse" />
               </div>
-            ) : (
-              <span>{shortName}</span>
-            )}
-          </div>
-          <div
-            className={`
-              transition-all duration-300 origin-left
-              opacity-100 max-w-[200px] translate-x-0
-              [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
-            `}
-          >
-            <p className="text-base font-bold tracking-tight text-white">{siteName}</p>
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{tagline}</p>
-          </div>
+            </>
+          ) : (
+            <>
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20 flex-shrink-0 overflow-hidden">
+                {logoUrl ? (
+                  <div className="relative h-full w-full">
+                    <Image
+                      src={logoUrl}
+                      alt={siteName}
+                      fill
+                      className="object-cover"
+                      priority
+                      sizes="36px"
+                    />
+                  </div>
+                ) : (
+                  <span>{shortName}</span>
+                )}
+              </div>
+              <div
+                className={`
+                  transition-all duration-300 origin-left
+                  opacity-100 max-w-[200px] translate-x-0
+                  [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
+                `}
+              >
+                <p className="text-base font-bold tracking-tight text-white">{siteName}</p>
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{tagline}</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Toggle Button */}

@@ -45,11 +45,9 @@ export const upload = multer({
     }
 })
 
-// Branding uploads (logo, favicon) should be lightweight and can safely use local disk,
-// even if Cloudinary is configured. This avoids any Cloudinary-specific limitations
-// and keeps org assets simple.
+// Branding uploads (logo, favicon) honor Cloudinary when configured; otherwise fallback to disk
 export const uploadBranding = multer({
-    storage: diskStorage,
+    storage: storageConfig,
     fileFilter: fileFilter,
     limits: {
         fileSize: 5 * 1024 * 1024 // 5MB limit

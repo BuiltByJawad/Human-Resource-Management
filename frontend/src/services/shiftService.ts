@@ -16,13 +16,8 @@ export interface Shift {
 
 export const shiftService = {
     getShifts: async (startDate: string, endDate: string) => {
-        try {
-            const response = await api.get<{ data: Shift[] }>(`/shifts?startDate=${startDate}&endDate=${endDate}`);
-            return Array.isArray(response.data?.data) ? response.data.data : [];
-        } catch (error) {
-            console.error('Failed to fetch shifts:', error);
-            return [];
-        }
+        const response = await api.get<{ data: Shift[] }>(`/shifts?startDate=${startDate}&endDate=${endDate}`);
+        return Array.isArray(response.data?.data) ? response.data.data : [];
     },
 
     requestSwap: async (shiftId: string, reason?: string, targetId?: string) => {
