@@ -29,8 +29,10 @@ export default function BurnoutAnalyticsPage() {
     const analyticsQuery = useQuery({
         queryKey: ['burnout-analytics', period, token],
         queryFn: async () => {
-            const response = await api.get(`/analytics/burnout`, { params: { period } });
-            return response.data;
+            const response = await api.get(`/analytics/burnout`, {
+                params: { period },
+            });
+            return response.data?.data ?? response.data;
         },
         enabled: !!token && !!user && canViewAnalytics,
         retry: false,
@@ -141,7 +143,7 @@ export default function BurnoutAnalyticsPage() {
                     <div className="mt-4 md:mt-0 w-48">
                         <Select
                             value={period.toString()}
-                            onChange={(value) => setPeriod(Number(value))}
+                            onChange={(value) => handlePeriodChange(value)}
                             options={[
                                 { value: '7', label: 'Last 7 days' },
                                 { value: '30', label: 'Last 30 days' },

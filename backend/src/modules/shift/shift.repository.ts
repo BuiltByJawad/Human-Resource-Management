@@ -7,9 +7,12 @@ export class ShiftRepository {
         return prisma.shift.create({ data });
     }
 
-    async getShifts(startDate: Date, endDate: Date): Promise<Shift[]> {
+    async getShifts(organizationId: string, startDate: Date, endDate: Date): Promise<Shift[]> {
         return prisma.shift.findMany({
             where: {
+                employee: {
+                    organizationId,
+                },
                 startTime: { gte: startDate },
                 endTime: { lte: endDate }
             },
@@ -18,10 +21,13 @@ export class ShiftRepository {
         });
     }
 
-    async getEmployeeShifts(employeeId: string, startDate: Date, endDate: Date): Promise<Shift[]> {
+    async getEmployeeShifts(organizationId: string, employeeId: string, startDate: Date, endDate: Date): Promise<Shift[]> {
         return prisma.shift.findMany({
             where: {
                 employeeId,
+                employee: {
+                    organizationId,
+                },
                 startTime: { gte: startDate },
                 endTime: { lte: endDate }
             },
@@ -29,14 +35,39 @@ export class ShiftRepository {
         });
     }
 
-    async getShiftById(id: string): Promise<Shift | null> {
-        return prisma.shift.findUnique({ where: { id } });
+    async getShiftById(organizationId: string, id: string): Promise<Shift | null> {
+        return prisma.shift.findFirst({
+            where: {
+                id,
+                employee: {
+                    organizationId,
+                },
+            },
+        });
     }
 
-    async updateShift(id: string, data: any): Promise<Shift> {
-        return prisma.shift.update({
-            where: { id },
-            data
+    async updateShift(organizationId: string, id: string, data: any): Promise<Shift | null> {
+        const result = await prisma.shift.updateMany({
+            where: {
+                id,
+                employee: {
+                    organizationId,
+                },
+            },
+            data,
+        });
+
+        if (!result.count) {
+            return null;
+        }
+
+        return prisma.shift.findFirst({
+            where: {
+                id,
+                employee: {
+                    organizationId,
+                },
+            },
         });
     }
 
@@ -44,9 +75,12 @@ export class ShiftRepository {
         return prisma.shiftSwapRequest.create({ data });
     }
 
-    async getSwapRequests(status?: string): Promise<ShiftSwapRequest[]> {
+    async getSwapRequests(organizationId: string, status?: string): Promise<ShiftSwapRequest[]> {
         return prisma.shiftSwapRequest.findMany({
-            where: status ? { status } : {},
+            where: {
+                ...(status ? { status } : {}),
+                shift: { employee: { organizationId } },
+            },
             include: {
                 shift: true,
                 requestor: { select: { id: true, firstName: true, lastName: true } },
@@ -55,17 +89,35 @@ export class ShiftRepository {
         });
     }
 
-    async getSwapRequestById(id: string): Promise<ShiftSwapRequest | null> {
-        return prisma.shiftSwapRequest.findUnique({
-            where: { id },
+    async getSwapRequestById(organizationId: string, id: string): Promise<ShiftSwapRequest | null> {
+        return prisma.shiftSwapRequest.findFirst({
+            where: {
+                id,
+                shift: { employee: { organizationId } },
+            },
             include: { shift: true }
         });
     }
 
-    async updateSwapRequest(id: string, data: any): Promise<ShiftSwapRequest> {
-        return prisma.shiftSwapRequest.update({
-            where: { id },
-            data
+    async updateSwapRequest(organizationId: string, id: string, data: any): Promise<ShiftSwapRequest | null> {
+        const result = await prisma.shiftSwapRequest.updateMany({
+            where: {
+                id,
+                shift: { employee: { organizationId } },
+            },
+            data,
+        });
+
+        if (!result.count) {
+            return null;
+        }
+
+        return prisma.shiftSwapRequest.findFirst({
+            where: {
+                id,
+                shift: { employee: { organizationId } },
+            },
+            include: { shift: true },
         });
     }
 }

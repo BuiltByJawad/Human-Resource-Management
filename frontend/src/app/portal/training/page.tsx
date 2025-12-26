@@ -1,101 +1,73 @@
-﻿'use client';
+﻿import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
-import { useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { trainingService, EmployeeTraining } from '@/services/trainingService';
-import { CourseCard } from '@/components/modules/training/CourseCard';
-import Sidebar from '@/components/ui/Sidebar';
-import Header from '@/components/ui/Header';
-import { handleCrudError } from '@/lib/apiError';
-import { useToast } from '@/components/ui/ToastProvider';
+import type { EmployeeTraining } from '@/services/trainingService'
+import { TrainingPageClient } from './TrainingPageClient'
 
-export default function TrainingDashboard() {
-    const { showToast } = useToast();
+function buildApiBase() {
+  return (
+    process.env.BACKEND_URL ||
+    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '') : null) ||
+    'http://localhost:5000'
+  )
+}
 
-    const coursesQuery = useQuery<EmployeeTraining[], Error>({
-        queryKey: ['training', 'my-courses'],
-        queryFn: trainingService.getMyCourses,
-        staleTime: 5 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        initialData: [],
-    });
+async function fetchCurrentUser() {
+  try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('accessToken')?.value
+    if (!token) {
+      return { user: null, token: null }
+    }
 
-    useEffect(() => {
-        if (coursesQuery.isError && coursesQuery.error) {
-            handleCrudError({
-                error: coursesQuery.error,
-                resourceLabel: 'Training courses',
-                showToast,
-            });
-        }
-    }, [coursesQuery.isError, coursesQuery.error, showToast]);
+    const response = await fetch(`${buildApiBase()}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    })
 
-    const courses = coursesQuery.data ?? [];
+    if (!response.ok) {
+      return { user: null, token: null }
+    }
 
-    const inProgress = useMemo(
-        () => courses.filter((t: EmployeeTraining) => t.status === 'in-progress' || t.status === 'assigned'),
-        [courses]
-    );
-    const completed = useMemo(
-        () => courses.filter((t: EmployeeTraining) => t.status === 'completed'),
-        [courses]
-    );
+    const payload = await response.json().catch(() => null)
+    const data = payload?.data ?? payload
+    return { user: data?.user ?? data ?? null, token }
+  } catch {
+    return { user: null, token: null }
+  }
+}
 
-    return (
-        <div className="min-h-screen bg-gray-50 flex">
-            <Sidebar />
-            <div className="flex-1 flex flex-col">
-                <Header />
-                <main className="flex-1 p-6">
-                    <div className="max-w-7xl mx-auto">
-                        <div className="mb-8">
-                            <h1 className="text-2xl font-bold text-gray-900">Learning Center</h1>
-                            <p className="text-gray-600">Access your assigned training courses and track your progress.</p>
-                        </div>
+async function fetchInitialCourses(token: string | null): Promise<EmployeeTraining[]> {
+  try {
+    if (!token) return []
+    const base = buildApiBase()
+    const response = await fetch(`${base}/api/training/my-courses`, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store'
+    })
+    if (!response.ok) {
+      return []
+    }
+    const payload = await response.json().catch(() => null)
+    const data = payload?.data ?? payload
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
 
-                        {coursesQuery.isLoading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {[1, 2, 3].map((i) => (
-                                    <div key={i} className="h-64 bg-gray-100 rounded-lg animate-pulse" />
-                                ))}
-                            </div>
-                        ) : coursesQuery.isError ? (
-                            <div className="text-red-600 text-sm">Failed to load courses. Please try again.</div>
-                        ) : (
-                            <div className="space-y-10">
-                                <section>
-                                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900">
-                                        Active Courses
-                                        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
-                                            {inProgress.length}
-                                        </span>
-                                    </h2>
-                                    {inProgress.length > 0 ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                            {inProgress.map((t) => (
-                                                <CourseCard key={t.id} training={t} />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-gray-500 italic">No active courses. Great job!</p>
-                                    )}
-                                </section>
+export default async function TrainingDashboard() {
+  const { user, token } = await fetchCurrentUser()
+  const employeeId = user?.employee?.id ?? null
+  if (!employeeId) {
+    redirect('/dashboard')
+  }
 
-                                {completed.length > 0 && (
-                                    <section>
-                                        <h2 className="text-xl font-semibold mb-4 text-gray-700">Completed</h2>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 opacity-80">
-                                            {completed.map((t) => (
-                                                <CourseCard key={t.id} training={t} />
-                                            ))}
-                                        </div>
-                                    </section>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </main>
-            </div>
-        </div>
-    );
+  const initialCourses = await fetchInitialCourses(token)
+  return <TrainingPageClient initialCourses={initialCourses} />
 }

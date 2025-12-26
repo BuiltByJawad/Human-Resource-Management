@@ -137,7 +137,7 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
     }
   }
 
-  await prisma.userInvite.deleteMany({ where: { OR: [{ email }, { userId: user.id }] } })
+  await prisma.userInvite.deleteMany({ where: { acceptedAt: null, OR: [{ email }, { userId: user.id }] } })
 
   const token = generateToken()
   const tokenHash = hashToken(token)
@@ -159,13 +159,16 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
 
   const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}`
 
+  const settings = await prisma.companySettings.findFirst({ select: { siteName: true } })
+  const siteName = settings?.siteName || 'NovaHR'
+
   // Fire-and-forget email sending; failure won't break API response
   sendEmail({
     to: email,
-    subject: 'You have been invited to NovaHR',
+    subject: `You have been invited to ${siteName}`,
     html: `
       <p>Hello,</p>
-      <p>You have been invited to join the HRM system. Click the button below to set your password and activate your account:</p>
+      <p>You have been invited to join ${siteName}. Click the button below to set your password and activate your account:</p>
       <p><a href="${inviteLink}" style="display:inline-block;padding:8px 16px;border-radius:4px;background:#2563eb;color:#ffffff;text-decoration:none;">Accept invite</a></p>
       <p>If the button does not work, copy and paste this link into your browser:</p>
       <p><a href="${inviteLink}">${inviteLink}</a></p>
@@ -306,13 +309,16 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
 
   const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reset-password?token=${token}`
 
+  const settings = await prisma.companySettings.findFirst({ select: { siteName: true } })
+  const siteName = settings?.siteName || 'NovaHR'
+
   // Fire-and-forget password reset email
   sendEmail({
     to: email,
-    subject: 'Reset your NovaHR password',
+    subject: `Reset your ${siteName} password`,
     html: `
       <p>Hello,</p>
-      <p>We received a request to reset the password for your HRM account. Click the button below to set a new password:</p>
+      <p>We received a request to reset the password for your ${siteName} account. Click the button below to set a new password:</p>
       <p><a href="${resetLink}" style="display:inline-block;padding:8px 16px;border-radius:4px;background:#2563eb;color:#ffffff;text-decoration:none;">Reset password</a></p>
       <p>If you did not request this, you can safely ignore this email.</p>
       <p>If the button does not work, copy and paste this link into your browser:</p>
@@ -322,7 +328,7 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
     console.error('Failed to send password reset email', err)
   })
 
-  res.json({ success: true, data: { resetLink } })
+  res.json({ success: true, data: { resetLink: process.env.NODE_ENV !== 'production' ? resetLink : '' } })
 
   // Audit: password reset requested (do not log token)
   await createAuditLog({

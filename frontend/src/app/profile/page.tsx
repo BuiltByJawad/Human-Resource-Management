@@ -30,7 +30,7 @@ type ProfileFormData = yup.InferType<typeof profileSchema>
 
 export default function ProfilePage() {
     const router = useRouter()
-    const { user, updateUser } = useAuthStore()
+    const { user, updateUser, token } = useAuthStore()
     const { showToast } = useToast()
     const [activeTab, setActiveTab] = useState('personal')
     const [isEditing, setIsEditing] = useState(false)
@@ -74,15 +74,59 @@ export default function ProfilePage() {
         formData.append('avatar', file)
 
         try {
-            await api.put('/auth/avatar', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+            if (!token) {
+                showToast('You are not logged in.', 'error')
+                return
+            }
+
+            const envApiUrl = process.env.NEXT_PUBLIC_API_URL
+            const resolvedBaseUrl =
+                envApiUrl && /^https?:\/\//i.test(envApiUrl)
+                    ? envApiUrl
+                    : String((api as any)?.defaults?.baseURL || 'http://localhost:5000/api')
+            const baseUrl = resolvedBaseUrl.replace(/\/$/, '')
+            const endpoint = `${baseUrl}/auth/avatar`
+
+            const uploadResponse = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                body: formData,
             })
-            // Refresh profile
-            const response = await api.get('/auth/profile')
-            updateUser(response.data.data.user)
+
+            if (!uploadResponse.ok) {
+                const payload = await uploadResponse.json().catch(() => null)
+                const message =
+                    payload?.error?.message ||
+                    payload?.message ||
+                    'Failed to upload photo'
+                throw new Error(message)
+            }
+
+            const uploadPayload = await uploadResponse.json().catch(() => null)
+            const uploadedAvatarUrl =
+                uploadPayload?.data?.avatarUrl ||
+                uploadPayload?.avatarUrl ||
+                null
+
+            if (uploadedAvatarUrl) {
+                updateUser({ avatarUrl: uploadedAvatarUrl })
+            }
+
+            // Refresh profile (but preserve the latest avatarUrl if backend returns stale user data)
+            const profileResponse = await api.get('/auth/profile')
+            const profileUser = profileResponse?.data?.data?.user ?? null
+            if (profileUser) {
+                updateUser({
+                    ...profileUser,
+                    avatarUrl: uploadedAvatarUrl ?? profileUser?.avatarUrl ?? user?.avatarUrl ?? null,
+                })
+            }
             showToast('Profile photo updated', 'success')
         } catch (error) {
-            showToast('Failed to upload photo', 'error')
+            const message = error instanceof Error ? error.message : 'Failed to upload photo'
+            showToast(message, 'error')
         }
     }
 

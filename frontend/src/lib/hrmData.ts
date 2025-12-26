@@ -23,7 +23,9 @@ export async function fetchDepartments(token?: string): Promise<Department[]> {
   } catch (error: any) {
     const status = error?.response?.status
     if (status === 401) {
-      console.warn('Not authorized to fetch departments')
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Not authorized to fetch departments')
+      }
       return []
     }
     if (status === 404) return []
@@ -57,15 +59,51 @@ export async function fetchRoles(): Promise<Role[]> {
   return []
 }
 
-export async function fetchRolePermissions(): Promise<{
+export async function fetchRolesWithToken(token?: string): Promise<Role[]> {
+  try {
+    const response = await api.get('/roles', withAuthConfig(token))
+    const payload = response.data
+
+    if (Array.isArray(payload?.data)) return payload.data
+    if (Array.isArray(payload)) return payload
+
+    const root = payload?.data ?? payload
+    if (Array.isArray(root?.roles)) return root.roles
+    if (Array.isArray(root?.data?.roles)) return root.data.roles
+    if (Array.isArray(root?.data)) return root.data
+
+    return []
+  } catch (error: any) {
+    const status = error?.response?.status
+    if (status === 401) return []
+    if (status === 404) return []
+    throw error
+  }
+}
+
+export async function fetchRolePermissions(token?: string): Promise<{
   permissions: Permission[]
   grouped: Record<string, Permission[]>
 }> {
-  const response = await api.get('/roles/permissions')
-  const payload = response.data
-  return {
-    permissions: Array.isArray(payload?.data) ? payload.data : [],
-    grouped: payload?.grouped ?? {},
+  try {
+    const response = await api.get('/roles/permissions', withAuthConfig(token))
+    const payload = response.data
+    const permissions = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : []
+    const grouped = payload?.grouped ?? {}
+    if (!permissions.length && typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.warn('[roles] /roles/permissions returned no permissions for current token')
+    }
+    return { permissions, grouped }
+  } catch (error: any) {
+    const status = error?.response?.status
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      if (status === 401) console.warn('[roles] not authorized to fetch permissions (401)')
+      if (status === 404) console.warn('[roles] permissions endpoint not found (404)')
+    }
+    if (status === 401 || status === 404) {
+      return { permissions: [], grouped: {} }
+    }
+    throw error
   }
 }
 

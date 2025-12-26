@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trainingService, EmployeeTraining } from '@/services/trainingService';
@@ -26,14 +26,18 @@ export default function CoursePlayerPage() {
         queryFn: trainingService.getMyCourses,
         enabled: !!trainingId,
         staleTime: 5 * 60 * 1000,
-        onError: (err) =>
-            handleCrudError({
-                error: err,
-                resourceLabel: 'Training courses',
-                showToast,
-            }),
         initialData: [],
     });
+
+    useEffect(() => {
+        if (coursesQuery.isError && coursesQuery.error) {
+            handleCrudError({
+                error: coursesQuery.error,
+                resourceLabel: 'Training courses',
+                showToast,
+            });
+        }
+    }, [coursesQuery.isError, coursesQuery.error, showToast]);
 
     const training = useMemo(
         () => coursesQuery.data?.find((c) => c.id === trainingId) ?? null,

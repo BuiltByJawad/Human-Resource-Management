@@ -2,12 +2,44 @@ import { payrollRepository } from './payroll.repository';
 import { NotFoundError, BadRequestError } from '../../shared/utils/errors';
 import { GeneratePayrollDto, UpdatePayrollStatusDto, PayrollQueryDto } from './dto';
 import { PAGINATION } from '../../shared/constants';
+import { prisma } from '../../shared/config/database';
+import { notificationService } from '../notification/notification.service';
 
 export class PayrollService {
+    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { userId: true },
+        });
+        return employee?.userId ?? null;
+    }
+
+    private async resolvePayrollAdminUserIds(organizationId: string): Promise<string[]> {
+        const users = await prisma.user.findMany({
+            where: {
+                status: 'active',
+                organizationId,
+                role: {
+                    permissions: {
+                        some: {
+                            permission: {
+                                resource: 'payroll',
+                                action: { in: ['manage', 'generate', 'configure'] },
+                            },
+                        },
+                    },
+                },
+            },
+            select: { id: true },
+            take: 50,
+        });
+        return users.map((u) => u.id);
+    }
+
     /**
      * Get all payroll records with pagination
      */
-    async getAll(query: PayrollQueryDto) {
+    async getAll(query: PayrollQueryDto, organizationId: string) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
@@ -27,8 +59,8 @@ export class PayrollService {
         }
 
         const [records, total] = await Promise.all([
-            payrollRepository.findAll({ where, skip, take: limit }),
-            payrollRepository.count(where),
+            payrollRepository.findAll({ where, skip, take: limit, organizationId }),
+            payrollRepository.count(organizationId, where),
         ]);
 
         return {
@@ -45,8 +77,8 @@ export class PayrollService {
     /**
      * Get payroll record by ID
      */
-    async getById(id: string) {
-        const record = await payrollRepository.findById(id);
+    async getById(id: string, organizationId: string) {
+        const record = await payrollRepository.findById(id, organizationId);
 
         if (!record) {
             throw new NotFoundError('Payroll record not found');
@@ -58,7 +90,7 @@ export class PayrollService {
     /**
      * Generate payroll for a period
      */
-    async generatePayroll(data: GeneratePayrollDto) {
+    async generatePayroll(data: GeneratePayrollDto, organizationId: string) {
         // Validate pay period format (YYYY-MM)
         const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
         if (!periodRegex.test(data.payPeriod)) {
@@ -66,7 +98,11 @@ export class PayrollService {
         }
 
         // Get active employees with attendance for the period
-        const employees = await payrollRepository.getActiveEmployeesWithAttendance(data.payPeriod);
+        const employees = await payrollRepository.getActiveEmployeesWithAttendance(
+            data.payPeriod,
+            organizationId,
+            data.employeeIds
+        );
 
         if (employees.length === 0) {
             throw new BadRequestError('No active employees found for payroll generation');
@@ -88,6 +124,19 @@ export class PayrollService {
 
             payrolls.push(payroll);
         }
+
+        const payrollAdminIds = await this.resolvePayrollAdminUserIds(organizationId);
+        await Promise.all(
+            Array.from(new Set(payrollAdminIds)).map((userId) =>
+                notificationService.create({
+                    userId,
+                    title: 'Payroll generated',
+                    message: `Payroll has been generated for period ${data.payPeriod} (${payrolls.length} employee(s)).`,
+                    type: 'payroll',
+                    link: '/payroll',
+                })
+            )
+        );
 
         return {
             message: `Generated payroll for ${payrolls.length} employees`,
@@ -138,12 +187,26 @@ export class PayrollService {
     /**
      * Update payroll status
      */
-    async updateStatus(id: string, data: UpdatePayrollStatusDto) {
-        await this.getById(id); // Verify exists
+    async updateStatus(id: string, data: UpdatePayrollStatusDto, organizationId: string) {
+        const existing = await this.getById(id, organizationId); // Verify exists
 
-        const record = await payrollRepository.updateStatus(id, data.status);
+        const record = await payrollRepository.updateStatusScoped(id, data.status, organizationId);
+        if (!record) {
+            throw new NotFoundError('Payroll record not found');
+        }
 
-        // TODO: If status is 'paid', trigger payment processing notification
+        if (data.status === 'paid') {
+            const employeeUserId = await this.resolveEmployeeUserId(existing.employeeId, organizationId);
+            if (employeeUserId) {
+                await notificationService.create({
+                    userId: employeeUserId,
+                    title: 'Payslip available',
+                    message: `Your payslip for ${existing.payPeriod} is now available.`,
+                    type: 'payroll',
+                    link: '/payroll',
+                });
+            }
+        }
 
         return record;
     }
@@ -151,8 +214,8 @@ export class PayrollService {
     /**
      * Get employee payslips
      */
-    async getEmployeePayslips(employeeId: string) {
-        const records = await payrollRepository.findByEmployee(employeeId);
+    async getEmployeePayslips(employeeId: string, organizationId: string) {
+        const records = await payrollRepository.findByEmployee(employeeId, organizationId);
 
         return records;
     }
@@ -160,8 +223,8 @@ export class PayrollService {
     /**
      * Get payroll summary for a period
      */
-    async getPeriodSummary(payPeriod: string) {
-        const records = await payrollRepository.findByPeriod(payPeriod);
+    async getPeriodSummary(payPeriod: string, organizationId: string) {
+        const records = await payrollRepository.findByPeriod(payPeriod, organizationId);
 
         const summary = {
             totalEmployees: records.length,

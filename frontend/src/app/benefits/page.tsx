@@ -69,7 +69,9 @@ export default function BenefitsAdminPage() {
           }))
         )
       } catch (err) {
-        console.error(err)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(err)
+        }
         showToast('Failed to load benefits data', 'error')
       } finally {
         setLoading(false)

@@ -70,7 +70,7 @@ function ResetPasswordContent() {
     setIsSubmitting(true)
 
     try {
-      await api.post('/auth/password-reset/complete', {
+      await api.post('/auth/password/reset', {
         token,
         password: data.password
       })

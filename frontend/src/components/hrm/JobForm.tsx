@@ -139,7 +139,7 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
                             <Button variant="secondary" onClick={onClose} type="button">
                                 Cancel
                             </Button>
-                            <Button type="submit" loading={createJob.isLoading}>
+                            <Button type="submit" loading={createJob.isPending}>
                                 Create Job
                             </Button>
                         </div>

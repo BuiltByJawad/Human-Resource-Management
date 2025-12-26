@@ -10,9 +10,9 @@ export class OnboardingRepository {
     })
   }
 
-  async getProcessByEmployeeId(employeeId: string): Promise<OnboardingProcess | null> {
-    return prisma.onboardingProcess.findUnique({
-      where: { employeeId },
+  async getProcessByEmployeeId(employeeId: string, organizationId: string): Promise<OnboardingProcess | null> {
+    return prisma.onboardingProcess.findFirst({
+      where: { employeeId, employee: { organizationId } },
       include: {
         tasks: { orderBy: { dueDate: 'asc' } },
         employee: {
@@ -29,22 +29,30 @@ export class OnboardingRepository {
     })
   }
 
-  async getProcessById(id: string): Promise<OnboardingProcess | null> {
-    return prisma.onboardingProcess.findUnique({
-      where: { id },
+  async getProcessById(id: string, organizationId: string): Promise<OnboardingProcess | null> {
+    return prisma.onboardingProcess.findFirst({
+      where: { id, employee: { organizationId } },
       include: { tasks: true }
     })
   }
 
-  async updateProcess(id: string, data: any): Promise<OnboardingProcess> {
-    return prisma.onboardingProcess.update({
-      where: { id },
+  async updateProcess(id: string, data: any, organizationId: string): Promise<OnboardingProcess | null> {
+    const updated = await prisma.onboardingProcess.updateMany({
+      where: { id, employee: { organizationId } },
       data
+    })
+
+    if (!updated.count) return null
+
+    return prisma.onboardingProcess.findFirst({
+      where: { id, employee: { organizationId } },
+      include: { tasks: true }
     })
   }
 
-  async getAllProcesses(): Promise<OnboardingProcess[]> {
+  async getAllProcesses(organizationId: string): Promise<OnboardingProcess[]> {
     return prisma.onboardingProcess.findMany({
+      where: { employee: { organizationId } },
       include: {
         employee: {
           select: {

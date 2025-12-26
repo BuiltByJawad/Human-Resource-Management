@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express'
 import { prisma } from '@/shared/config/database'
 import { NotFoundError } from '@/shared/utils/errors'
+import { requireRequestOrganizationId } from '@/shared/utils/tenant'
 
 export const getEmployees = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        const organizationId = requireRequestOrganizationId(req as any)
         const page = parseInt(req.query.page as string) || 1
         const limit = parseInt(req.query.limit as string) || 10
         const search = req.query.search as string
@@ -12,7 +14,7 @@ export const getEmployees = async (req: Request, res: Response, next: NextFuncti
 
         const skip = (page - 1) * limit
 
-        const where: any = {}
+        const where: any = { organizationId }
 
         if (search) {
             const numericSearch = Number(search)
@@ -58,7 +60,7 @@ export const getEmployees = async (req: Request, res: Response, next: NextFuncti
 
         const [employees, total] = await Promise.all([
             prisma.employee.findMany({
-                where,
+                where: where as any,
                 skip,
                 take: limit,
                 include: {
@@ -74,7 +76,7 @@ export const getEmployees = async (req: Request, res: Response, next: NextFuncti
                 },
                 orderBy: { createdAt: 'desc' },
             }),
-            prisma.employee.count({ where }),
+            prisma.employee.count({ where: where as any }),
         ])
 
         res.json({
@@ -98,8 +100,10 @@ export const getEmployeeById = async (req: Request, res: Response, next: NextFun
     try {
         const { id } = req.params
 
-        const employee = await prisma.employee.findUnique({
-            where: { id },
+        const organizationId = requireRequestOrganizationId(req as any)
+
+        const employee = await prisma.employee.findFirst({
+            where: { id, organizationId } as any,
             include: {
                 department: true,
                 role: true,
@@ -133,8 +137,10 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
         const { id } = req.params
         const { firstName, lastName, departmentId, roleId, status, salary } = req.body
 
-        const employee = await prisma.employee.update({
-            where: { id },
+        const organizationId = requireRequestOrganizationId(req as any)
+
+        const updated = await prisma.employee.updateMany({
+            where: { id, organizationId } as any,
             data: {
                 firstName,
                 lastName,
@@ -142,8 +148,14 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
                 roleId,
                 status,
                 salary,
-            },
+            } as any,
         })
+
+        if (!updated.count) {
+            throw new NotFoundError('Employee')
+        }
+
+        const employee = await prisma.employee.findFirst({ where: { id, organizationId } as any })
 
         res.json({
             status: 'success',
@@ -158,8 +170,10 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
     try {
         const { id } = req.params
 
-        const employee = await prisma.employee.findUnique({
-            where: { id },
+        const organizationId = requireRequestOrganizationId(req as any)
+
+        const employee = await prisma.employee.findFirst({
+            where: { id, organizationId } as any,
             include: {
                 user: true,
             },
@@ -173,9 +187,11 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
 
         await prisma.$transaction(async (tx) => {
             // Delete the employee record first so there is no FK reference to the user
-            await tx.employee.delete({
-                where: { id },
-            })
+            const deleted = await tx.employee.deleteMany({ where: { id, organizationId } as any })
+
+            if (!deleted.count) {
+                return
+            }
 
             // If this employee is linked to a user account, remove that user as well
             if (userId) {
@@ -199,9 +215,41 @@ export const createEmployee = async (req: Request, res: Response, next: NextFunc
     try {
         const { firstName, lastName, email, departmentId, roleId, hireDate, salary, status } = req.body
 
+        const organizationId = requireRequestOrganizationId(req as any)
+
+        const existing = await prisma.employee.findFirst({ where: { email, organizationId } as any })
+        if (existing) {
+            return res.status(400).json({
+                success: false,
+                error: { message: 'Employee with this email already exists' },
+            })
+        }
+
+        if (departmentId) {
+            const dept = await prisma.department.findFirst({ where: { id: departmentId, organizationId } as any })
+            if (!dept) {
+                return res.status(400).json({
+                    success: false,
+                    error: { message: 'Invalid departmentId' },
+                })
+            }
+        }
+
+        if (roleId) {
+            const role = await prisma.role.findUnique({ where: { id: roleId } })
+            if (!role) {
+                return res.status(400).json({
+                    success: false,
+                    error: { message: 'Invalid roleId' },
+                })
+            }
+        }
+
         // Generate employee number
-        const count = await prisma.employee.count()
+        const count = await prisma.employee.count({ where: { organizationId } as any })
         const employeeNumber = `EMP${String(count + 1).padStart(3, '0')}`
+
+        const salaryNumber = typeof salary === 'number' ? salary : parseFloat(String(salary))
 
         const employee = await prisma.employee.create({
             data: {
@@ -209,10 +257,11 @@ export const createEmployee = async (req: Request, res: Response, next: NextFunc
                 firstName,
                 lastName,
                 email,
+                organizationId,
                 departmentId,
                 roleId,
                 hireDate: new Date(hireDate),
-                salary: parseFloat(salary),
+                salary: salaryNumber,
                 status: status || 'active',
             },
             include: {

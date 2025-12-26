@@ -7,7 +7,7 @@ export class EmployeeService {
     /**
      * Get paginated list of employees with filters
      */
-    async getAll(query: EmployeeQueryDto): Promise<EmployeeListResponse> {
+    async getAll(query: EmployeeQueryDto, organizationId: string): Promise<EmployeeListResponse> {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
@@ -72,9 +72,10 @@ export class EmployeeService {
                 where,
                 skip,
                 take: limit,
+                organizationId,
                 orderBy: { createdAt: 'desc' },
             }),
-            employeeRepository.count(where),
+            employeeRepository.count(organizationId, where),
         ]);
 
         return {
@@ -91,8 +92,8 @@ export class EmployeeService {
     /**
      * Get employee by ID
      */
-    async getById(id: string) {
-        const employee = await employeeRepository.findById(id);
+    async getById(id: string, organizationId: string) {
+        const employee = await employeeRepository.findById(id, organizationId);
 
         if (!employee) {
             throw new NotFoundError('Employee not found');
@@ -104,15 +105,15 @@ export class EmployeeService {
     /**
      * Create new employee
      */
-    async create(data: CreateEmployeeDto) {
+    async create(data: CreateEmployeeDto, organizationId: string) {
         // Check if email already exists
-        const existingEmployee = await employeeRepository.findByEmail(data.email);
+        const existingEmployee = await employeeRepository.findByEmail(data.email, organizationId);
         if (existingEmployee) {
             throw new BadRequestError('Employee with this email already exists');
         }
 
         // Generate employee number
-        const count = await employeeRepository.getEmployeeCount();
+        const count = await employeeRepository.getEmployeeCount(organizationId);
         const employeeNumber = `EMP${String(count + 1).padStart(3, '0')}`;
 
         // Create employee
@@ -129,7 +130,7 @@ export class EmployeeService {
             phoneNumber: data.phoneNumber,
             address: data.address,
             manager: data.managerId ? { connect: { id: data.managerId } } : undefined,
-        });
+        }, organizationId);
 
         return employee;
     }
@@ -137,9 +138,9 @@ export class EmployeeService {
     /**
      * Update employee
      */
-    async update(id: string, data: UpdateEmployeeDto) {
+    async update(id: string, data: UpdateEmployeeDto, organizationId: string) {
         // Verify employee exists
-        await this.getById(id);
+        await this.getById(id, organizationId);
 
         const updateData: any = {};
 
@@ -153,7 +154,10 @@ export class EmployeeService {
         if (data.address) updateData.address = data.address;
         if (data.managerId) updateData.manager = { connect: { id: data.managerId } };
 
-        const employee = await employeeRepository.update(id, updateData);
+        const employee = await employeeRepository.update(id, updateData, organizationId);
+        if (!employee) {
+            throw new NotFoundError('Employee not found');
+        }
 
         return employee;
     }
@@ -161,8 +165,8 @@ export class EmployeeService {
     /**
      * Delete employee
      */
-    async delete(id: string): Promise<void> {
-        const employee = await employeeRepository.findById(id);
+    async delete(id: string, organizationId: string): Promise<void> {
+        const employee = await employeeRepository.findById(id, organizationId);
 
         if (!employee) {
             throw new NotFoundError('Employee not found');
@@ -171,7 +175,7 @@ export class EmployeeService {
         const userId = employee.userId;
 
         // Delete employee and associated user
-        await employeeRepository.deleteWithUser(id, userId);
+        await employeeRepository.deleteWithUser(id, userId, organizationId);
     }
 }
 

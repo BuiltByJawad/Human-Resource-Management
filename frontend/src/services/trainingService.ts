@@ -38,7 +38,9 @@ export const trainingService = {
             const response = await api.get<{ data: TrainingCourse[] }>('/training/courses');
             return Array.isArray(response.data?.data) ? response.data.data : [];
         } catch (error) {
-            console.error('Failed to fetch all courses:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to fetch all courses:', error);
+            }
             return [];
         }
     },

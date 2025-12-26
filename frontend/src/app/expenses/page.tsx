@@ -1,122 +1,64 @@
-"use client"
+import { cookies } from "next/headers"
 
-import { useEffect, useMemo, useState } from 'react'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useToast } from '@/components/ui/ToastProvider'
-import { getPendingExpenses, updateExpenseStatus, ExpenseClaim } from '@/services/expenseService'
-import { format } from 'date-fns'
+import { ExpensesAdminPageClient } from "./ExpensesAdminPageClient"
+import type { ExpenseClaim } from "@/services/expenseService"
 
-export default function ExpensesAdminPage() {
-  const { user } = useAuthStore()
-  const { showToast } = useToast()
-  const [claims, setClaims] = useState<ExpenseClaim[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const canApprove = useMemo(() => user?.permissions?.includes('expenses.approve'), [user?.permissions])
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true)
-        const data = await getPendingExpenses()
-        setClaims(data || [])
-      } catch (err) {
-        console.error(err)
-        showToast('Failed to load expense claims', 'error')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [showToast])
-
-  const handleStatus = async (id: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
-    try {
-      await updateExpenseStatus(id, { status, rejectionReason })
-      showToast(`Claim ${status}`, 'success')
-      setClaims((prev) => prev.filter((claim) => claim.id !== id))
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to update status'
-      showToast(message, 'error')
-    }
-  }
-
+function buildApiBase() {
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Expense Approvals</h1>
-                <p className="text-sm text-gray-600">Review and approve incoming claims.</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-100 shadow p-5">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Pending Claims</h2>
-              {loading ? (
-                <p className="text-sm text-gray-500">Loading...</p>
-              ) : claims.length === 0 ? (
-                <p className="text-sm text-gray-500">No pending claims.</p>
-              ) : (
-                <div className="space-y-3">
-                  {claims.map((claim) => (
-                    <div key={claim.id} className="border rounded-lg p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          <p className="text-base font-semibold text-gray-900">
-                            ${claim.amount.toFixed(2)} · {claim.category}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {claim.description || 'No description provided'}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Submitted {format(new Date(claim.date), 'PP')} {claim.currency}
-                          </p>
-                        </div>
-                        {canApprove && (
-                          <div className="flex gap-2">
-                            <button
-                              className="px-3 py-1.5 text-xs rounded bg-emerald-600 text-white"
-                              onClick={() => handleStatus(claim.id, 'approved')}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              className="px-3 py-1.5 text-xs rounded bg-red-600 text-white"
-                              onClick={() => {
-                                const reason = prompt('Reason for rejection?')
-                                if (reason) handleStatus(claim.id, 'rejected', reason)
-                              }}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      {claim.receiptUrl && (
-                        <a
-                          href={claim.receiptUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-blue-600 underline mt-2 inline-block"
-                        >
-                          View receipt
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
+    process.env.BACKEND_URL ||
+    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "") : null) ||
+    "http://localhost:5000"
   )
+}
+
+async function fetchWithToken<T = any>(
+  path: string,
+  token: string | null,
+  params?: URLSearchParams,
+): Promise<T | null> {
+  if (!token) return null
+  try {
+    const base = buildApiBase()
+    const url = params ? `${base}${path}?${params.toString()}` : `${base}${path}`
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    })
+    if (!response.ok) {
+      return null
+    }
+    const payload = await response.json().catch(() => null)
+    return (payload?.data ?? payload ?? null) as T | null
+  } catch {
+    return null
+  }
+}
+
+async function fetchCurrentUser(token: string | null) {
+  const data = (await fetchWithToken(`/api/auth/me`, token)) as any
+  if (!data) return null
+  return data?.user ?? data ?? null
+}
+
+async function fetchPendingExpenses(token: string | null): Promise<ExpenseClaim[]> {
+  const data = (await fetchWithToken<ExpenseClaim[] | { data?: ExpenseClaim[] }>(`/api/expenses/pending`, token)) ?? []
+  if (Array.isArray(data)) return data
+  if (Array.isArray((data as any)?.data)) return (data as any).data
+  return []
+}
+
+export default async function ExpensesAdminPage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("accessToken")?.value ?? null
+
+  const user = await fetchCurrentUser(token)
+  const permissions: string[] = Array.isArray(user?.permissions) ? user!.permissions : []
+  const canApprove = permissions.includes("expenses.approve")
+
+  const initialClaims = await fetchPendingExpenses(token)
+
+  return <ExpensesAdminPageClient initialClaims={initialClaims} initialCanApprove={canApprove} />
 }

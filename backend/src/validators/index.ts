@@ -109,4 +109,19 @@ export const orgSettingsSchema = Joi.object({
   tagline: Joi.string().max(150).allow('', null),
   companyName: Joi.string().max(150).allow('', null),
   companyAddress: Joi.string().max(300).allow('', null),
+  loginHeroTitle: Joi.string().max(120).allow('', null),
+  loginHeroSubtitle: Joi.string().max(200).allow('', null),
+  loginAccentColor: Joi.string()
+    .pattern(/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/)
+    .allow('', null),
+  loginBackgroundImage: Joi.string().uri().allow('', null),
+  loginHighlights: Joi.array()
+    .items(
+      Joi.object({
+        title: Joi.string().max(80).allow('', null),
+        description: Joi.string().max(240).allow('', null),
+      })
+    )
+    .max(4)
+    .optional(),
 })

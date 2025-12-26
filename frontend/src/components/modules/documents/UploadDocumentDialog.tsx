@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useForm, Controller, type Resolver } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/FormComponents';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { documentService } from '@/services/documentService';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -13,31 +15,79 @@ interface UploadDocumentDialogProps {
     onSuccess?: () => void;
 }
 
+const uploadDocumentSchema = yup.object({
+    title: yup.string().trim().required('Title is required'),
+    category: yup.string().trim().required('Category is required'),
+    fileUrl: yup.string().trim().url('Enter a valid URL (https://...)').required('File URL is required'),
+    description: yup.string().max(500, 'Description must be 500 characters or less').nullable().notRequired()
+});
+
+type UploadDocumentFormValues = {
+    title: string;
+    category: string;
+    fileUrl: string;
+    description?: string | null;
+};
+
+const FieldLabel = ({ htmlFor, children, required }: { htmlFor?: string; children: React.ReactNode; required?: boolean }) => (
+    <label
+        htmlFor={htmlFor}
+        className="flex items-center text-sm font-medium text-gray-700 gap-1"
+    >
+        <span>{children}</span>
+        {required && <span className="text-red-500" aria-hidden="true">*</span>}
+    </label>
+);
+
 export const UploadDocumentDialog: React.FC<UploadDocumentDialogProps> = ({ onSuccess }) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        category: 'HR Policy',
-        fileUrl: '',
-        type: 'PDF'
+
+    const {
+        register,
+        control,
+        handleSubmit,
+        reset,
+        formState: { errors }
+    } = useForm<UploadDocumentFormValues>({
+        resolver: yupResolver(uploadDocumentSchema) as unknown as Resolver<UploadDocumentFormValues>,
+        defaultValues: {
+            title: '',
+            description: '',
+            category: 'HR Policy',
+            fileUrl: ''
+        }
     });
 
-    const handleChange = (field: string, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-    };
+    const inferDocumentType = (url: string) => {
+        try {
+            const parsed = new URL(url)
+            const extension = parsed.pathname.split('.').pop()
+            if (!extension) return 'PDF'
+            return extension.toUpperCase()
+        } catch {
+            const fallbackExtension = url.split('?')[0]?.split('.').pop()
+            return fallbackExtension ? fallbackExtension.toUpperCase() : 'PDF'
+        }
+    }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const onSubmit = async (values: UploadDocumentFormValues) => {
         setLoading(true);
         try {
-            await documentService.uploadDocument(formData);
+            await documentService.uploadDocument({
+                title: values.title.trim(),
+                category: values.category.trim(),
+                fileUrl: values.fileUrl.trim(),
+                description: values.description?.trim() || undefined,
+                type: inferDocumentType(values.fileUrl)
+            });
             setOpen(false);
-            setFormData({ title: '', description: '', category: 'HR Policy', fileUrl: '', type: 'PDF' });
+            reset();
             if (onSuccess) onSuccess();
         } catch (error) {
-            console.error('Failed to upload document:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to upload document:', error);
+            }
         } finally {
             setLoading(false);
         }
@@ -55,50 +105,63 @@ export const UploadDocumentDialog: React.FC<UploadDocumentDialogProps> = ({ onSu
                 <DialogHeader>
                     <DialogTitle>Upload New Document</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="title">Title</Label>
+                        <FieldLabel htmlFor="title" required>Title</FieldLabel>
                         <Input
                             id="title"
-                            value={formData.title}
-                            onChange={(e) => handleChange('title', e.target.value)}
                             required
+                            error={errors.title?.message}
+                            {...register('title')}
                         />
                     </div>
+
                     <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
-                        <Select onValueChange={(val) => handleChange('category', val)} defaultValue={formData.category}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="HR Policy">HR Policy</SelectItem>
-                                <SelectItem value="IT Policy">IT Policy</SelectItem>
-                                <SelectItem value="Handbook">Handbook</SelectItem>
-                                <SelectItem value="Form">Form</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <FieldLabel htmlFor="category" required>Category</FieldLabel>
+                        <Controller
+                            control={control}
+                            name="category"
+                            render={({ field }) => (
+                                <>
+                                    <Select value={field.value} onValueChange={field.onChange}>
+                                        <SelectTrigger className={`${errors.category ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''}`}>
+                                            <SelectValue placeholder="Select category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="HR Policy">HR Policy</SelectItem>
+                                            <SelectItem value="IT Policy">IT Policy</SelectItem>
+                                            <SelectItem value="Handbook">Handbook</SelectItem>
+                                            <SelectItem value="Form">Form</SelectItem>
+                                            <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>}
+                                </>
+                            )}
+                        />
                     </div>
+
                     <div className="space-y-2">
-                        <Label htmlFor="url">File URL (Demo)</Label>
+                        <FieldLabel htmlFor="fileUrl" required>File URL (Demo)</FieldLabel>
                         <Input
-                            id="url"
+                            id="fileUrl"
                             placeholder="https://..."
-                            value={formData.fileUrl}
-                            onChange={(e) => handleChange('fileUrl', e.target.value)}
                             required
+                            error={errors.fileUrl?.message}
+                            {...register('fileUrl')}
                         />
                         <p className="text-xs text-gray-500">Enter a public URL for demonstration.</p>
                     </div>
+
                     <div className="space-y-2">
-                        <Label htmlFor="desc">Description</Label>
+                        <FieldLabel htmlFor="description">Description</FieldLabel>
                         <Input
-                            id="desc"
-                            value={formData.description}
-                            onChange={(e) => handleChange('description', e.target.value)}
+                            id="description"
+                            error={errors.description?.message}
+                            {...register('description')}
                         />
                     </div>
+
                     <DialogFooter>
                         <Button type="submit" disabled={loading}>
                             {loading ? 'Uploading...' : 'Upload'}

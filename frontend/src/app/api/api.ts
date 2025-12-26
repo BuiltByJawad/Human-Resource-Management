@@ -1,7 +1,14 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/useAuthStore'
+import { getClientTenantSlug } from '@/lib/tenant'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL
+const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value)
+const isLikelyNextOrigin = (value: string) => /localhost:3000/i.test(value)
+const API_URL =
+  envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)
+    ? envApiUrl
+    : 'http://localhost:5000/api'
 
 const api = axios.create({
     baseURL: API_URL,
@@ -16,6 +23,14 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`
         }
+
+        if (typeof window !== 'undefined') {
+            const tenantSlug = getClientTenantSlug()
+            if (tenantSlug) {
+                config.headers = config.headers ?? {}
+                ;(config.headers as any)['X-Tenant-Slug'] = tenantSlug
+            }
+        }
         return config
     },
     (error) => {
@@ -29,6 +44,12 @@ api.interceptors.response.use(
         const originalRequest = error.config
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true
+            const token = useAuthStore.getState().token
+            const url = String(originalRequest?.url || '')
+            const isAuthFlow = url.startsWith('/auth/') || url.includes('/auth/')
+            if (!token || isAuthFlow) {
+                return Promise.reject(error)
+            }
             try {
                 // Attempt to refresh token
                 // Note: This requires a refresh token flow which might need more setup

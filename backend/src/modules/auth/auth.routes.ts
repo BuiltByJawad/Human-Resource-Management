@@ -1,18 +1,19 @@
 import { Router } from 'express';
 import * as authController from './auth.controller';
 import { authenticate } from '../../shared/middleware/auth';
+import { resolveTenant } from '../../shared/middleware/tenant';
 import { upload } from '../../shared/middleware/uploadMiddleware';
 import { authRateLimiter } from '../../shared/middleware/security';
 
 const router = Router();
 
 // Public routes
-router.post('/register', authController.register);
-router.post('/login', authController.login);
+router.post('/register', authRateLimiter, resolveTenant, authController.register);
+router.post('/login', authRateLimiter, resolveTenant, authController.login);
 router.post('/refresh', authController.refreshToken);
-router.post('/password/request-reset', authController.requestPasswordReset);
-router.post('/password/reset', authController.resetPassword);
-router.post('/invite/complete', authController.completeInvite);
+router.post('/password/request-reset', authRateLimiter, authController.requestPasswordReset);
+router.post('/password/reset', authRateLimiter, authController.resetPassword);
+router.post('/invite/complete', authRateLimiter, authController.completeInvite);
 
 // Protected routes
 router.use(authenticate); // All routes below require authentication

@@ -3,34 +3,78 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/middleware/errorHandler';
 import { expenseService } from './expense.service';
 import { createExpenseSchema, updateExpenseStatusSchema } from './dto';
+import { BadRequestError, ForbiddenError } from '../../shared/utils/errors';
+import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const submitClaim = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = createExpenseSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+    if (error) throw new BadRequestError(error.details[0].message);
 
-    const claim = await expenseService.submitClaim(value);
+    const authReq: any = req as any;
+    const employeeId = authReq?.user?.employeeId;
+    if (!employeeId) throw new BadRequestError('Employee ID required');
+
+    const organizationId = requireRequestOrganizationId(req as any);
+
+    const claim = await expenseService.submitClaim({
+        ...(value as any),
+        employeeId,
+    }, organizationId);
     res.status(201).json({ success: true, data: claim });
 });
 
 export const getMyExpenses = asyncHandler(async (req: Request, res: Response) => {
-    const employeeId = req.params.employeeId;
-    const claims = await expenseService.getMyExpenses(employeeId);
+    const authReq: any = req as any;
+    const permissions: string[] = Array.isArray(authReq?.user?.permissions) ? authReq.user.permissions : [];
+    const canViewAll =
+        permissions.includes('expenses.view') ||
+        permissions.includes('expenses.manage') ||
+        permissions.includes('expenses.approve');
+
+    const requestedEmployeeId = req.params.employeeId;
+    const selfEmployeeId = authReq?.user?.employeeId;
+    const employeeId = requestedEmployeeId || selfEmployeeId;
+    if (!employeeId) throw new BadRequestError('Employee ID required');
+
+    if (!canViewAll && requestedEmployeeId && selfEmployeeId && requestedEmployeeId !== selfEmployeeId) {
+        throw new ForbiddenError('You can only view your own expense claims');
+    }
+
+    const organizationId = requireRequestOrganizationId(req as any);
+    const claims = await expenseService.getMyExpenses(employeeId, organizationId);
     res.json({ success: true, data: claims });
 });
 
 export const getPendingClaims = asyncHandler(async (req: Request, res: Response) => {
-    const claims = await expenseService.getPendingClaims();
+    const authReq: any = req as any;
+    const permissions: string[] = Array.isArray(authReq?.user?.permissions) ? authReq.user.permissions : [];
+    const canAct = permissions.includes('expenses.approve') || permissions.includes('expenses.manage');
+    if (!canAct) {
+        throw new ForbiddenError('Missing permission: expenses.approve');
+    }
+
+    const organizationId = requireRequestOrganizationId(req as any);
+    const claims = await expenseService.getPendingClaims(organizationId);
     res.json({ success: true, data: claims });
 });
 
 export const updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const claimId = req.params.id;
     const { error, value } = updateExpenseStatusSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+    if (error) throw new BadRequestError(error.details[0].message);
+
+    const authReq: any = req as any;
+    const permissions: string[] = Array.isArray(authReq?.user?.permissions) ? authReq.user.permissions : [];
+    const canAct = permissions.includes('expenses.approve') || permissions.includes('expenses.manage');
+    if (!canAct) {
+        throw new ForbiddenError('Missing permission: expenses.approve');
+    }
+
+    const organizationId = requireRequestOrganizationId(req as any);
 
     const updated = await expenseService.updateStatus(claimId, {
         ...value,
         approvedBy: (req as any).user?.id
-    });
+    }, organizationId);
     res.json({ success: true, data: updated });
 });

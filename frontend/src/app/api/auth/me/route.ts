@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { extractTenantSlug } from '@/lib/tenant'
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,10 +8,16 @@ export async function GET(request: NextRequest) {
     if (!accessToken) {
       return NextResponse.json({ user: null }, { status: 401 })
     }
+
+    const tenantSlug = extractTenantSlug({
+      headerSlug: request.headers.get('x-tenant-slug'),
+      hostname: request.headers.get('host'),
+    })
     
     const response = await fetch(`${process.env.BACKEND_URL}/api/auth/me`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
+        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       },
     })
     

@@ -2,6 +2,7 @@ import { Router } from 'express';
 // Use legacy orgController for branding/settings to align with companySettings schema
 import * as organizationController from '../../controllers/orgController';
 import { authenticate } from '../../shared/middleware/auth';
+import { resolveTenant } from '../../shared/middleware/tenant';
 import { uploadBranding } from '../../shared/middleware/uploadMiddleware';
 
 /**
@@ -14,7 +15,7 @@ import { uploadBranding } from '../../shared/middleware/uploadMiddleware';
 const router = Router();
 
 // Public branding endpoint (no auth needed)
-router.get('/branding/public', organizationController.getPublicBranding);
+router.get('/branding/public', resolveTenant, organizationController.getPublicBranding);
 
 // Protected routes
 router.use(authenticate);

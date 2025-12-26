@@ -26,7 +26,7 @@ interface OnboardingTask {
 export default function OnboardingEmployeePage() {
   const { employeeId } = useParams<{ employeeId: string }>()
   const router = useRouter()
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, refreshSession } = useAuthStore()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,15 +35,18 @@ export default function OnboardingEmployeePage() {
   const [newTask, setNewTask] = useState<OnboardingTaskPayload>({ title: '', description: '', dueDate: '' })
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/login')
-      return
-    }
     if (!employeeId) return
     const init = async () => {
       setLoading(true)
       setError(null)
       try {
+        if (!isAuthenticated) {
+          const ok = await refreshSession({ silent: true })
+          if (!ok) {
+            router.replace('/login')
+            return
+          }
+        }
         await startOnboardingProcess(employeeId as string)
         const process = await getOnboardingProcess(employeeId as string)
         setTasks(process?.tasks ?? [])
@@ -54,7 +57,7 @@ export default function OnboardingEmployeePage() {
       }
     }
     init()
-  }, [employeeId, isAuthenticated, router])
+  }, [employeeId, isAuthenticated, refreshSession, router])
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()

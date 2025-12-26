@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -39,6 +39,7 @@ type NavItem = {
   href: string
   icon: NavIcon
   permissions?: Permission[]
+  requiresEmployeeProfile?: boolean
 }
 
 const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = [
@@ -50,15 +51,15 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
     label: 'My Workspace',
     isPersonal: true,
     items: [
-      { name: 'My Dashboard', href: '/portal', icon: UserCircleIcon },
-      { name: 'My Shifts', href: '/portal/shifts', icon: CalendarDaysIcon },
-      { name: 'My Documents', href: '/portal/documents', icon: DocumentTextIcon },
-      { name: 'My Training', href: '/portal/training', icon: AcademicCapIcon },
-      { name: 'My Goals', href: '/portal/goals', icon: FlagIcon },
-      { name: 'My Benefits', href: '/portal/benefits', icon: HeartIcon },
-      { name: 'My Expenses', href: '/portal/expenses', icon: CreditCardIcon },
-      { name: 'My Offboarding', href: '/portal/offboarding', icon: ArrowTrendingDownIcon },
-      { name: 'My Leave', href: '/leave', icon: ClipboardDocumentListIcon },
+      { name: 'My Dashboard', href: '/portal', icon: UserCircleIcon, requiresEmployeeProfile: true },
+      { name: 'My Shifts', href: '/portal/shifts', icon: CalendarDaysIcon, requiresEmployeeProfile: true },
+      { name: 'My Documents', href: '/portal/documents', icon: DocumentTextIcon, requiresEmployeeProfile: true },
+      { name: 'My Training', href: '/portal/training', icon: AcademicCapIcon, requiresEmployeeProfile: true },
+      { name: 'My Goals', href: '/portal/goals', icon: FlagIcon, requiresEmployeeProfile: true },
+      { name: 'My Benefits', href: '/portal/benefits', icon: HeartIcon, requiresEmployeeProfile: true },
+      { name: 'My Expenses', href: '/portal/expenses', icon: CreditCardIcon, requiresEmployeeProfile: true },
+      { name: 'My Offboarding', href: '/portal/offboarding', icon: ArrowTrendingDownIcon, requiresEmployeeProfile: true },
+      { name: 'My Leave', href: '/leave', icon: ClipboardDocumentListIcon, requiresEmployeeProfile: true },
     ],
   },
   // ═══════════════════════════════════════════════════════════════════════════
@@ -71,6 +72,7 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
       { name: 'Employees', href: '/employees', icon: UsersIcon, permissions: [PERMISSIONS.VIEW_EMPLOYEES] },
       { name: 'Departments', href: '/departments', icon: BuildingOfficeIcon, permissions: [PERMISSIONS.MANAGE_DEPARTMENTS] },
       { name: 'Attendance', href: '/attendance', icon: ClockIcon, permissions: [PERMISSIONS.VIEW_ATTENDANCE] },
+      { name: 'Leave Requests', href: '/leave/requests', icon: ClipboardDocumentListIcon, permissions: [PERMISSIONS.VIEW_LEAVE_REQUESTS, PERMISSIONS.APPROVE_LEAVE, PERMISSIONS.MANAGE_LEAVE_REQUESTS, PERMISSIONS.MANAGE_LEAVE_POLICIES] },
     ],
   },
   {
@@ -79,11 +81,12 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
       { name: 'Payroll', href: '/payroll', icon: BanknotesIcon, permissions: [PERMISSIONS.VIEW_PAYROLL] },
       { name: 'Benefits', href: '/benefits', icon: HeartIcon, permissions: [PERMISSIONS.VIEW_BENEFITS] },
       { name: 'Expenses', href: '/expenses', icon: CreditCardIcon, permissions: [PERMISSIONS.VIEW_EXPENSES] },
+      { name: 'Expense Approvals', href: '/expenses/approvals', icon: CreditCardIcon, permissions: [PERMISSIONS.APPROVE_EXPENSES, PERMISSIONS.MANAGE_EXPENSES] },
       { name: 'Offboarding', href: '/offboarding', icon: ArrowTrendingDownIcon, permissions: [PERMISSIONS.VIEW_OFFBOARDING] },
       { name: 'Assets', href: '/assets', icon: ComputerDesktopIcon, permissions: [PERMISSIONS.VIEW_ASSETS] },
       { name: 'Performance', href: '/performance', icon: SparklesIcon, permissions: [PERMISSIONS.VIEW_PERFORMANCE] },
       { name: 'Burnout Analytics', href: '/analytics/burnout', icon: ExclamationTriangleIcon, permissions: [PERMISSIONS.VIEW_ANALYTICS] },
-      { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon, permissions: [PERMISSIONS.MANAGE_EMPLOYEES] },
+      { name: 'Recruitment', href: '/recruitment', icon: UserGroupIcon, permissions: [PERMISSIONS.MANAGE_RECRUITMENT] },
       { name: 'Reports', href: '/reports', icon: ChartBarIcon, permissions: [PERMISSIONS.VIEW_REPORTS] },
       { name: 'Compliance', href: '/compliance', icon: ShieldCheckIcon, permissions: [PERMISSIONS.VIEW_COMPLIANCE] },
     ],
@@ -133,9 +136,31 @@ export default function Sidebar() {
   const { siteName, shortName, tagline, logoUrl, loaded: orgLoaded } = useOrgStore()
   const pathname = usePathname()
 
+  const avatarUrl = useMemo(() => {
+    const raw = user?.avatarUrl
+    if (!raw) return null
+    if (/ui-avatars\.com\/api\//i.test(raw)) {
+      return raw.includes('format=') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}format=png`
+    }
+    return raw
+  }, [user?.avatarUrl])
+
+  const activeHref = (() => {
+    const allItems = navigation.flatMap(section => section.items)
+    const matches = allItems
+      .map(item => item.href)
+      .filter(href => pathname === href || pathname.startsWith(`${href}/`))
+    if (matches.length === 0) return null
+    return matches.sort((a, b) => b.length - a.length)[0]
+  })()
+
   // canSeeItem handles hydration: on server (not mounted), hide permission-gated items
   // This ensures server and client render the same items
   const canSeeItem = (item: NavItem) => {
+    if (item.requiresEmployeeProfile) {
+      if (!isMounted) return false
+      return !!user?.employee?.id
+    }
     if (!item.permissions || item.permissions.length === 0) return true
     // Before mount, hide permission-gated items to prevent hydration mismatch
     if (!isMounted) return false
@@ -167,7 +192,7 @@ export default function Sidebar() {
   }, [isMounted, router, user, hasAnyPermission])
 
   const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
-    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+    const isActive = activeHref === item.href
 
     return (
       <Link
@@ -314,9 +339,20 @@ export default function Sidebar() {
             gap-3 [.sidebar-collapsed_&]:justify-center
           `}
         >
-          <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-sm shadow-inner flex-shrink-0 border-2 border-white/10">
+          <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-sm shadow-inner flex-shrink-0 border-2 border-white/10 overflow-hidden relative">
             {hasUser ? (
-              initials
+              avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt={userDisplayName || 'User'}
+                  fill
+                  className="object-cover"
+                  sizes="36px"
+                  unoptimized
+                />
+              ) : (
+                initials
+              )
             ) : (
               <span className="h-6 w-6 rounded-full bg-slate-500/60 animate-pulse block" />
             )}

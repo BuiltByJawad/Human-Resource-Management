@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { authenticate, authorize } from '../../shared/middleware/auth';
+import { authenticate, checkPermission } from '../../shared/middleware/auth';
 import * as trainingController from './training.controller';
 
 const router = Router();
@@ -15,7 +15,7 @@ router.get(
 router.post(
     '/courses',
     authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager']),
+    checkPermission('training', 'manage'),
     trainingController.createCourse
 );
 
@@ -23,7 +23,7 @@ router.post(
 router.post(
     '/assign',
     authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager']),
+    checkPermission('training', 'manage'),
     trainingController.assignCourse
 );
 

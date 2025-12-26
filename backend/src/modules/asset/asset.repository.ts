@@ -37,7 +37,29 @@ export class AssetRepository {
 
     async findByEmployee(employeeId: string) {
         return prisma.asset.findMany({
-            where: {},
+            where: {
+                assignments: {
+                    some: {
+                        employeeId,
+                        returnedDate: null,
+                    },
+                },
+            },
+            include: {
+                assignments: {
+                    where: { employeeId, returnedDate: null },
+                    include: {
+                        employee: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                employeeNumber: true,
+                            },
+                        },
+                    },
+                },
+            },
             orderBy: { createdAt: 'desc' },
         });
     }

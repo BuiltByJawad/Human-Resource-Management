@@ -20,6 +20,24 @@ export class AuthRepository {
         });
     }
 
+    async findUserByEmailAndOrganization(email: string, organizationId: string) {
+        return prisma.user.findFirst({
+            where: { email, organizationId },
+            include: {
+                role: {
+                    include: {
+                        permissions: {
+                            include: {
+                                permission: true,
+                            },
+                        },
+                    },
+                },
+                employee: true,
+            },
+        });
+    }
+
     async findUserById(id: string) {
         return prisma.user.findUnique({
             where: { id },
@@ -86,7 +104,7 @@ export class AuthRepository {
 
     async deleteInvitesByEmail(email: string) {
         return prisma.userInvite.deleteMany({
-            where: { email },
+            where: { email, acceptedAt: null },
         });
     }
 
@@ -126,9 +144,30 @@ export class AuthRepository {
         });
     }
 
+    async findEmployeeByEmailAndOrganization(email: string, organizationId: string) {
+        return prisma.employee.findUnique({
+            where: {
+                organizationId_email: {
+                    organizationId,
+                    email,
+                },
+            },
+        });
+    }
+
     async updateEmployeeUserId(email: string, userId: string) {
         return prisma.employee.updateMany({
             where: { email },
+            data: { userId },
+        });
+    }
+
+    async updateEmployeeUserIdScoped(email: string, organizationId: string, userId: string) {
+        return prisma.employee.updateMany({
+            where: {
+                organizationId,
+                email,
+            },
             data: { userId },
         });
     }

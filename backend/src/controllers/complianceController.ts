@@ -2,13 +2,16 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '@/shared/middleware/errorHandler'
 import { prisma } from '@/shared/config/database'
 import { BadRequestError, NotFoundError } from '@/shared/utils/errors'
+import { requireRequestOrganizationId } from '@/shared/utils/tenant'
 import { startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 
 // @desc    Get all compliance rules
 // @route   GET /api/compliance/rules
 // @access  Private
 export const getRules = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as any)
     const rules = await prisma.complianceRule.findMany({
+        where: { organizationId },
         orderBy: { createdAt: 'desc' }
     })
 
@@ -22,11 +25,10 @@ export const getRules = asyncHandler(async (req: Request, res: Response) => {
 // @route   POST /api/compliance/rules
 // @access  Private (Admin)
 export const createRule = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as any)
     const { name, description, type, threshold } = req.body
 
-    const existingRule = await prisma.complianceRule.findUnique({
-        where: { name }
-    })
+    const existingRule = await prisma.complianceRule.findFirst({ where: { organizationId, name } })
 
     if (existingRule) {
         throw new BadRequestError('Rule with this name already exists')
@@ -34,6 +36,7 @@ export const createRule = asyncHandler(async (req: Request, res: Response) => {
 
     const rule = await prisma.complianceRule.create({
         data: {
+            organizationId,
             name,
             description,
             type,
@@ -53,15 +56,19 @@ export const createRule = asyncHandler(async (req: Request, res: Response) => {
 // @route   PATCH /api/compliance/rules/:id/toggle
 // @access  Private (Admin)
 export const toggleRule = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as any)
     const { id } = req.params
 
-    const rule = await prisma.complianceRule.findUnique({ where: { id } })
+    const rule = await prisma.complianceRule.findFirst({ where: { id, organizationId } })
     if (!rule) throw new NotFoundError('Rule not found')
 
-    const updatedRule = await prisma.complianceRule.update({
-        where: { id },
+    const result = await prisma.complianceRule.updateMany({
+        where: { id, organizationId },
         data: { isActive: !rule.isActive }
     })
+    if (!result.count) throw new NotFoundError('Rule not found')
+
+    const updatedRule = await prisma.complianceRule.findFirst({ where: { id, organizationId } })
 
     res.json({
         success: true,
@@ -73,7 +80,13 @@ export const toggleRule = asyncHandler(async (req: Request, res: Response) => {
 // @route   GET /api/compliance/logs
 // @access  Private
 export const getLogs = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as any)
     const logs = await prisma.complianceLog.findMany({
+        where: {
+            employee: {
+                organizationId,
+            },
+        },
         include: {
             rule: true,
             employee: {
@@ -98,9 +111,10 @@ export const getLogs = asyncHandler(async (req: Request, res: Response) => {
 // @route   POST /api/compliance/run
 // @access  Private (Admin)
 export const runComplianceCheck = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as any)
     // 1. Get active rules
     const rules = await prisma.complianceRule.findMany({
-        where: { isActive: true }
+        where: { isActive: true, organizationId }
     })
 
     if (rules.length === 0) {
@@ -121,6 +135,9 @@ export const runComplianceCheck = asyncHandler(async (req: Request, res: Respons
             const attendance = await prisma.attendance.groupBy({
                 by: ['employeeId'],
                 where: {
+                    employee: {
+                        organizationId,
+                    },
                     checkIn: {
                         gte: start,
                         lte: end

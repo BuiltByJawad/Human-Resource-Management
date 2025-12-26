@@ -4,22 +4,22 @@ import { NotFoundError, UnauthorizedError } from '../../shared/utils/errors'
 import { OnboardingTaskStatus, OnboardingStatus } from '@prisma/client'
 
 class OnboardingService {
-  async ensureEmployee(employeeId: string) {
-    const employee = await prisma.employee.findUnique({ where: { id: employeeId } })
+  async ensureEmployee(employeeId: string, organizationId: string) {
+    const employee = await prisma.employee.findFirst({ where: { id: employeeId, organizationId } })
     if (!employee) throw new NotFoundError('Employee not found')
     return employee
   }
 
-  async getProcess(employeeId: string) {
-    await this.ensureEmployee(employeeId)
+  async getProcess(employeeId: string, organizationId: string) {
+    await this.ensureEmployee(employeeId, organizationId)
     return prisma.onboardingProcess.findUnique({
       where: { employeeId },
       include: { tasks: { orderBy: { createdAt: 'asc' } } }
     })
   }
 
-  async startProcess(employeeId: string, createdBy?: string, data?: { startDate?: Date; dueDate?: Date }) {
-    await this.ensureEmployee(employeeId)
+  async startProcess(employeeId: string, organizationId: string, createdBy?: string, data?: { startDate?: Date; dueDate?: Date }) {
+    await this.ensureEmployee(employeeId, organizationId)
     const existing = await prisma.onboardingProcess.findUnique({ where: { employeeId } })
     if (existing) {
       return prisma.onboardingProcess.update({
@@ -45,8 +45,8 @@ class OnboardingService {
     })
   }
 
-  async createTask(employeeId: string, payload: { title: string; description?: string; assigneeUserId?: string; dueDate?: Date }) {
-    await this.ensureEmployee(employeeId)
+  async createTask(employeeId: string, organizationId: string, payload: { title: string; description?: string; assigneeUserId?: string; dueDate?: Date }) {
+    await this.ensureEmployee(employeeId, organizationId)
     let process = await prisma.onboardingProcess.findUnique({ where: { employeeId } })
     if (!process) {
       process = await prisma.onboardingProcess.create({
@@ -64,12 +64,14 @@ class OnboardingService {
     })
   }
 
-  async updateTask(taskId: string, payload: Partial<{ title: string; description: string; assigneeUserId: string; dueDate: Date; status: OnboardingTaskStatus; notes: string; order: number }>) {
-    const task = await prisma.onboardingTask.findUnique({ where: { id: taskId } })
+  async updateTask(taskId: string, organizationId: string, payload: Partial<{ title: string; description: string; assigneeUserId: string; dueDate: Date; status: OnboardingTaskStatus; notes: string; order: number }>) {
+    const task = await prisma.onboardingTask.findFirst({
+      where: { id: taskId, process: { employee: { organizationId } } }
+    })
     if (!task) throw new NotFoundError('Task not found')
 
-    return prisma.onboardingTask.update({
-      where: { id: taskId },
+    const result = await prisma.onboardingTask.updateMany({
+      where: { id: taskId, process: { employee: { organizationId } } },
       data: {
         title: payload.title,
         description: payload.description,
@@ -80,20 +82,33 @@ class OnboardingService {
         order: payload.order
       }
     })
+
+    if (!result.count) throw new NotFoundError('Task not found')
+
+    return prisma.onboardingTask.findFirst({
+      where: { id: taskId, process: { employee: { organizationId } } }
+    })
   }
 
-  async completeTask(taskId: string, userId?: string) {
-    const task = await prisma.onboardingTask.findUnique({
-      where: { id: taskId },
+  async completeTask(taskId: string, organizationId: string, userId?: string) {
+    const task = await prisma.onboardingTask.findFirst({
+      where: { id: taskId, process: { employee: { organizationId } } },
       include: { assignee: true }
     })
     if (!task) throw new NotFoundError('Task not found')
     if (task.assigneeUserId && userId && task.assigneeUserId !== userId) {
       throw new UnauthorizedError('Only assignee can complete this task')
     }
-    return prisma.onboardingTask.update({
-      where: { id: taskId },
+
+    const result = await prisma.onboardingTask.updateMany({
+      where: { id: taskId, process: { employee: { organizationId } } },
       data: { status: OnboardingTaskStatus.done, completedAt: new Date() }
+    })
+
+    if (!result.count) throw new NotFoundError('Task not found')
+
+    return prisma.onboardingTask.findFirst({
+      where: { id: taskId, process: { employee: { organizationId } } }
     })
   }
 }

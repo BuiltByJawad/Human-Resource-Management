@@ -10,7 +10,9 @@ export default function Error({
     reset: () => void
 }) {
     useEffect(() => {
-        console.error(error)
+        if (process.env.NODE_ENV !== 'production') {
+            console.error(error)
+        }
     }, [error])
 
     return (
@@ -19,7 +21,9 @@ export default function Error({
                 <div>
                     <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Something went wrong!</h2>
                     <p className="mt-2 text-sm text-gray-600">
-                        {error.message || 'An unexpected error occurred.'}
+                        {process.env.NODE_ENV !== 'production'
+                            ? (error.message || 'An unexpected error occurred.')
+                            : 'An unexpected error occurred.'}
                     </p>
                 </div>
                 <div className="mt-5">

@@ -2,13 +2,66 @@
 import { offboardingRepository } from './offboarding.repository';
 import { InitiateOffboardingDto, UpdateOffboardingTaskDto } from './dto';
 import { NotFoundError, BadRequestError } from '../../shared/utils/errors';
+import { prisma } from '../../shared/config/database';
+import { notificationService } from '../notification/notification.service';
 
 export class OffboardingService {
-    async initiateOffboarding(data: InitiateOffboardingDto) {
+    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { userId: true },
+        });
+        return employee?.userId ?? null;
+    }
+
+    private async resolveUsersByRoleNames(roleNames: string[], organizationId: string): Promise<string[]> {
+        if (!roleNames.length) return [];
+        const users = await prisma.user.findMany({
+            where: {
+                organizationId,
+                status: 'active',
+                role: {
+                    name: { in: roleNames },
+                },
+            },
+            select: { id: true },
+            take: 50,
+        });
+        return users.map((u) => u.id);
+    }
+
+    private async resolveUsersWithPermission(resource: string, action: string, organizationId: string): Promise<string[]> {
+        const users = await prisma.user.findMany({
+            where: {
+                organizationId,
+                status: 'active',
+                role: {
+                    permissions: {
+                        some: {
+                            permission: { resource, action },
+                        },
+                    },
+                },
+            },
+            select: { id: true },
+            take: 50,
+        });
+        return users.map((u) => u.id);
+    }
+
+    async initiateOffboarding(data: InitiateOffboardingDto, organizationId: string) {
         const { employeeId, exitDate, reason, notes } = data;
 
+        const employeeInTenant = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { id: true },
+        });
+        if (!employeeInTenant) {
+            throw new NotFoundError('Employee not found');
+        }
+
         // Check if already offboarding
-        const existing = await offboardingRepository.getProcessByEmployeeId(employeeId);
+        const existing = await offboardingRepository.getProcessByEmployeeId(employeeId, organizationId);
         if (existing) {
             throw new BadRequestError('Offboarding process already initiated for this employee');
         }
@@ -41,26 +94,79 @@ export class OffboardingService {
 
         await offboardingRepository.createTasks(tasksData);
 
-        return offboardingRepository.getProcessById(process.id);
+        const employeeUserId = await this.resolveEmployeeUserId(employeeId, organizationId);
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { firstName: true, lastName: true },
+        });
+        const employeeName = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim() || 'Employee';
+
+        const hrUserIds = await this.resolveUsersWithPermission('offboarding', 'manage', organizationId);
+        const itUserIds = await this.resolveUsersByRoleNames(['IT Admin', 'IT'], organizationId);
+
+        const uniqueRecipients = (ids: string[]) => Array.from(new Set(ids.filter(Boolean)));
+
+        if (employeeUserId) {
+            await notificationService.create({
+                userId: employeeUserId,
+                title: 'Offboarding initiated',
+                message: `An offboarding process has been initiated for you. Exit date: ${new Date(exitDate).toDateString()}.`,
+                type: 'offboarding',
+                link: '/offboarding',
+            });
+        }
+
+        await Promise.all(
+            uniqueRecipients(hrUserIds).map((userId) =>
+                notificationService.create({
+                    userId,
+                    title: 'Offboarding initiated',
+                    message: `Offboarding started for ${employeeName}. Reason: ${reason}.`,
+                    type: 'offboarding',
+                    link: '/offboarding',
+                })
+            )
+        );
+
+        const hasItTasks = defaultTasks.some((t) => t.assigneeRole === 'IT');
+        if (hasItTasks) {
+            await Promise.all(
+                uniqueRecipients(itUserIds).map((userId) =>
+                    notificationService.create({
+                        userId,
+                        title: 'Offboarding tasks assigned',
+                        message: `New offboarding tasks require IT action for ${employeeName}.`,
+                        type: 'offboarding',
+                        link: '/offboarding',
+                    })
+                )
+            );
+        }
+
+        return offboardingRepository.getProcessById(process.id, organizationId);
     }
 
-    async getEmployeeOffboarding(employeeId: string) {
-        const process = await offboardingRepository.getProcessByEmployeeId(employeeId);
+    async getEmployeeOffboarding(employeeId: string, organizationId: string) {
+        const process = await offboardingRepository.getProcessByEmployeeId(employeeId, organizationId);
         if (!process) {
             throw new NotFoundError('Offboarding process not found');
         }
         return process;
     }
 
-    async updateTask(taskId: string, data: UpdateOffboardingTaskDto) {
+    async updateTask(taskId: string, data: UpdateOffboardingTaskDto, organizationId: string) {
         const updatedTask = await offboardingRepository.updateTask(taskId, {
             status: data.status,
             completedAt: data.status === 'completed' ? new Date() : null,
             completedBy: data.completedBy,
-        });
+        }, organizationId);
+
+        if (!updatedTask) {
+            throw new NotFoundError('Offboarding task not found');
+        }
 
         // Check if all tasks completed to update process status
-        const process = await offboardingRepository.getProcessById(updatedTask.processId);
+        const process = await offboardingRepository.getProcessById(updatedTask.processId, organizationId);
         if (process) {
             const tasks = (process as any).tasks || []; // Relation might not be loaded if using basic findUnique unless included
             // Actually repo getProcessById includes tasks.
@@ -74,17 +180,47 @@ export class OffboardingService {
             const allCompleted = allTasks.every((t: any) => t.status === 'completed' || t.status === 'skipped');
 
             if (allCompleted) {
-                await offboardingRepository.updateProcess(process.id, { status: 'completed' });
+                await offboardingRepository.updateProcess(process.id, { status: 'completed' }, organizationId);
             } else if (process.status === 'pending') {
-                await offboardingRepository.updateProcess(process.id, { status: 'in_progress' });
+                await offboardingRepository.updateProcess(process.id, { status: 'in_progress' }, organizationId);
+            }
+
+            if (data.status === 'completed') {
+                const hrUserIds = await this.resolveUsersWithPermission('offboarding', 'manage', organizationId);
+                await Promise.all(
+                    Array.from(new Set(hrUserIds)).map((userId) =>
+                        notificationService.create({
+                            userId,
+                            title: 'Offboarding task completed',
+                            message: `Task completed: ${updatedTask.title}`,
+                            type: 'offboarding',
+                            link: '/offboarding',
+                        })
+                    )
+                );
+            }
+
+            if (allCompleted) {
+                const fullProcess = await offboardingRepository.getProcessByEmployeeId((process as any).employeeId, organizationId);
+                const employeeId = (process as any).employeeId as string;
+                const employeeUserId = await this.resolveEmployeeUserId(employeeId, organizationId);
+                if (employeeUserId) {
+                    await notificationService.create({
+                        userId: employeeUserId,
+                        title: 'Offboarding completed',
+                        message: 'All offboarding tasks have been completed.',
+                        type: 'offboarding',
+                        link: '/offboarding',
+                    });
+                }
             }
         }
 
         return updatedTask;
     }
 
-    async getAllProcesses() {
-        return offboardingRepository.getAllProcesses();
+    async getAllProcesses(organizationId: string) {
+        return offboardingRepository.getAllProcesses(organizationId);
     }
 }
 

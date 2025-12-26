@@ -17,6 +17,8 @@ const ADMIN_PASSWORD = 'AdminPassword123!'
 const EMP_EMAIL = 'employee@example.com'
 const EMP_PASSWORD = 'EmployeePassword123!'
 
+let organizationId
+
 const uniqueEmpNumber = () => `EMP${Date.now()}${Math.floor(Math.random() * 1000)}`
 
 describe('Authentication API', () => {
@@ -25,6 +27,14 @@ describe('Authentication API', () => {
     await prisma.employee.deleteMany({})
     await prisma.user.deleteMany({})
     await prisma.role.deleteMany({})
+
+    const org = await prisma.organization.create({
+      data: {
+        name: `Test Org ${Date.now()}`,
+        slug: `test-org-${Date.now()}`
+      }
+    })
+    organizationId = org.id
 
     await prisma.role.createMany({
       data: [
@@ -83,6 +93,7 @@ describe('Authentication API', () => {
           password: hashed,
           firstName: 'Test',
           lastName: 'User',
+          organizationId,
           roleId: role?.id,
           status: 'active'
         }
@@ -128,6 +139,7 @@ describe('Authentication API', () => {
           password: hashed,
           firstName: 'Refresh',
           lastName: 'User',
+          organizationId,
           roleId: role?.id,
           status: 'active'
         }
@@ -161,6 +173,14 @@ describe('Employee API', () => {
     await prisma.user.deleteMany({})
     await prisma.role.deleteMany({})
 
+    const org = await prisma.organization.create({
+      data: {
+        name: `Test Org ${Date.now()}`,
+        slug: `test-org-${Date.now()}`
+      }
+    })
+    organizationId = org.id
+
     // Seed roles
     const superAdminRole = await prisma.role.create({
       data: { name: SUPER_ADMIN_ROLE, description: 'Super administrator' }
@@ -177,6 +197,7 @@ describe('Employee API', () => {
         password: adminHashed,
         firstName: 'Admin',
         lastName: 'User',
+        organizationId,
         roleId: superAdminRole.id,
         status: 'active'
       }
@@ -190,6 +211,7 @@ describe('Employee API', () => {
         password: empHashed,
         firstName: 'Employee',
         lastName: 'User',
+        organizationId,
         roleId: employeeRole.id,
         status: 'active'
       }
@@ -213,6 +235,7 @@ describe('Employee API', () => {
     await prisma.employee.deleteMany({})
     await prisma.user.deleteMany({})
     await prisma.role.deleteMany({})
+    await prisma.organization.deleteMany({ where: { id: organizationId } })
     await prisma.$disconnect()
   })
 

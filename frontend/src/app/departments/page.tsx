@@ -1,212 +1,88 @@
-'use client'
+"use server"
 
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api from '@/lib/axios'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
-import { Department, DepartmentList, DepartmentForm, DepartmentFormErrors } from '@/components/hrm/DepartmentComponents'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useToast } from '@/components/ui/ToastProvider'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { PlusIcon } from '@heroicons/react/24/outline'
-import { LoadingSpinner } from '@/components/ui/CommonComponents'
-import { Skeleton } from '@/components/ui/Skeleton'
-import { fetchDepartments, fetchEmployeesForManagers } from '@/lib/hrmData'
-import { handleCrudError } from '@/lib/apiError'
+import { cookies } from 'next/headers'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+import { DepartmentsPageClient } from './DepartmentsPageClient'
+import type { Department } from '@/components/hrm/DepartmentComponents'
 
-export default function DepartmentsPage() {
-  const { token } = useAuthStore()
-  const { showToast } = useToast()
-  const queryClient = useQueryClient()
+interface ApiDepartmentPayload {
+  data?: Department[] | { data?: Department[] }
+  departments?: Department[]
+}
 
-  const [formErrors, setFormErrors] = useState<DepartmentFormErrors>({})
+interface EmployeesPayload {
+  data?: any[] | { employees?: any[] }
+  employees?: any[]
+}
 
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
+function buildApiBase() {
+  return (
+    process.env.BACKEND_URL ||
+    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '') : null) ||
+    'http://localhost:5000'
+  )
+}
 
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null)
+async function fetchWithToken<T = any>(
+  path: string,
+  token: string | null,
+  params?: URLSearchParams,
+): Promise<T | null> {
+  if (!token) return null
+  try {
+    const base = buildApiBase()
+    const url = params ? `${base}${path}?${params.toString()}` : `${base}${path}`
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) {
+      return null
+    }
+    const payload = await response.json().catch(() => null)
+    return (payload?.data ?? payload ?? null) as T | null
+  } catch {
+    return null
+  }
+}
 
-  const {
-    data: departments = [],
-    isLoading: departmentsLoading,
-  } = useQuery<Department[]>({
-    queryKey: ['departments', token],
-    queryFn: () => fetchDepartments(token ?? undefined),
-    enabled: !!token,
+async function fetchInitialDepartments(token: string | null): Promise<Department[]> {
+  const data = (await fetchWithToken<ApiDepartmentPayload | Department[]>(`/api/departments`, token)) ?? []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.departments)) return data.departments
+  if (Array.isArray((data as ApiDepartmentPayload)?.data)) return (data as ApiDepartmentPayload).data as Department[]
+  if (Array.isArray((data as any)?.data?.data)) return (data as any).data.data
+  return []
+}
+
+async function fetchInitialManagerList(token: string | null): Promise<any[]> {
+  const params = new URLSearchParams({
+    limit: '100',
   })
+  const data = (await fetchWithToken<EmployeesPayload | any[]>(`/api/employees`, token, params)) ?? []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.employees)) return data.employees
+  if (Array.isArray((data as EmployeesPayload)?.data)) return (data as EmployeesPayload).data as any[]
+  if (Array.isArray((data as any)?.data?.employees)) return (data as any).data.employees
+  return []
+}
 
-  const {
-    data: employees = [],
-    isLoading: employeesLoading,
-  } = useQuery<any[]>({
-    queryKey: ['employees', 'manager-list', token],
-    queryFn: () => fetchEmployeesForManagers(token ?? undefined),
-    enabled: !!token,
-  })
+export default async function DepartmentsPage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('accessToken')?.value ?? null
 
-  const listLoading = departmentsLoading || employeesLoading
-
-  const refetchLists = () => {
-    queryClient.invalidateQueries({ queryKey: ['departments', token] })
-    queryClient.invalidateQueries({ queryKey: ['employees', 'manager-list', token] })
-  }
-
-  const handleCreate = () => {
-    setFormErrors({})
-    setEditingDepartment(null)
-    setIsModalOpen(true)
-  }
-
-  const handleEdit = (dept: Department) => {
-    setFormErrors({})
-    setEditingDepartment(dept)
-    setIsModalOpen(true)
-  }
-
-  const handleDeleteClick = (dept: Department) => {
-    setDepartmentToDelete(dept)
-    setIsDeleteOpen(true)
-  }
-
-  const saveDepartment = useMutation({
-    mutationFn: async ({ payload, department }: { payload: Partial<Department>, department?: Department | null }) => {
-      if (department) {
-        await api.put(`${API_URL}/departments/${department.id}`, payload)
-        return 'updated'
-      }
-      await api.post(`${API_URL}/departments`, payload)
-      return 'created'
-    },
-    onSuccess: (action) => {
-      showToast(
-        action === 'updated' ? 'Department updated successfully' : 'Department created successfully',
-        'success'
-      )
-      setFormErrors({})
-      setIsModalOpen(false)
-      setEditingDepartment(null)
-      refetchLists()
-    },
-    onError: (error: any) => {
-      handleCrudError({
-        error,
-        resourceLabel: 'Department',
-        showToast,
-        setFieldError: (field, message) => {
-          setFormErrors((prev) => ({ ...prev, [field]: message }))
-        },
-        defaultField: 'name',
-        onUnauthorized: () => console.warn('Department action unauthorized'),
-      })
-    },
-  })
-
-  const deleteDepartment = useMutation({
-    mutationFn: async (departmentId: string) => {
-      await api.delete(`${API_URL}/departments/${departmentId}`)
-    },
-    onSuccess: () => {
-      showToast('Department deleted successfully', 'success')
-      setIsDeleteOpen(false)
-      setDepartmentToDelete(null)
-      refetchLists()
-    },
-    onError: (error: any) => {
-      handleCrudError({
-        error,
-        resourceLabel: 'Department',
-        showToast,
-        onUnauthorized: () => console.warn('Department delete unauthorized'),
-      })
-    },
-  })
-
-  const handleSubmit = async (data: Partial<Department>) => {
-    await saveDepartment.mutateAsync({ payload: data, department: editingDepartment })
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!departmentToDelete) return
-    await deleteDepartment.mutateAsync(departmentToDelete.id)
-  }
-
-  const actionLoading = saveDepartment.isPending || deleteDepartment.isPending
-  const currentEmployees = useMemo(() => employees ?? [], [employees])
+  const [initialDepartments, initialEmployees] = await Promise.all([
+    fetchInitialDepartments(token),
+    fetchInitialManagerList(token),
+  ])
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {listLoading && !departments.length ? (
-              <div className="flex flex-col items-center justify-center py-24">
-                <LoadingSpinner size="lg" />
-                <p className="mt-4 text-sm text-gray-500">Loading departments…</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
-                    <p className="text-sm text-gray-500">Manage company organizational structure</p>
-                  </div>
-                  <button
-                    onClick={handleCreate}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                    Add Department
-                  </button>
-                </div>
-
-                <DepartmentList
-                  departments={departments}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  loading={departmentsLoading && !departments.length}
-                />
-              </>
-            )}
-          </div>
-        </main>
-      </div>
-
-      <DepartmentForm
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
-        initialData={editingDepartment}
-        departments={departments}
-        employees={currentEmployees}
-        loading={actionLoading}
-        apiErrors={formErrors}
-        onClearApiErrors={(field) => {
-          setFormErrors((prev) => {
-            if (!prev[field]) return prev
-            const next = { ...prev }
-            delete next[field]
-            return next
-          })
-        }}
-      />
-
-      <ConfirmDialog
-        isOpen={isDeleteOpen}
-        onClose={() => setIsDeleteOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Department"
-        message={`Are you sure you want to delete "${departmentToDelete?.name}"? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
-        type="danger"
-        loading={deleteDepartment.isPending}
-      />
-    </div>
+    <DepartmentsPageClient
+      initialDepartments={initialDepartments ?? []}
+      initialEmployees={initialEmployees ?? []}
+    />
   )
 }

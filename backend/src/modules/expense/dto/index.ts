@@ -18,7 +18,7 @@ export interface UpdateExpenseStatusDto {
 }
 
 export const createExpenseSchema = Joi.object({
-    employeeId: Joi.string().uuid().required(),
+    employeeId: Joi.string().uuid().optional(),
     amount: Joi.number().min(0).required(),
     currency: Joi.string().default('USD'),
     category: Joi.string().valid('Travel', 'Meals', 'Equipment', 'Training', 'Other').required(),

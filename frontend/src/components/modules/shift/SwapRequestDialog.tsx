@@ -26,7 +26,9 @@ export const SwapRequestDialog: React.FC<SwapRequestDialogProps> = ({ shift, onS
             setOpen(false);
             if (onSuccess) onSuccess();
         } catch (error) {
-            console.error('Failed to submit swap request:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to submit swap request:', error);
+            }
         } finally {
             setLoading(false);
         }

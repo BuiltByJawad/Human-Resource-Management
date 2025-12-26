@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline'
 import api from '@/lib/axios'
 import { handleCrudError } from '@/lib/apiError'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Skeleton } from '@/components/ui/Skeleton'
 
 export default function AssetDetailsPage() {
@@ -31,6 +32,7 @@ export default function AssetDetailsPage() {
     const [activeTab, setActiveTab] = useState<'history' | 'maintenance'>('history')
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
     const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false)
+    const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
 
     const assetQuery = useQuery<Asset, Error>({
         queryKey: ['asset', assetId],
@@ -99,9 +101,12 @@ export default function AssetDetailsPage() {
         await assignMutation.mutateAsync({ employeeId, notes })
     }
 
-    const handleReturn = async () => {
-        if (!confirm('Are you sure you want to mark this asset as returned?')) return
+    const handleReturn = () => {
+        setIsReturnDialogOpen(true)
+    }
+    const confirmReturn = async () => {
         await returnMutation.mutateAsync()
+        setIsReturnDialogOpen(false)
     }
 
     const handleMaintenanceSubmit = async (data: any) => {
@@ -421,6 +426,17 @@ export default function AssetDetailsPage() {
                 isOpen={isMaintenanceModalOpen}
                 onClose={() => setIsMaintenanceModalOpen(false)}
                 onSubmit={handleMaintenanceSubmit}
+            />
+            <ConfirmDialog
+                isOpen={isReturnDialogOpen}
+                onClose={() => setIsReturnDialogOpen(false)}
+                onConfirm={confirmReturn}
+                title="Return asset"
+                message="Mark this asset as returned? It will be available for reassignment."
+                confirmText={returnMutation.isPending ? 'Returning...' : 'Return'}
+                cancelText="Keep assigned"
+                loading={returnMutation.isPending}
+                type="warning"
             />
         </div>
     )

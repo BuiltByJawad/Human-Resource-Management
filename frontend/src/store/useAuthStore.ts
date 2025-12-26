@@ -1,7 +1,113 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import axios from 'axios'
 import type { Permission } from '@/constants/permissions'
+import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
+
+type AuthPersistMode = 'local' | 'session'
+
+const AUTH_STORAGE_KEY = 'auth-storage'
+const AUTH_STORAGE_MODE_KEY = 'auth-storage-mode'
+
+const resolveTenantKey = (baseKey: string) => {
+    if (typeof window === 'undefined') return baseKey
+    return buildTenantStorageKey(baseKey, getClientTenantSlug())
+}
+
+function resolvePersistMode(): AuthPersistMode {
+    if (typeof window === 'undefined') return 'session'
+
+    try {
+        const explicitMode = window.localStorage.getItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY)) as AuthPersistMode | null
+        if (explicitMode === 'local' || explicitMode === 'session') {
+            return explicitMode
+        }
+
+        const tenantAuthKey = resolveTenantKey(AUTH_STORAGE_KEY)
+        const hasTenantLocalAuth = !!window.localStorage.getItem(tenantAuthKey)
+        if (hasTenantLocalAuth) {
+            return 'local'
+        }
+
+        const tenantSlug = getClientTenantSlug()
+        const shouldMigrateLegacy = !tenantSlug
+        if (shouldMigrateLegacy) {
+            const hasLegacyLocalAuth = !!window.localStorage.getItem(AUTH_STORAGE_KEY)
+            return hasLegacyLocalAuth ? 'local' : 'session'
+        }
+
+        return 'session'
+    } catch {
+        return 'session'
+    }
+}
+
+function setPersistMode(mode: AuthPersistMode) {
+    if (typeof window === 'undefined') return
+    try {
+        window.localStorage.setItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY), mode)
+    } catch {
+    }
+}
+
+const authPersistStorage = {
+    getItem: (name: string) => {
+        if (typeof window === 'undefined') return null
+        try {
+            const mode = resolvePersistMode()
+            const storage = mode === 'local' ? window.localStorage : window.sessionStorage
+            const tenantKey = resolveTenantKey(name)
+            const value = storage.getItem(tenantKey)
+            if (value) return value
+
+            const tenantSlug = getClientTenantSlug()
+            if (!tenantSlug && tenantKey !== name) {
+                const legacy = storage.getItem(name)
+                if (legacy) {
+                    storage.setItem(tenantKey, legacy)
+                    storage.removeItem(name)
+                    return legacy
+                }
+            }
+
+            return null
+        } catch {
+            return null
+        }
+    },
+    setItem: (name: string, value: string) => {
+        if (typeof window === 'undefined') return
+        try {
+            const mode = resolvePersistMode()
+            const storage = mode === 'local' ? window.localStorage : window.sessionStorage
+            storage.setItem(resolveTenantKey(name), value)
+        } catch {
+        }
+    },
+    removeItem: (name: string) => {
+        if (typeof window === 'undefined') return
+        try {
+            window.localStorage.removeItem(resolveTenantKey(name))
+        } catch {
+        }
+        try {
+            window.sessionStorage.removeItem(resolveTenantKey(name))
+        } catch {
+        }
+
+        const tenantSlug = typeof window !== 'undefined' ? getClientTenantSlug() : null
+        if (!tenantSlug) {
+            try {
+                window.localStorage.removeItem(name)
+            } catch {
+            }
+            try {
+                window.sessionStorage.removeItem(name)
+            } catch {
+            }
+        }
+    },
+}
 
 interface User {
     id: string
@@ -30,7 +136,8 @@ interface AuthState {
     isLoggingOut: boolean
     isAuthTransition: boolean
     lastRefreshedAt: number | null
-    login: (email: string, password: string) => Promise<void>
+    rememberMe: boolean
+    login: (email: string, password: string, options?: { rememberMe?: boolean }) => Promise<void>
     logout: () => Promise<void>
     endAuthTransition: () => void
     clearAuth: () => void
@@ -42,7 +149,13 @@ interface AuthState {
     hasAllPermissions: (permissions: Permission[]) => boolean
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL
+const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value)
+const isLikelyNextOrigin = (value: string) => /localhost:3000/i.test(value)
+const API_URL =
+  envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)
+    ? envApiUrl
+    : 'http://localhost:5000/api'
 
 export const useAuthStore = create<AuthState>()(
     persist(
@@ -54,11 +167,36 @@ export const useAuthStore = create<AuthState>()(
             isLoggingOut: false,
             isAuthTransition: false,
             lastRefreshedAt: null,
-            login: async (email, password) => {
+            rememberMe: resolvePersistMode() === 'local',
+            login: async (email, password, options) => {
+                const rememberMe = !!options?.rememberMe
+                setPersistMode(rememberMe ? 'local' : 'session')
+
+                if (typeof window !== 'undefined') {
+                    try {
+                        const opposite = rememberMe ? window.sessionStorage : window.localStorage
+                        opposite.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
+                    } catch {
+                    }
+                }
                 set({ isAuthTransition: true })
                 try {
-                    const response = await axios.post(`${API_URL}/auth/login`, { email, password })
-                    const { user, accessToken, refreshToken, permissions } = response.data.data
+                    const tenantSlug = getClientTenantSlug()
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ email, password, rememberMe }),
+                    })
+                    const json = await response.json()
+                    if (!response.ok) {
+                        throw new Error(json?.error || json?.message || 'Login failed')
+                    }
+                    const payload = json?.data ?? json
+                    const { user, accessToken, refreshToken, permissions } = payload
                     const normalizedUser: User = {
                         ...user,
                         permissions: permissions ?? [],
@@ -69,13 +207,10 @@ export const useAuthStore = create<AuthState>()(
                         refreshToken: refreshToken ?? null,
                         isAuthenticated: true,
                         isLoggingOut: false,
+                        rememberMe,
+                        isAuthTransition: true,
                         lastRefreshedAt: Date.now(),
-                        isAuthTransition: false,
                     })
-                    // Set cookie for middleware-based auth checks
-                    if (typeof document !== 'undefined' && accessToken) {
-                        document.cookie = `accessToken=${accessToken}; path=/; SameSite=Lax`
-                    }
                 } catch (error: any) {
                     set({ isAuthTransition: false })
                     const message =
@@ -88,14 +223,27 @@ export const useAuthStore = create<AuthState>()(
             },
             logout: async () => {
                 set({ isAuthTransition: true, isLoggingOut: true })
-                if (typeof document !== 'undefined') {
-                    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+                if (typeof window !== 'undefined') {
+                    try {
+                        await fetch('/api/auth/logout', { credentials: 'include' })
+                    } catch {
+                    }
                 }
                 if (typeof window !== 'undefined') {
                     try {
-                        localStorage.removeItem('auth-storage')
+                        window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
                     } catch (error) {
-                        console.warn('Failed to clear auth storage', error)
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.warn('Failed to clear auth storage', error)
+                        }
+                    }
+                    try {
+                        window.sessionStorage.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
+                    } catch {
+                    }
+                    try {
+                        window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY))
+                    } catch {
                     }
                 }
                 set({
@@ -103,37 +251,54 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     refreshToken: null,
                     isAuthenticated: false,
+                    rememberMe: false,
                     isLoggingOut: true,
                     isAuthTransition: true,
                     lastRefreshedAt: null,
                 })
-                // Allow the overlay to remain visible during the transition; clear after a short delay
-                setTimeout(() => {
-                    set({ isLoggingOut: false, isAuthTransition: false })
-                }, 1200)
             },
             endAuthTransition: () => set({ isAuthTransition: false, isLoggingOut: false }),
-            clearAuth: () => set({
-                user: null,
-                token: null,
-                refreshToken: null,
-                isAuthenticated: false,
-                isLoggingOut: false,
-                isAuthTransition: false,
-                lastRefreshedAt: null,
-            }),
-            refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
-                const { refreshToken, token, user } = get()
-                if (!refreshToken) {
-                    return false
+            clearAuth: () => {
+                if (typeof window !== 'undefined') {
+                    try {
+                        window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY))
+                    } catch {
+                    }
                 }
+                set({
+                    user: null,
+                    token: null,
+                    refreshToken: null,
+                    isAuthenticated: false,
+                    rememberMe: false,
+                    isLoggingOut: false,
+                    isAuthTransition: false,
+                    lastRefreshedAt: null,
+                })
+            },
+            refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
+                const { refreshToken, token, user, rememberMe } = get()
                 try {
-                    const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken })
-                    const data = response.data.data || response.data
-                    const newAccessToken = data?.accessToken || data?.token || token
-                    const newRefreshToken = data?.refreshToken || refreshToken
-                    const nextUser = data?.user
-                        ? { ...(data.user || {}), permissions: data.permissions ?? data.user?.permissions ?? user?.permissions ?? [] }
+                    const requestBody = refreshToken ? { refreshToken, rememberMe } : { rememberMe }
+                    const tenantSlug = getClientTenantSlug()
+                    const response = await fetch('/api/auth/refresh', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify(requestBody),
+                    })
+                    const json = await response.json()
+                    if (!response.ok) {
+                        throw new Error(json?.error || json?.message || 'Token refresh failed')
+                    }
+                    const payload = json?.data ?? json
+                    const newAccessToken = payload?.accessToken || payload?.token || token
+                    const newRefreshToken = payload?.refreshToken || refreshToken
+                    const nextUser = payload?.user
+                        ? { ...(payload.user || {}), permissions: payload.permissions ?? payload.user?.permissions ?? user?.permissions ?? [] }
                         : user
 
                     set({
@@ -144,13 +309,9 @@ export const useAuthStore = create<AuthState>()(
                         lastRefreshedAt: Date.now(),
                     })
 
-                    if (typeof document !== 'undefined' && newAccessToken) {
-                        document.cookie = `accessToken=${newAccessToken}; path=/; SameSite=Lax`
-                    }
-
                     return true
                 } catch (error) {
-                    if (!silent) {
+                    if (!silent && process.env.NODE_ENV !== 'production') {
                         console.warn('Session refresh failed', error)
                     }
                     get().logout()
@@ -196,12 +357,14 @@ export const useAuthStore = create<AuthState>()(
             },
         }),
         {
-            name: 'auth-storage',
+            name: AUTH_STORAGE_KEY,
+            storage: createJSONStorage(() => authPersistStorage),
             partialize: (state) => ({
                 user: state.user,
                 token: state.token,
                 refreshToken: state.refreshToken,
                 isAuthenticated: state.isAuthenticated,
+                rememberMe: state.rememberMe,
                 lastRefreshedAt: state.lastRefreshedAt,
             }),
         }

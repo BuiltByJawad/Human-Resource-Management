@@ -1,5 +1,7 @@
 import './module-alias'
 import { config } from 'dotenv';
+config();
+
 import express from 'express';
 import cors from 'cors';
 import { connectDatabases } from './shared/config/database';
@@ -30,11 +32,10 @@ import { shiftRoutes } from './modules/shift';
 import { documentsRoutes } from './modules/documents';
 import { trainingRoutes } from './modules/training';
 import { goalsRoutes } from './modules/goals';
+import notificationRoutes from './modules/notification/notification.routes';
 
 // Import legacy routes (if any still exist)
 import reportRoutes from './routes/reportRoutes';
-
-config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -75,6 +76,7 @@ app.use('/api/shifts', shiftRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/training', trainingRoutes);
 app.use('/api/goals', goalsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Legacy routes
 app.use('/api/reports', reportRoutes);

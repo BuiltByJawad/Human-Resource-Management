@@ -13,6 +13,9 @@ const { app } = createApp()
 describe('Onboarding API', () => {
   let adminToken
   let employeeId
+  let organizationId
+  let superAdminRoleId
+  let employeeRoleId
 
   const ADMIN_EMAIL = 'onboard-admin@example.com'
   const ADMIN_PASSWORD = 'AdminPassword123!'
@@ -20,12 +23,13 @@ describe('Onboarding API', () => {
   const EMP_PASSWORD = 'EmployeePassword123!'
 
   beforeAll(async () => {
-    await prisma.auditLog.deleteMany({})
-    await prisma.onboardingTask.deleteMany({})
-    await prisma.onboardingProcess.deleteMany({})
-    await prisma.employee.deleteMany({})
-    await prisma.user.deleteMany({})
-    await prisma.role.deleteMany({})
+    const org = await prisma.organization.create({
+      data: {
+        name: `Test Org ${Date.now()}`,
+        slug: `test-org-${Date.now()}`
+      }
+    })
+    organizationId = org.id
 
     const onboardingManage = await prisma.permission.upsert({
       where: { resource_action: { resource: 'onboarding', action: 'manage' } },
@@ -39,12 +43,19 @@ describe('Onboarding API', () => {
       create: { resource: 'onboarding', action: 'view', description: 'View onboarding' }
     })
 
-    const superAdminRole = await prisma.role.create({
-      data: { name: 'Super Admin', description: 'Full access', isSystem: true }
+    const superAdminRole = await prisma.role.upsert({
+      where: { name: 'Super Admin' },
+      update: { description: 'Full access', isSystem: true },
+      create: { name: 'Super Admin', description: 'Full access', isSystem: true }
     })
-    const employeeRole = await prisma.role.create({
-      data: { name: 'Employee', description: 'Employee', isSystem: true }
+    const employeeRole = await prisma.role.upsert({
+      where: { name: 'Employee' },
+      update: { description: 'Employee', isSystem: true },
+      create: { name: 'Employee', description: 'Employee', isSystem: true }
     })
+
+    superAdminRoleId = superAdminRole.id
+    employeeRoleId = employeeRole.id
 
     await prisma.rolePermission.createMany({
       data: [
@@ -54,6 +65,9 @@ describe('Onboarding API', () => {
       skipDuplicates: true
     })
 
+  })
+
+  beforeEach(async () => {
     const adminHashed = await bcrypt.hash(ADMIN_PASSWORD, 10)
     const adminUser = await prisma.user.create({
       data: {
@@ -61,7 +75,8 @@ describe('Onboarding API', () => {
         password: adminHashed,
         firstName: 'Admin',
         lastName: 'User',
-        roleId: superAdminRole.id,
+        organizationId,
+        roleId: superAdminRoleId,
         status: 'active'
       }
     })
@@ -73,7 +88,8 @@ describe('Onboarding API', () => {
         password: empHashed,
         firstName: 'Emp',
         lastName: 'User',
-        roleId: employeeRole.id,
+        organizationId,
+        roleId: employeeRoleId,
         status: 'active'
       }
     })
@@ -85,30 +101,25 @@ describe('Onboarding API', () => {
         firstName: 'Emp',
         lastName: 'User',
         email: EMP_EMAIL,
+        organizationId,
         hireDate: new Date(),
         salary: 50000,
         status: 'active'
       }
     })
+
     employeeId = employee.id
     adminToken = jwt.sign(
-      { userId: adminUser.id },
+      { userId: adminUser.id, organizationId },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     )
-  })
 
-  beforeEach(async () => {
     expect(adminToken).toBeTruthy()
   })
 
   afterAll(async () => {
-    await prisma.auditLog.deleteMany({})
-    await prisma.onboardingTask.deleteMany({})
-    await prisma.onboardingProcess.deleteMany({})
-    await prisma.employee.deleteMany({})
-    await prisma.user.deleteMany({})
-    await prisma.role.deleteMany({})
+    await prisma.organization.deleteMany({ where: { id: organizationId } })
     await prisma.$disconnect()
   })
 
@@ -137,15 +148,21 @@ describe('Onboarding API', () => {
   })
 
   it('should list onboarding process with tasks', async () => {
+    await request(app)
+      .post(`/api/onboarding/process/${employeeId}/start`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ startDate: new Date().toISOString() })
+
+    await request(app)
+      .post(`/api/onboarding/process/${employeeId}/tasks`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: 'Submit ID proof' })
+
     const res = await request(app)
       .get(`/api/onboarding/process/${employeeId}`)
       .set('Authorization', `Bearer ${adminToken}`)
 
-    expect([200, 401, 403]).toContain(res.status)
-    if (res.status === 200) {
-      expect(res.body.data).toHaveProperty('tasks')
-    } else {
-      expect(res.body).toHaveProperty('error')
-    }
+    expect(res.status).toBe(200)
+    expect(res.body.data).toHaveProperty('tasks')
   })
 })

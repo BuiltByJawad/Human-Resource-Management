@@ -1,205 +1,74 @@
-'use client'
+"use server"
 
-import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api from '@/lib/axios'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useToast } from '@/components/ui/ToastProvider'
-import {
-    ComplianceRule,
-    ComplianceLog,
-    RuleList,
-    ViolationLog,
-    RuleForm,
-    RuleFormField
-} from '@/components/hrm/ComplianceComponents'
-import { PlusIcon, PlayIcon } from '@heroicons/react/24/outline'
-import { handleCrudError } from '@/lib/apiError'
+import { cookies } from "next/headers"
 
-export default function CompliancePage() {
-    const { token } = useAuthStore()
-    const { showToast } = useToast()
-    const queryClient = useQueryClient()
+import { CompliancePageClient } from "./CompliancePageClient"
+import type { ComplianceRule, ComplianceLog } from "@/components/hrm/ComplianceComponents"
 
-    const [isModalOpen, setIsModalOpen] = useState(false)
-    const [formErrors, setFormErrors] = useState<Partial<Record<RuleFormField, string>>>({})
+interface CompliancePayload<T> {
+  data?: T[]
+  items?: T[]
+}
 
-    const {
-        data: rules = [],
-        isLoading: isLoadingRules,
-        isError: isRulesError,
-        error: rulesError,
-    } = useQuery<ComplianceRule[], Error>({
-        queryKey: ['compliance', 'rules', token],
-        queryFn: async () => {
-            const res = await api.get('/compliance/rules')
-            return res.data?.data ?? []
-        },
-        enabled: !!token,
-        retry: false,
-        initialData: [] as ComplianceRule[],
+function buildApiBase() {
+  return (
+    process.env.BACKEND_URL ||
+    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "") : null) ||
+    "http://localhost:5000"
+  )
+}
+
+async function fetchWithToken<T = any>(path: string, token: string | null): Promise<T | null> {
+  if (!token) return null
+  try {
+    const base = buildApiBase()
+    const response = await fetch(`${base}${path}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
     })
-
-    const {
-        data: logs = [],
-        isLoading: isLoadingLogs,
-        isError: isLogsError,
-        error: logsError,
-    } = useQuery<ComplianceLog[], Error>({
-        queryKey: ['compliance', 'logs', token],
-        queryFn: async () => {
-            const res = await api.get('/compliance/logs')
-            return res.data?.data ?? []
-        },
-        enabled: !!token,
-        retry: false,
-        initialData: [] as ComplianceLog[],
-    })
-
-    useEffect(() => {
-        if (isRulesError && rulesError) {
-            handleCrudError({
-                error: rulesError,
-                resourceLabel: 'Compliance rules',
-                showToast,
-            })
-        }
-    }, [isRulesError, rulesError, showToast])
-
-    useEffect(() => {
-        if (isLogsError && logsError) {
-            handleCrudError({
-                error: logsError,
-                resourceLabel: 'Compliance logs',
-                showToast,
-            })
-        }
-    }, [isLogsError, logsError, showToast])
-
-    const createRuleMutation = useMutation({
-        mutationFn: (data: Partial<ComplianceRule>) => api.post('/compliance/rules', data),
-        onSuccess: () => {
-            showToast('Rule created successfully', 'success')
-            setFormErrors({})
-            setIsModalOpen(false)
-            queryClient.invalidateQueries({ queryKey: ['compliance', 'rules'] })
-        },
-        onError: (error: any) =>
-            handleCrudError({
-                error,
-                resourceLabel: 'Compliance rule',
-                showToast,
-                setFieldError: (field, message) => {
-                    setFormErrors((prev) => ({ ...prev, [field as RuleFormField]: message }))
-                },
-                defaultField: 'name',
-                onUnauthorized: () => console.warn('Not authorized to manage compliance rules'),
-            }),
-    })
-
-    const toggleRuleMutation = useMutation({
-        mutationFn: (id: string) => api.patch(`/compliance/rules/${id}/toggle`),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['compliance', 'rules'] })
-        },
-        onError: (error: any) =>
-            handleCrudError({
-                error,
-                resourceLabel: 'Compliance rule',
-                showToast,
-            }),
-    })
-
-    const runCheckMutation = useMutation({
-        mutationFn: () => api.post('/compliance/run'),
-        onSuccess: (res) => {
-            showToast(res?.data?.message || 'Compliance check completed', 'success')
-            queryClient.invalidateQueries({ queryKey: ['compliance', 'logs'] })
-        },
-        onError: (error: any) =>
-            handleCrudError({
-                error,
-                resourceLabel: 'Compliance check',
-                showToast,
-            }),
-    })
-
-    const actionLoading =
-        createRuleMutation.isPending || toggleRuleMutation.isPending || runCheckMutation.isPending
-
-    const handleCreateRule = async (data: Partial<ComplianceRule>) => {
-        await createRuleMutation.mutateAsync(data)
+    if (!response.ok) {
+      return null
     }
-    const handleToggleRule = (id: string) => toggleRuleMutation.mutate(id)
-    const handleRunCheck = () => runCheckMutation.mutate()
+    const payload = await response.json().catch(() => null)
+    return (payload?.data ?? payload ?? null) as T | null
+  } catch {
+    return null
+  }
+}
 
-    return (
-        <div className="flex h-screen bg-gray-50">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-4 md:p-6">
-                    <div className="max-w-7xl mx-auto space-y-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-900">Compliance Sentinel</h1>
-                                <p className="text-sm text-gray-500">Monitor labor law compliance and violations</p>
-                            </div>
-                            <div className="flex space-x-3">
-                                <button
-                                    onClick={handleRunCheck}
-                                    disabled={actionLoading}
-                                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                    <PlayIcon className="-ml-1 mr-2 h-5 w-5 text-gray-500" />
-                                    Run Check
-                                </button>
-                                <button
-                                    onClick={() => setIsModalOpen(true)}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                    <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                                    Add Rule
-                                </button>
-                            </div>
-                        </div>
+async function fetchInitialComplianceRules(token: string | null): Promise<ComplianceRule[]> {
+  const data = await fetchWithToken<CompliancePayload<ComplianceRule> | ComplianceRule[]>(`/api/compliance/rules`, token)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.data)) return data.data
+  if (Array.isArray(data.items)) return data.items
+  const nested = (data as unknown as { data?: { data?: ComplianceRule[] } })?.data?.data
+  if (Array.isArray(nested)) return nested
+  return []
+}
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-1 space-y-6">
-                                <div className="bg-white shadow rounded-lg p-6">
-                                    <h2 className="text-lg font-medium text-gray-900 mb-4">Active Rules</h2>
-                                    <RuleList rules={rules} onToggle={handleToggleRule} />
-                                </div>
-                            </div>
+async function fetchInitialComplianceLogs(token: string | null): Promise<ComplianceLog[]> {
+  const data = await fetchWithToken<CompliancePayload<ComplianceLog> | ComplianceLog[]>(`/api/compliance/logs`, token)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.data)) return data.data
+  if (Array.isArray(data.items)) return data.items
+  const nested = (data as unknown as { data?: { data?: ComplianceLog[] } })?.data?.data
+  if (Array.isArray(nested)) return nested
+  return []
+}
 
-                            <div className="lg:col-span-2 space-y-6">
-                                <div className="bg-white shadow rounded-lg p-6">
-                                    <h2 className="text-lg font-medium text-gray-900 mb-4">Violation Logs</h2>
-                                    <ViolationLog logs={logs} />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </main>
-            </div>
+export default async function CompliancePage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("accessToken")?.value ?? null
 
-            <RuleForm
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={handleCreateRule}
-                loading={actionLoading}
-                apiErrors={formErrors}
-                onClearApiErrors={(field) => {
-                    setFormErrors((prev) => {
-                        if (!prev[field]) return prev
-                        const next = { ...prev }
-                        delete next[field]
-                        return next
-                    })
-                }}
-            />
-        </div>
-    )
+  const [initialRules, initialLogs] = await Promise.all([
+    fetchInitialComplianceRules(token),
+    fetchInitialComplianceLogs(token),
+  ])
+
+  return <CompliancePageClient initialRules={initialRules} initialLogs={initialLogs} />
 }

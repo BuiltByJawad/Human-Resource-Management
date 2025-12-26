@@ -1,6 +1,12 @@
 import { Router } from 'express';
-import * as recruitmentController from './recruitment.controller';
-import { authenticate } from '../../shared/middleware/auth';
+import { authenticate, checkPermission } from '../../shared/middleware/auth';
+import {
+    getJobPostings,
+    createJobPosting,
+    getApplicants,
+    createApplicant,
+    updateApplicantStatus,
+} from '../../controllers/recruitmentController';
 
 /**
  * @swagger
@@ -11,10 +17,13 @@ import { authenticate } from '../../shared/middleware/auth';
 
 const router = Router();
 
-router.get('/jobs', recruitmentController.getAllJobs);
-router.get('/jobs/:id', recruitmentController.getJobById);
-router.post('/jobs', authenticate, recruitmentController.createJob);
-router.get('/applications', authenticate, recruitmentController.getAllApplications);
-router.post('/applications', recruitmentController.createApplication); // Public
+router.use(authenticate);
+
+router.get('/jobs', getJobPostings);
+router.post('/jobs', checkPermission('recruitment', 'manage'), createJobPosting);
+
+router.get('/applicants', getApplicants);
+router.post('/applicants', createApplicant);
+router.patch('/applicants/:id/status', checkPermission('recruitment', 'manage'), updateApplicantStatus);
 
 export default router;

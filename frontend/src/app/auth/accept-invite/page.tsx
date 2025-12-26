@@ -41,7 +41,9 @@ type InviteForm = yup.InferType<typeof inviteSchema>
 function AcceptInviteContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const token = searchParams.get('token') || ''
+  const token =
+    searchParams.get('token') ||
+    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') || '' : '')
   const login = useAuthStore((state) => state.login)
   const [serverError, setServerError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -67,24 +69,31 @@ function AcceptInviteContent() {
       return
     }
 
+    if (!token) {
+      setServerError('Invite token missing. Please use the invite link from your email.')
+      return
+    }
+
     setServerError('')
     setIsSubmitting(true)
 
     try {
-      const response = await api.post('/auth/complete-invite', {
+      const response = await api.post('/auth/invite/complete', {
         token,
         password: data.password
       })
 
-      const email = response.data?.data?.email
+      const email = response?.data?.data?.email
       if (!email) {
         throw new Error('Invite completed but no email was returned from server')
       }
 
-      await login(email, data.password)
+      await login(email, data.password, { rememberMe: true })
       router.push('/dashboard')
     } catch (error: any) {
-      console.error('Failed to complete invite', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to complete invite', error)
+      }
       const message =
         error?.response?.data?.error?.message ||
         error?.response?.data?.message ||

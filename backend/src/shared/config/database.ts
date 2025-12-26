@@ -55,8 +55,46 @@ export const logger = winston.createLogger({
 
 export const connectDatabases = async () => {
   try {
-    await prisma.$connect()
-    logger.info('PostgreSQL connected successfully')
+    try {
+      await prisma.$connect()
+      logger.info('PostgreSQL connected successfully')
+    } catch (err: any) {
+      const name = String(err?.name || '')
+      const code = String(err?.errorCode || err?.code || '')
+
+      // Prisma P1001: Can't reach database server
+      if (name === 'PrismaClientInitializationError' && code === 'P1001') {
+        const rawUrl = process.env.DATABASE_URL || ''
+        try {
+          const u = new URL(rawUrl)
+          const host = u.hostname
+          const port = u.port || '5432'
+          logger.warn('Initial DB connection failed (P1001)', { host, port })
+
+          if (host === 'localhost') {
+            u.hostname = '127.0.0.1'
+            process.env.DATABASE_URL = u.toString()
+            logger.warn('Retrying DB connection with 127.0.0.1', { port })
+            await prisma.$disconnect().catch(() => undefined)
+            await prisma.$connect()
+            logger.info('PostgreSQL connected successfully (fallback host)')
+          } else if (host === '127.0.0.1') {
+            u.hostname = 'localhost'
+            process.env.DATABASE_URL = u.toString()
+            logger.warn('Retrying DB connection with localhost', { port })
+            await prisma.$disconnect().catch(() => undefined)
+            await prisma.$connect()
+            logger.info('PostgreSQL connected successfully (fallback host)')
+          } else {
+            throw err
+          }
+        } catch {
+          throw err
+        }
+      } else {
+        throw err
+      }
+    }
 
     // Try to connect to Redis, but don't fail if it's not available
     /*

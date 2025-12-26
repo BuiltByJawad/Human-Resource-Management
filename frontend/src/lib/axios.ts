@@ -1,8 +1,15 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/store/useAuthStore'
+import { getClientTenantSlug } from '@/lib/tenant'
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL
+const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value)
+const isLikelyNextOrigin = (value: string) => /localhost:3000/i.test(value)
+const baseURL =
+  envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)
+    ? envApiUrl
+    : 'http://localhost:5000/api'
 
 axios.defaults.baseURL = baseURL
 axios.defaults.headers.common['Content-Type'] = 'application/json'
@@ -23,6 +30,12 @@ const attachInterceptors = (instance: AxiosInstance) => {
       if (token) {
         config.headers = config.headers ?? {}
         config.headers.Authorization = `Bearer ${token}`
+      }
+
+      const tenantSlug = getClientTenantSlug()
+      if (tenantSlug) {
+        config.headers = config.headers ?? {}
+        ;(config.headers as any)['X-Tenant-Slug'] = tenantSlug
       }
     }
     return config

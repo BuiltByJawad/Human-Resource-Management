@@ -54,6 +54,8 @@ export const PERMISSIONS = {
   MANAGE_PERFORMANCE_CYCLES: 'performance.manage_cycles',
   REVIEW_PERFORMANCE: 'performance.review',
 
+  MANAGE_RECRUITMENT: 'recruitment.manage',
+
   MANAGE_SYSTEM_SETTINGS: 'settings.manage_system_settings',
 } as const
 

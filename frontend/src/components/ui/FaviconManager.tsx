@@ -1,16 +1,74 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { useOrgStore } from '@/store/useOrgStore'
+import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 
 const CACHE_KEY = 'favicon-cache'
+const ORG_CONFIG_KEY = 'org-config'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+const DEFAULT_TITLE = 'HRM Platform'
+
+const envApiUrl = process.env.NEXT_PUBLIC_API_URL
+const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value)
+const isLikelyNextOrigin = (value: string) => /localhost:3000/i.test(value)
+const API_URL =
+  envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)
+    ? envApiUrl
+    : 'http://localhost:5000/api'
 
 export function FaviconManager() {
-  const { faviconUrl, updateOrg } = useOrgStore()
+  const pathname = usePathname()
+  const { faviconUrl, siteName, tagline, companyName, companyAddress, logoUrl, updateOrg } = useOrgStore()
   const fetchedBranding = useRef(false)
   const prevSourceRef = useRef<string | null>(null)
+
+  const resolveTenantKey = (baseKey: string) => {
+    const tenantSlug = typeof window !== 'undefined' ? getClientTenantSlug() : null
+    return buildTenantStorageKey(baseKey, tenantSlug)
+  }
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    let cachedSiteName = ''
+    if (!(siteName || '').trim() && typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(resolveTenantKey(ORG_CONFIG_KEY))
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const value = parsed?.state?.siteName
+          if (typeof value === 'string') {
+            cachedSiteName = value
+          }
+        }
+      } catch {
+      }
+    }
+
+    const derivedTitle = ((siteName || '').trim() || (cachedSiteName || '').trim())
+    if (!derivedTitle) {
+      if (!document.title || document.title === DEFAULT_TITLE) {
+        if (document.title !== DEFAULT_TITLE) {
+          document.title = DEFAULT_TITLE
+        }
+      }
+      return
+    }
+
+    const title = derivedTitle
+    if (document.title !== title) {
+      document.title = title
+    }
+
+    const id = window.setTimeout(() => {
+      if (document.title !== title) {
+        document.title = title
+      }
+    }, 0)
+
+    return () => window.clearTimeout(id)
+  }, [siteName, pathname])
 
   useEffect(() => {
     const head = document.head || document.getElementsByTagName('head')[0]
@@ -63,7 +121,7 @@ export function FaviconManager() {
       setLink('apple-touch-icon', href, typeHint)
     }
 
-    const cachedRaw = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) : null
+    const cachedRaw = typeof window !== 'undefined' ? localStorage.getItem(resolveTenantKey(CACHE_KEY)) : null
     if (cachedRaw) {
       try {
         const cached = JSON.parse(cachedRaw) as { source: string; dataUrl: string }
@@ -77,7 +135,7 @@ export function FaviconManager() {
 
     // If source changed, clear stale cache
     if (prevSourceRef.current && prevSourceRef.current !== targetHref) {
-      localStorage.removeItem(CACHE_KEY)
+      localStorage.removeItem(resolveTenantKey(CACHE_KEY))
     }
     prevSourceRef.current = targetHref
 
@@ -101,7 +159,7 @@ export function FaviconManager() {
           setFaviconLinks(dataUrl, mimeType || undefined)
           try {
             localStorage.setItem(
-              CACHE_KEY,
+              resolveTenantKey(CACHE_KEY),
               JSON.stringify({ source: targetHref, dataUrl })
             )
           } catch {
@@ -125,20 +183,37 @@ export function FaviconManager() {
   useEffect(() => {
     if (fetchedBranding.current) return
     fetchedBranding.current = true
+
+    if ((siteName || '').trim() || (tagline || '').trim() || (companyName || '').trim() || (companyAddress || '').trim() || !!logoUrl) {
+      return
+    }
+
     const loadBranding = async () => {
       try {
-        const res = await fetch(`${API_URL}/organization/branding/public`)
+        let url = `${API_URL}/organization/branding/public`
+        if (typeof window !== 'undefined' && window.location?.protocol === 'https:' && url.startsWith('http://')) {
+          url = url.replace(/^http:\/\//i, 'https://')
+        }
+
+        const tenantSlug = getClientTenantSlug()
+        const res = await fetch(url, {
+          headers: {
+            ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
+          },
+        })
         const json = await res.json().catch(() => null)
         const data = json?.data || json
         if (data?.faviconUrl || data?.logoUrl || data?.siteName || data?.tagline || data?.companyName || data?.companyAddress) {
-          updateOrg({
-            siteName: data.siteName,
-            tagline: data.tagline,
-            companyName: data.companyName,
-            companyAddress: data.companyAddress,
-            logoUrl: data.logoUrl,
-            faviconUrl: data.faviconUrl,
-          })
+          const next: any = {}
+          if (typeof data.siteName === 'string' && data.siteName.trim()) next.siteName = data.siteName
+          if (typeof data.tagline === 'string') next.tagline = data.tagline
+          if (typeof data.companyName === 'string') next.companyName = data.companyName
+          if (typeof data.companyAddress === 'string') next.companyAddress = data.companyAddress
+          if (typeof data.logoUrl === 'string' || data.logoUrl === null) next.logoUrl = data.logoUrl
+          if (typeof data.faviconUrl === 'string' || data.faviconUrl === null) next.faviconUrl = data.faviconUrl
+          if (Object.keys(next).length > 0) {
+            updateOrg(next)
+          }
         }
       } catch {
         // ignore; fallback already handled

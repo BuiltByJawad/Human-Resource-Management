@@ -122,7 +122,9 @@ export const DepartmentForm = ({
         parentDepartmentId: data.parentDepartmentId || undefined
       })
     } catch (error) {
-      console.error('Department form submission failed', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Department form submission failed', error)
+      }
     }
   }
 

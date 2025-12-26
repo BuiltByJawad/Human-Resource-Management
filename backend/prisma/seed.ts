@@ -1,10 +1,22 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import bcrypt from 'bcrypt'
 
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Starting seeding...')
+
+  const demoOrg = await prisma.organization.upsert({
+    where: { slug: 'demo' },
+    update: { name: 'Demo Company' },
+    create: { name: 'Demo Company', slug: 'demo' },
+  })
+
+  await prisma.companySettings.upsert({
+    where: { organizationId: demoOrg.id },
+    update: {},
+    create: { organizationId: demoOrg.id },
+  })
 
   // 1. Create Permissions
   const permissions = [
@@ -220,9 +232,9 @@ async function main() {
 
   for (const d of departments) {
     await prisma.department.upsert({
-      where: { name: d.name },
-      update: {},
-      create: d
+      where: { organizationId_name: { organizationId: demoOrg.id, name: d.name } },
+      update: { description: d.description },
+      create: { ...d, organizationId: demoOrg.id }
     })
   }
   console.log('✅ Departments created')
@@ -233,10 +245,11 @@ async function main() {
   if (adminRole) {
     const hashedPassword = await bcrypt.hash('password123', 10)
 
-    await prisma.user.upsert({
+    const adminUser = await prisma.user.upsert({
       where: { email: 'admin@novahr.com' },
       update: {
         verified: true,
+        organizationId: demoOrg.id,
       },
       create: {
         email: 'admin@novahr.com',
@@ -244,6 +257,7 @@ async function main() {
         firstName: 'System',
         lastName: 'Admin',
         roleId: adminRole.id,
+        organizationId: demoOrg.id,
         status: 'active',
         verified: true,
         avatarUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=0D8ABC&color=fff'
@@ -252,24 +266,85 @@ async function main() {
     console.log('✅ Admin user created: admin@novahr.com / password123')
 
     // 4. Create Employee record for Admin (Required for Performance Reviews)
-    const adminUserRecord = await prisma.user.findUnique({ where: { email: 'admin@novahr.com' } })
-    if (adminUserRecord) {
-      await prisma.employee.upsert({
-        where: { email: 'admin@novahr.com' },
-        update: { userId: adminUserRecord.id },
-        create: {
-          userId: adminUserRecord.id,
-          employeeNumber: 'EMP001',
-          firstName: 'System',
-          lastName: 'Admin',
-          email: 'admin@novahr.com',
-          hireDate: new Date(),
-          salary: 0,
-          status: 'active'
-        }
-      })
-      console.log('✅ Admin Employee record created')
-    }
+    const adminEmployee = await prisma.employee.upsert({
+      where: { userId: adminUser.id },
+      update: {
+        organizationId: demoOrg.id,
+        employeeNumber: 'EMP001',
+        firstName: 'System',
+        lastName: 'Admin',
+        email: 'admin@novahr.com',
+        salary: new Prisma.Decimal('0'),
+        status: 'active',
+      },
+      create: {
+        userId: adminUser.id,
+        organizationId: demoOrg.id,
+        employeeNumber: 'EMP001',
+        firstName: 'System',
+        lastName: 'Admin',
+        email: 'admin@novahr.com',
+        hireDate: new Date(),
+        salary: new Prisma.Decimal('0'),
+        status: 'active'
+      }
+    })
+    console.log('✅ Admin Employee record created')
+
+    await prisma.complianceRule.upsert({
+      where: {
+        organizationId_name: { organizationId: demoOrg.id, name: 'DEMO: Max weekly hours' },
+      },
+      update: {
+        description: 'Demo compliance rule for testing',
+        type: 'max_hours_per_week',
+        threshold: 48,
+        isActive: true,
+      },
+      create: {
+        organizationId: demoOrg.id,
+        name: 'DEMO: Max weekly hours',
+        description: 'Demo compliance rule for testing',
+        type: 'max_hours_per_week',
+        threshold: 48,
+        isActive: true,
+      },
+    })
+
+    const demoAsset = await prisma.asset.upsert({
+      where: {
+        organizationId_serialNumber: { organizationId: demoOrg.id, serialNumber: 'DEMO-LAP-0001' },
+      },
+      update: {
+        name: 'Demo Laptop',
+        type: 'Laptop',
+        status: 'assigned',
+      },
+      create: {
+        organizationId: demoOrg.id,
+        name: 'Demo Laptop',
+        description: 'Seeded demo asset',
+        serialNumber: 'DEMO-LAP-0001',
+        type: 'Laptop',
+        status: 'assigned',
+        purchaseDate: new Date('2024-01-01T00:00:00.000Z'),
+        purchasePrice: new Prisma.Decimal('950.00'),
+        vendor: 'DemoVendor',
+      },
+    })
+
+    await prisma.assetAssignment.deleteMany({
+      where: { assetId: demoAsset.id, employeeId: adminEmployee.id, returnedDate: null },
+    })
+
+    await prisma.assetAssignment.create({
+      data: {
+        assetId: demoAsset.id,
+        employeeId: adminEmployee.id,
+        assignedDate: new Date('2025-01-01T00:00:00.000Z'),
+        notes: 'DEMO: Assigned for testing',
+      },
+    })
   }
 
   console.log('🌱 Seeding completed.')

@@ -2,12 +2,62 @@ import { leaveRepository } from './leave.repository';
 import { NotFoundError, BadRequestError } from '../../shared/utils/errors';
 import { CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveQueryDto, ApproveLeaveDto, RejectLeaveDto } from './dto';
 import { PAGINATION } from '../../shared/constants';
+import { prisma } from '../../shared/config/database';
+import { notificationService } from '../notification/notification.service';
 
 export class LeaveService {
+    private async resolveApproverUserIds(employeeId: string, organizationId: string): Promise<string[]> {
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: {
+                managerId: true,
+                manager: {
+                    select: {
+                        userId: true,
+                    },
+                },
+            },
+        });
+
+        const managerUserId = employee?.manager?.userId ?? null;
+        if (managerUserId) {
+            return [managerUserId];
+        }
+
+        const approvers = await prisma.user.findMany({
+            where: {
+                organizationId,
+                status: 'active',
+                role: {
+                    permissions: {
+                        some: {
+                            permission: {
+                                resource: 'leave_requests',
+                                action: 'approve',
+                            },
+                        },
+                    },
+                },
+            },
+            select: { id: true },
+            take: 25,
+        });
+
+        return approvers.map((u) => u.id);
+    }
+
+    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { userId: true },
+        });
+        return employee?.userId ?? null;
+    }
+
     /**
      * Get all leave requests with pagination and filters
      */
-    async getAll(query: LeaveQueryDto) {
+    async getAll(query: LeaveQueryDto, organizationId: string) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
@@ -48,8 +98,8 @@ export class LeaveService {
         }
 
         const [leaveRequests, total] = await Promise.all([
-            leaveRepository.findAll({ where, skip, take: limit }),
-            leaveRepository.count(where),
+            leaveRepository.findAll({ where, skip, take: limit }, organizationId),
+            leaveRepository.count(where, organizationId),
         ]);
 
         return {
@@ -66,8 +116,8 @@ export class LeaveService {
     /**
      * Get leave request by ID
      */
-    async getById(id: string) {
-        const leaveRequest = await leaveRepository.findById(id);
+    async getById(id: string, organizationId: string) {
+        const leaveRequest = await leaveRepository.findById(id, organizationId);
 
         if (!leaveRequest) {
             throw new NotFoundError('Leave request not found');
@@ -79,7 +129,7 @@ export class LeaveService {
     /**
      * Create new leave request
      */
-    async create(employeeId: string, data: CreateLeaveRequestDto) {
+    async create(employeeId: string, data: CreateLeaveRequestDto, organizationId: string) {
         const startDate = new Date(data.startDate);
         const endDate = new Date(data.endDate);
 
@@ -97,6 +147,14 @@ export class LeaveService {
         //   throw new BadRequestError('Insufficient leave balance');
         // }
 
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { id: true },
+        });
+        if (!employee) {
+            throw new NotFoundError('Employee not found');
+        }
+
         // Create leave request
         const leaveRequest = await leaveRepository.create({
             leaveType: data.leaveType as any,
@@ -110,7 +168,19 @@ export class LeaveService {
             },
         });
 
-        // TODO: Send notification to manager
+        const approverUserIds = await this.resolveApproverUserIds(employeeId, organizationId);
+        const employeeName = `${leaveRequest.employee.firstName} ${leaveRequest.employee.lastName}`.trim();
+        await Promise.all(
+            approverUserIds.map((userId) =>
+                notificationService.create({
+                    userId,
+                    title: 'Leave request submitted',
+                    message: `${employeeName} submitted a ${leaveRequest.leaveType} leave request (${daysRequested} day(s)).`,
+                    type: 'leave',
+                    link: '/leave/requests',
+                })
+            )
+        );
 
         return leaveRequest;
     }
@@ -118,8 +188,8 @@ export class LeaveService {
     /**
      * Update leave request (only if pending)
      */
-    async update(id: string, data: UpdateLeaveRequestDto) {
-        const leaveRequest = await this.getById(id);
+    async update(id: string, data: UpdateLeaveRequestDto, organizationId: string) {
+        const leaveRequest = await this.getById(id, organizationId);
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Cannot update leave request that has been processed');
@@ -145,14 +215,18 @@ export class LeaveService {
             updateData.daysRequested = this.calculateBusinessDays(startDate, endDate);
         }
 
-        return leaveRepository.update(id, updateData);
+        const updated = await leaveRepository.update(id, updateData, organizationId);
+        if (!updated) {
+            throw new NotFoundError('Leave request not found');
+        }
+        return updated;
     }
 
     /**
      * Approve leave request
      */
-    async approve(id: string, approverId: string, data?: ApproveLeaveDto) {
-        const leaveRequest = await this.getById(id);
+    async approve(id: string, approverId: string, data: ApproveLeaveDto | undefined, organizationId: string) {
+        const leaveRequest = await this.getById(id, organizationId);
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Leave request has already been processed');
@@ -164,9 +238,22 @@ export class LeaveService {
                 connect: { id: approverId },
             },
 
-        });
+        }, organizationId);
 
-        // TODO: Send approval notification to employee
+        if (!updated) {
+            throw new NotFoundError('Leave request not found');
+        }
+
+        const employeeUserId = await this.resolveEmployeeUserId(updated.employeeId, organizationId);
+        if (employeeUserId) {
+            await notificationService.create({
+                userId: employeeUserId,
+                title: 'Leave request approved',
+                message: `Your ${updated.leaveType} leave request has been approved.`,
+                type: 'leave',
+                link: '/leave',
+            });
+        }
         // TODO: Update leave balance
 
         return updated;
@@ -175,8 +262,8 @@ export class LeaveService {
     /**
      * Reject leave request
      */
-    async reject(id: string, approverId: string, data: RejectLeaveDto) {
-        const leaveRequest = await this.getById(id);
+    async reject(id: string, approverId: string, data: RejectLeaveDto, organizationId: string) {
+        const leaveRequest = await this.getById(id, organizationId);
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Leave request has already been processed');
@@ -188,9 +275,22 @@ export class LeaveService {
                 connect: { id: approverId },
             },
 
-        });
+        }, organizationId);
 
-        // TODO: Send rejection notification to employee
+        if (!updated) {
+            throw new NotFoundError('Leave request not found');
+        }
+
+        const employeeUserId = await this.resolveEmployeeUserId(updated.employeeId, organizationId);
+        if (employeeUserId) {
+            await notificationService.create({
+                userId: employeeUserId,
+                title: 'Leave request rejected',
+                message: data?.reason ? `Your leave request was rejected: ${data.reason}` : 'Your leave request was rejected.',
+                type: 'leave',
+                link: '/leave',
+            });
+        }
 
         return updated;
     }
@@ -198,8 +298,8 @@ export class LeaveService {
     /**
      * Cancel leave request
      */
-    async cancel(id: string, employeeId: string) {
-        const leaveRequest = await this.getById(id);
+    async cancel(id: string, employeeId: string, organizationId: string) {
+        const leaveRequest = await this.getById(id, organizationId);
 
         // Verify ownership
         if (leaveRequest.employeeId !== employeeId) {
@@ -218,9 +318,14 @@ export class LeaveService {
             }
         }
 
-        return leaveRepository.update(id, {
-            status: 'rejected' as any,
-        });
+        const cancelled = await leaveRepository.update(id, {
+            status: 'cancelled' as any,
+        }, organizationId);
+
+        if (!cancelled) {
+            throw new NotFoundError('Leave request not found');
+        }
+        return cancelled;
     }
 
     /**
@@ -245,7 +350,15 @@ export class LeaveService {
     /**
      * Get leave balance for employee (simplified)
      */
-    async getLeaveBalance(employeeId: string, leaveType?: string) {
+    async getLeaveBalance(employeeId: string, organizationId: string, leaveType?: string) {
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { id: true },
+        });
+        if (!employee) {
+            throw new NotFoundError('Employee not found');
+        }
+
         // This would connect to a leave balance table
         // For now, return mock data
         return {

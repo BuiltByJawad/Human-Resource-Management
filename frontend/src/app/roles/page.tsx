@@ -1,219 +1,90 @@
-'use client'
+"use server"
 
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
-import { Role, Permission, RoleList, RoleForm, RoleFormField } from '@/components/hrm/RoleComponents'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useToast } from '@/components/ui/ToastProvider'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { PlusIcon } from '@heroicons/react/24/outline'
-import { Button } from '@/components/ui/FormComponents'
-import { handleCrudError } from '@/lib/apiError'
-import { Skeleton } from '@/components/ui/Skeleton'
-import api from '@/lib/axios'
-import { fetchRoles, fetchRolePermissions } from '@/lib/hrmData'
+import { cookies } from "next/headers"
 
-export default function RolesPage() {
-    const { token } = useAuthStore()
-    const { showToast } = useToast()
-    const queryClient = useQueryClient()
+import { RolesPageClient } from "./RolesPageClient"
+import type { Role, Permission } from "@/components/hrm/RoleComponents"
 
-    const [formErrors, setFormErrors] = useState<Partial<Record<RoleFormField, string>>>({})
-    const [isModalOpen, setIsModalOpen] = useState(false)
-    const [editingRole, setEditingRole] = useState<Role | null>(null)
-    const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-    const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+interface RolesPayload {
+  data?: Role[]
+  roles?: Role[]
+}
 
-    const {
-        data: roles = [],
-        isLoading: rolesLoading,
-    } = useQuery<Role[]>({
-        queryKey: ['roles'],
-        queryFn: fetchRoles,
-        enabled: !!token,
+interface PermissionsPayload {
+  data?: Permission[]
+  grouped?: Record<string, Permission[]>
+}
+
+function buildApiBase() {
+  return (
+    process.env.BACKEND_URL ||
+    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "") : null) ||
+    "http://localhost:5000"
+  )
+}
+
+async function fetchWithToken<T = any>(path: string, token: string | null): Promise<T | null> {
+  if (!token) return null
+  try {
+    const base = buildApiBase()
+    const response = await fetch(`${base}${path}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
     })
-
-    const {
-        data: permissionsPayload,
-        isLoading: permissionsLoading,
-    } = useQuery<{
-        permissions: Permission[]
-        grouped: Record<string, Permission[]>
-    }>({
-        queryKey: ['roles', 'permissions'],
-        queryFn: fetchRolePermissions,
-        enabled: !!token,
-    })
-
-    const permissions = permissionsPayload?.permissions ?? []
-    const groupedPermissions = permissionsPayload?.grouped ?? {}
-
-    const invalidateRoleQueries = () => {
-        queryClient.invalidateQueries({ queryKey: ['roles'] })
-        queryClient.invalidateQueries({ queryKey: ['roles', 'permissions'] })
+    if (!response.ok) {
+      return null
     }
+    const payload = await response.json().catch(() => null)
+    return (payload ?? null) as T | null
+  } catch {
+    return null
+  }
+}
 
-    const handleCreate = () => {
-        setFormErrors({})
-        setEditingRole(null)
-        setIsModalOpen(true)
-    }
+async function fetchInitialRoles(token: string | null): Promise<Role[]> {
+  const data = await fetchWithToken<RolesPayload | Role[]>(`/api/roles`, token)
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray((data as any)?.data)) return (data as any).data
+  if (Array.isArray((data as any)?.roles)) return (data as any).roles as Role[]
+  if (Array.isArray((data as any)?.data?.roles)) return (data as any).data.roles as Role[]
+  if (Array.isArray((data as any)?.data?.data)) return (data as any).data.data as Role[]
+  if (Array.isArray((data as any)?.data?.data?.roles)) return (data as any).data.data.roles as Role[]
+  return []
+}
 
-    const handleEdit = (role: Role) => {
-        setFormErrors({})
-        setEditingRole(role)
-        setIsModalOpen(true)
-    }
+async function fetchInitialRolePermissions(
+  token: string | null,
+): Promise<{ permissions: Permission[]; grouped: Record<string, Permission[]> }> {
+  const data = await fetchWithToken<PermissionsPayload & { grouped?: Record<string, Permission[]> }>(
+    `/api/roles/permissions`,
+    token,
+  )
+  if (!data) {
+    return { permissions: [], grouped: {} }
+  }
 
-    const handleDeleteClick = (role: Role) => {
-        setRoleToDelete(role)
-        setIsDeleteOpen(true)
-    }
+  const permissions = Array.isArray(data.data) ? data.data : []
+  const grouped = data.grouped ?? {}
+  return { permissions, grouped }
+}
 
-    const saveRole = useMutation({
-        mutationFn: async ({ payload, roleId }: { payload: Partial<Role> & { permissionIds?: string[] }, roleId?: string }) => {
-            if (roleId) {
-                await api.put(`/roles/${roleId}`, payload)
-                return 'updated'
-            }
-            await api.post('/roles', payload)
-            return 'created'
-        },
-        onSuccess: (action) => {
-            showToast(action === 'updated' ? 'Role updated successfully' : 'Role created successfully', 'success')
-            setFormErrors({})
-            setIsModalOpen(false)
-            setEditingRole(null)
-            invalidateRoleQueries()
-        },
-        onError: (error: any) => {
-            handleCrudError({
-                error,
-                resourceLabel: 'Role',
-                showToast,
-                setFieldError: (field, message) => {
-                    setFormErrors((prev) => ({ ...prev, [field as RoleFormField]: message }))
-                },
-                defaultField: 'name',
-                onUnauthorized: () => console.warn('Not authorized to manage roles'),
-            })
-        },
-    })
+export default async function RolesPage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("accessToken")?.value ?? null
 
-    const deleteRole = useMutation({
-        mutationFn: async (roleId: string) => {
-            await api.delete(`/roles/${roleId}`)
-        },
-        onSuccess: () => {
-            showToast('Role deleted successfully', 'success')
-            setIsDeleteOpen(false)
-            setRoleToDelete(null)
-            invalidateRoleQueries()
-        },
-        onError: (error: any) => {
-            handleCrudError({
-                error,
-                resourceLabel: 'Role',
-                showToast,
-                onUnauthorized: () => console.warn('Not authorized to delete roles'),
-            })
-        },
-    })
+  const [initialRoles, initialPermissionsPayload] = await Promise.all([
+    fetchInitialRoles(token),
+    fetchInitialRolePermissions(token),
+  ])
 
-    const handleSubmit = async (data: Partial<Role> & { permissionIds?: string[] }) => {
-        await saveRole.mutateAsync({ payload: data, roleId: editingRole?.id })
-    }
-
-    const handleDeleteConfirm = async () => {
-        if (!roleToDelete) return
-        await deleteRole.mutateAsync(roleToDelete.id)
-    }
-
-    const actionLoading = saveRole.isPending || deleteRole.isPending
-    const showSkeleton = rolesLoading && !roles.length
-
-    return (
-        <div className="flex h-screen bg-gray-50">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-4 md:p-6">
-                    <div className="max-w-7xl mx-auto space-y-6">
-                        {showSkeleton ? (
-                            <div className="space-y-6">
-                                <header className="flex justify-between items-center">
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-6 w-48" />
-                                        <Skeleton className="h-4 w-72" />
-                                    </div>
-                                    <Skeleton className="h-10 w-32" />
-                                </header>
-                                <div className="space-y-3">
-                                    {[1, 2, 3].map((row) => (
-                                        <Skeleton key={row} className="h-20 w-full" />
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <h1 className="text-2xl font-bold text-gray-900">Roles & Permissions</h1>
-                                        <p className="text-sm text-gray-500">Manage user roles and access control</p>
-                                    </div>
-                                    <Button
-                                        onClick={handleCreate}
-                                        className="flex items-center"
-                                    >
-                                        <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                                        Add Role
-                                    </Button>
-                                </div>
-
-                                <RoleList
-                                    roles={roles}
-                                    onEdit={handleEdit}
-                                    onDelete={handleDeleteClick}
-                                    loading={rolesLoading && !roles.length}
-                                />
-                            </>
-                        )}
-                    </div>
-                </main>
-            </div>
-
-            <RoleForm
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={handleSubmit}
-                initialData={editingRole}
-                permissions={permissions}
-                groupedPermissions={groupedPermissions}
-                loading={actionLoading || permissionsLoading}
-                apiErrors={formErrors}
-                onClearApiErrors={(field) => {
-                    setFormErrors((prev) => {
-                        if (!prev[field]) return prev
-                        const next = { ...prev }
-                        delete next[field]
-                        return next
-                    })
-                }}
-            />
-
-            <ConfirmDialog
-                isOpen={isDeleteOpen}
-                onClose={() => setIsDeleteOpen(false)}
-                onConfirm={handleDeleteConfirm}
-                title="Delete Role"
-                message={`Are you sure you want to delete "${roleToDelete?.name}"? This action cannot be undone.`}
-                confirmText="Delete"
-                cancelText="Cancel"
-                type="danger"
-                loading={deleteRole.isPending}
-            />
-        </div>
-    )
+  return (
+    <RolesPageClient
+      initialRoles={initialRoles}
+      initialPermissionsPayload={initialPermissionsPayload}
+    />
+  )
 }

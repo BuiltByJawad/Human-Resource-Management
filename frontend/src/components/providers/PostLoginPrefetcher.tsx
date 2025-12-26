@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { usePathname, useRouter } from 'next/navigation'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/store/useAuthStore'
 
@@ -35,9 +36,31 @@ interface EmployeesResponse {
 }
 
 export function PostLoginPrefetcher() {
-  const { isAuthenticated, token } = useAuthStore()
+  const pathname = usePathname()
+  const router = useRouter()
+  const { isAuthenticated, token, refreshSession } = useAuthStore()
   const queryClient = useQueryClient()
   const didPrefetch = useRef(false)
+  const didRehydrate = useRef(false)
+
+  useEffect(() => {
+    if (didRehydrate.current) return
+    const isAuthPage = pathname === '/login' || pathname.startsWith('/auth')
+    if (isAuthPage) return
+
+    if (isAuthenticated && token) {
+      didRehydrate.current = true
+      return
+    }
+
+    didRehydrate.current = true
+    ;(async () => {
+      const ok = await refreshSession({ silent: true })
+      if (!ok) {
+        router.replace('/login')
+      }
+    })()
+  }, [isAuthenticated, token, refreshSession, pathname, router])
 
   useEffect(() => {
     if (!isAuthenticated || !token || didPrefetch.current) return
@@ -48,7 +71,7 @@ export function PostLoginPrefetcher() {
         await Promise.all([
           // Dashboard stats
           queryClient.prefetchQuery<DashboardStats>({
-            queryKey: ['dashboard-stats'],
+            queryKey: ['dashboard-stats', token],
             queryFn: async () => {
               const response = await api.get('/dashboard/stats')
               const raw = response.data?.data
@@ -67,7 +90,7 @@ export function PostLoginPrefetcher() {
 
           // Dashboard recent activities (leave requests)
           queryClient.prefetchQuery<DashboardRecentActivity[]>({
-            queryKey: ['dashboard', 'recent-activities'],
+            queryKey: ['dashboard', 'recent-activities', token],
             queryFn: async () => {
               const res = await api.get('/leave', { params: { limit: 8, page: 1 } })
               const raw = res.data?.data
@@ -85,7 +108,7 @@ export function PostLoginPrefetcher() {
 
           // Departments list (used in multiple places)
           queryClient.prefetchQuery<any[]>({
-            queryKey: ['departments'],
+            queryKey: ['departments', token],
             queryFn: async () => {
               const response = await api.get('/departments')
               const raw = response.data?.data
@@ -98,7 +121,7 @@ export function PostLoginPrefetcher() {
 
           // Roles list
           queryClient.prefetchQuery<any[]>({
-            queryKey: ['roles'],
+            queryKey: ['roles', token],
             queryFn: async () => {
               const response = await api.get('/roles')
               const raw = response.data?.data
@@ -111,7 +134,7 @@ export function PostLoginPrefetcher() {
 
           // Employees first page with default filters
           queryClient.prefetchQuery<EmployeesResponse>({
-            queryKey: ['employees', 1, 9, '', 'all', 'all'],
+            queryKey: ['employees', token, 1, 9, '', 'all', 'all'],
             queryFn: async () => {
               const params: any = { page: 1, limit: 9 }
               const response = await api.get('/employees', { params })

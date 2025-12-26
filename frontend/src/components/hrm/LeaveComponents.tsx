@@ -12,7 +12,7 @@ export interface LeaveRequest {
     startDate: string
     endDate: string
     reason: string
-    status: 'pending' | 'approved' | 'rejected'
+    status: 'pending' | 'approved' | 'rejected' | 'cancelled'
     employee: {
         id: string
         firstName: string
@@ -138,20 +138,24 @@ interface LeaveRequestCardProps {
     request: LeaveRequest
     onApprove?: (id: string) => void
     onReject?: (id: string) => void
-    canManage: boolean
+    onCancel?: (id: string) => void
+    canApprove: boolean
+    canManageLeave: boolean
 }
 
-export function LeaveRequestCard({ request, onApprove, onReject, canManage }: LeaveRequestCardProps) {
+export function LeaveRequestCard({ request, onApprove, onReject, onCancel, canApprove, canManageLeave }: LeaveRequestCardProps) {
     const statusColors = {
         pending: 'bg-yellow-100 text-yellow-800',
         approved: 'bg-green-100 text-green-800',
         rejected: 'bg-red-100 text-red-800',
+        cancelled: 'bg-gray-100 text-gray-700',
     }
 
     const statusIcons = {
         pending: ClockIcon,
         approved: CheckCircleIcon,
         rejected: XCircleIcon,
+        cancelled: XCircleIcon,
     }
 
     const StatusIcon = statusIcons[request.status]
@@ -189,25 +193,39 @@ export function LeaveRequestCard({ request, onApprove, onReject, canManage }: Le
                 )}
             </div>
 
-            {canManage && request.status === 'pending' && (
-                <div className="flex space-x-2 mt-4 pt-4 border-t border-gray-100">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
-                        onClick={() => onReject?.(request.id)}
-                    >
-                        Reject
-                    </Button>
-                    <Button
-                        size="sm"
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => onApprove?.(request.id)}
-                    >
-                        Approve
-                    </Button>
+            {(canApprove && request.status === 'pending') || (canManageLeave && (request.status === 'pending' || request.status === 'approved')) ? (
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+                    {canManageLeave && (request.status === 'pending' || request.status === 'approved') && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 min-w-[120px] text-gray-700 hover:bg-gray-50 border-gray-200"
+                            onClick={() => onCancel?.(request.id)}
+                        >
+                            Cancel
+                        </Button>
+                    )}
+                    {canApprove && request.status === 'pending' && (
+                        <>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                                onClick={() => onReject?.(request.id)}
+                            >
+                                Reject
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => onApprove?.(request.id)}
+                            >
+                                Approve
+                            </Button>
+                        </>
+                    )}
                 </div>
-            )}
+            ) : null}
 
             {request.status !== 'pending' && request.approver && (
                 <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 text-center">

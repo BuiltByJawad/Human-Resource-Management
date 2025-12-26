@@ -18,20 +18,31 @@ export class PerformanceRepository {
         return prisma.performanceReview.count({ where });
     }
 
-    async findReviewById(id: string) {
-        return prisma.performanceReview.findUnique({ where: { id }, include: { employee: true, reviewer: true, cycle: true } });
+    async findReviewById(organizationId: string, id: string) {
+        return prisma.performanceReview.findFirst({
+            where: { id, organizationId },
+            include: { employee: true, reviewer: true, cycle: true },
+        });
     }
 
     async createReview(data: any) {
         return prisma.performanceReview.create({ data });
     }
 
-    async findAllCycles() {
-        return prisma.reviewCycle.findMany({ orderBy: { createdAt: 'desc' } });
+    async findAllCycles(organizationId: string) {
+        return prisma.reviewCycle.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' } });
     }
 
     async createCycle(data: any) {
         return prisma.reviewCycle.create({ data });
+    }
+
+    async findCycleById(organizationId: string, id: string) {
+        return prisma.reviewCycle.findFirst({ where: { id, organizationId } });
+    }
+
+    async findEmployeeById(organizationId: string, id: string) {
+        return prisma.employee.findFirst({ where: { id, organizationId } });
     }
 }
 

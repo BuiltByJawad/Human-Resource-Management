@@ -1,11 +1,56 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { usePathname } from 'next/navigation'
+
 import { useAuthStore } from '@/store/useAuthStore'
 
 export function AuthTransitionOverlay() {
-  const { isAuthTransition } = useAuthStore()
+  const pathname = usePathname()
+  const { isAuthTransition, endAuthTransition } = useAuthStore()
+
+  const MIN_AUTH_TRANSITION_MS = 350
+
+  const transitionStartPathRef = useRef<string | null>(null)
+  const transitionStartAtRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!isAuthTransition) {
+      transitionStartPathRef.current = null
+      transitionStartAtRef.current = null
+      return
+    }
+
+    if (!transitionStartPathRef.current) {
+      transitionStartPathRef.current = pathname
+      transitionStartAtRef.current = Date.now()
+      return
+    }
+
+    // End the transition once navigation actually changes the route.
+    if (transitionStartPathRef.current !== pathname) {
+      const startedAt = transitionStartAtRef.current ?? Date.now()
+      const elapsedMs = Date.now() - startedAt
+      const remainingMs = Math.max(0, MIN_AUTH_TRANSITION_MS - elapsedMs)
+
+      const id = window.setTimeout(() => {
+        endAuthTransition()
+      }, remainingMs)
+      return () => window.clearTimeout(id)
+    }
+  }, [pathname, isAuthTransition, endAuthTransition])
+
+  useEffect(() => {
+    if (!isAuthTransition) return
+
+    const fallbackId = window.setTimeout(() => {
+      // Safety fallback: never allow the overlay to stay up forever.
+      endAuthTransition()
+    }, 5000)
+
+    return () => window.clearTimeout(fallbackId)
+  }, [isAuthTransition, endAuthTransition])
 
   const overlay = useMemo(() => {
     if (typeof document === 'undefined') return null
