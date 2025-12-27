@@ -66,6 +66,7 @@ export interface AuthResponse {
         lastName: string | null;
         role: string;
         avatarUrl?: string | null;
+        employee?: any;
     };
     permissions?: string[];
 }

@@ -27,10 +27,15 @@ export class AnalyticsRepository {
     }
 
     async getDepartmentCounts(organizationId: string) {
-        return prisma.employee.groupBy({
-            by: ['departmentId'],
+        return prisma.department.findMany({
             where: { organizationId },
-            _count: true,
+            select: {
+                id: true,
+                name: true,
+                _count: {
+                    select: { employees: true }
+                }
+            }
         });
     }
 }

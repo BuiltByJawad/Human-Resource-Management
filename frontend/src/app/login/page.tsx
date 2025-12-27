@@ -16,7 +16,7 @@ async function fetchBranding(): Promise<LoginBranding> {
   })
 
   try {
-    const response = await fetch(`${apiBase}/api/organization/branding/public`, {
+    const response = await fetch(`${apiBase}/api/org/branding/public`, {
       cache: 'no-store',
       headers: {
         ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),

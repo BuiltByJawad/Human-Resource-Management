@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { NotificationBell } from '@/components/ui/NotificationBell'
 
 export default function Header() {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -13,12 +14,10 @@ export default function Header() {
           <div className="flex items-center">
             <h1 className="text-2xl font-bold text-gray-900">HRM Dashboard</h1>
           </div>
-          
+
           <div className="flex items-center space-x-4">
-            <button className="p-2 rounded-full hover:bg-gray-100">
-              <span className="text-xl">🔔</span>
-            </button>
-            
+            <NotificationBell />
+
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -28,7 +27,7 @@ export default function Header() {
                   <span className="text-white text-sm font-medium">JD</span>
                 </div>
               </button>
-              
+
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
                   <Link

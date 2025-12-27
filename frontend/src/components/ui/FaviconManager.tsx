@@ -92,8 +92,8 @@ export function FaviconManager() {
     const versionedHref =
       faviconUrl && typeof faviconUrl === 'string'
         ? `${targetHref}${targetHref.includes('?') ? '&' : '?'}v=${encodeURIComponent(
-            btoa(faviconUrl)
-          )}`
+          btoa(faviconUrl)
+        )}`
         : targetHref
 
     const setLink = (rel: string, href: string, typeHint?: string) => {
@@ -190,7 +190,7 @@ export function FaviconManager() {
 
     const loadBranding = async () => {
       try {
-        let url = `${API_URL}/organization/branding/public`
+        let url = `${API_URL}/org/branding/public`
         if (typeof window !== 'undefined' && window.location?.protocol === 'https:' && url.startsWith('http://')) {
           url = url.replace(/^http:\/\//i, 'https://')
         }

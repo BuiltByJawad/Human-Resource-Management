@@ -19,6 +19,13 @@ import analyticsRoutes from './modules/analytics/analytics.routes';
 import organizationRoutes from './modules/organization/organization.routes';
 import onboardingRoutes from './modules/onboarding/onboarding.routes';
 import notificationRoutes from './modules/notification/notification.routes';
+import dashboardRoutes from './routes/dashboardRoutes';
+import reportRoutes from './routes/reportRoutes';
+import trainingRoutes from './modules/training/training.routes';
+import shiftRoutes from './modules/shift/shift.routes';
+import timeTrackingRoutes from './modules/time-tracking/time-tracking.routes';
+import documentsRoutes from './modules/documents/documents.routes';
+import goalsRoutes from './modules/goals/goals.routes';
 
 const router = Router();
 
@@ -41,5 +48,12 @@ router.use('/org', organizationRoutes);
 router.use('/onboarding', onboardingRoutes);
 router.use('/offboarding', offboardingRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/reports', reportRoutes);
+router.use('/training', trainingRoutes);
+router.use('/shifts', shiftRoutes);
+router.use('/time-tracking', timeTrackingRoutes);
+router.use('/documents', documentsRoutes);
+router.use('/goals', goalsRoutes);
 
 export default router;

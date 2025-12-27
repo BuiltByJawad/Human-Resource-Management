@@ -52,7 +52,7 @@ function isOrgSettingsResponse(value: unknown): value is OrgSettingsApiResponse 
 }
 
 async function fetchInitialOrgSettings(token: string | null): Promise<OrgSettingsPayload> {
-  const data = await fetchWithToken<OrgSettingsPayload | OrgSettingsApiResponse>("/api/organization/settings", token)
+  const data = await fetchWithToken<OrgSettingsPayload | OrgSettingsApiResponse>("/api/org/settings", token)
   if (!data) return {}
   if (isOrgSettingsResponse(data)) {
     return data.data ?? {}

@@ -54,17 +54,20 @@ export default function ProfilePage() {
 
     useEffect(() => {
         if (user) {
+            const employeeData = user.employee || {}
             reset({
                 firstName: user.firstName || '',
                 lastName: user.lastName || '',
-                phoneNumber: user.employee?.phoneNumber || user.phoneNumber || '',
-                address: user.employee?.address || user.address || '',
-                dateOfBirth: user.employee?.dateOfBirth || '',
-                gender: user.employee?.gender || user.gender || '',
-                maritalStatus: user.employee?.maritalStatus || user.maritalStatus || '',
-                emergencyContactName: user.employee?.emergencyContact?.name || '',
-                emergencyContactRelation: user.employee?.emergencyContact?.relationship || '',
-                emergencyContactPhone: user.employee?.emergencyContact?.phone || ''
+                phoneNumber: employeeData.phoneNumber || user.phoneNumber || '',
+                address: employeeData.address || user.address || '',
+                dateOfBirth: employeeData.dateOfBirth
+                    ? format(new Date(employeeData.dateOfBirth), 'yyyy-MM-dd')
+                    : '',
+                gender: employeeData.gender || user.gender || '',
+                maritalStatus: employeeData.maritalStatus || user.maritalStatus || '',
+                emergencyContactName: employeeData.emergencyContact?.name || '',
+                emergencyContactRelation: employeeData.emergencyContact?.relationship || '',
+                emergencyContactPhone: employeeData.emergencyContact?.phone || ''
             })
         }
     }, [user, reset])
@@ -150,6 +153,8 @@ export default function ProfilePage() {
 
             const response = await api.put('/auth/profile', payload)
             const result = response?.data?.data || {}
+
+            // Backend returns { user: { firstName, lastName }, employee: { ... } }
             const updatedBasic = result.user || {}
             const updatedEmployee = result.employee || {}
 
@@ -163,19 +168,23 @@ export default function ProfilePage() {
             }
 
             updateUser(nextUser)
+
+            // The useEffect above will fire when updateUser replaces the user object in the store,
+            // but we call reset here manually as well to be immediate and handle date formatting.
+            const finalEmployee = nextUser.employee || {}
             reset({
                 firstName: nextUser.firstName || '',
                 lastName: nextUser.lastName || '',
-                phoneNumber: nextUser.employee?.phoneNumber || nextUser.phoneNumber || '',
-                address: nextUser.employee?.address || nextUser.address || '',
-                dateOfBirth: nextUser.employee?.dateOfBirth
-                    ? format(new Date(nextUser.employee.dateOfBirth), 'yyyy-MM-dd')
+                phoneNumber: finalEmployee.phoneNumber || nextUser.phoneNumber || '',
+                address: finalEmployee.address || nextUser.address || '',
+                dateOfBirth: finalEmployee.dateOfBirth
+                    ? format(new Date(finalEmployee.dateOfBirth), 'yyyy-MM-dd')
                     : '',
-                gender: nextUser.employee?.gender || nextUser.gender || '',
-                maritalStatus: nextUser.employee?.maritalStatus || nextUser.maritalStatus || '',
-                emergencyContactName: nextUser.employee?.emergencyContact?.name || '',
-                emergencyContactRelation: nextUser.employee?.emergencyContact?.relationship || '',
-                emergencyContactPhone: nextUser.employee?.emergencyContact?.phone || ''
+                gender: finalEmployee.gender || nextUser.gender || '',
+                maritalStatus: finalEmployee.maritalStatus || nextUser.maritalStatus || '',
+                emergencyContactName: finalEmployee.emergencyContact?.name || '',
+                emergencyContactRelation: finalEmployee.emergencyContact?.relationship || '',
+                emergencyContactPhone: finalEmployee.emergencyContact?.phone || ''
             })
 
             setIsEditing(false)

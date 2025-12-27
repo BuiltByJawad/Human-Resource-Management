@@ -4,19 +4,31 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const isCloudinaryConfigured = !!(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+);
 
-export const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'hrm-avatars',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'gif'],
-        transformation: [{ width: 500, height: 500, crop: 'limit' }],
-    } as any, // Type assertion needed for some multer-storage-cloudinary versions
-});
+if (isCloudinaryConfigured) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+}
+
+// Only create CloudinaryStorage when Cloudinary is configured
+export const storage = isCloudinaryConfigured
+    ? new CloudinaryStorage({
+        cloudinary: cloudinary,
+        params: {
+            folder: 'hrm-avatars',
+            allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'webp', 'svg', 'ico'],
+            transformation: [{ width: 500, height: 500, crop: 'limit' }],
+        } as any,
+    })
+    : null;
 
 export default cloudinary;
+

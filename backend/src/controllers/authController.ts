@@ -397,7 +397,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
             }
           }
         }
-      }
+      },
+      employee: true  // Include employee data
     }
   })
 
@@ -444,7 +445,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role.name,
-        avatarUrl: user.avatarUrl
+        avatarUrl: user.avatarUrl,
+        employee: user.employee  // Include employee data for profile form
       },
       permissions
     }
@@ -603,7 +605,7 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
 
   const normalizedEmergencyContact =
     emergencyContact &&
-    (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
+      (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
       ? emergencyContact
       : null
 
@@ -662,8 +664,20 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
     success: true,
     data: {
       user: {
+        id: currentUser.id,
+        email: currentUser.email,
         firstName: finalFirstName,
         lastName: finalLastName,
+        role: (currentUser as any).role?.name || (req as any).user?.role,
+        avatarUrl: currentUser.avatarUrl,
+        phoneNumber: employee.phoneNumber,
+        address: employee.address,
+        dateOfBirth: employee.dateOfBirth,
+        gender: employee.gender,
+        maritalStatus: employee.maritalStatus,
+        emergencyContact: employee.emergencyContact,
+        employee,
+        status: currentUser.status,
       },
       employee
     }

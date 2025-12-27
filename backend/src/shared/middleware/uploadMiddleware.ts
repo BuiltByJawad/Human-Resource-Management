@@ -1,19 +1,26 @@
 import multer from 'multer'
 import { storage } from '../config/cloudinary'
 
+// Allow image formats including WebP, SVG, ICO
+const allowedMimeTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/x-icon',
+    'image/vnd.microsoft.icon',
+]
+
 const fileFilter = (req: any, file: any, cb: any) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') || allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true)
     } else {
         cb(new Error('Not an image! Please upload an image.'), false)
     }
 }
 
-const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
-
-// Shared local disk storage (used when Cloudinary is not configured and for branding uploads)
+// Shared local disk storage (used when Cloudinary is not configured)
 const diskStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         // Ensure uploads directory exists
@@ -32,10 +39,8 @@ const diskStorage = multer.diskStorage({
     }
 })
 
-// Default upload: Cloudinary if configured, otherwise disk
-const storageConfig = isCloudinaryConfigured
-    ? storage
-    : diskStorage
+// Use Cloudinary storage if available, otherwise fall back to disk
+const storageConfig = storage || diskStorage
 
 export const upload = multer({
     storage: storageConfig,
@@ -53,3 +58,4 @@ export const uploadBranding = multer({
         fileSize: 5 * 1024 * 1024 // 5MB limit
     }
 })
+
