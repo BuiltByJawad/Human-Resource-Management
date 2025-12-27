@@ -434,6 +434,7 @@ export class AuthService {
                 lastName: user.lastName,
                 role: user.role.name,
                 avatarUrl: user.avatarUrl,
+                employee: (user as any).employee,
             },
             permissions,
         };
@@ -485,6 +486,7 @@ export class AuthService {
                 lastName: user.lastName,
                 role: user.role!.name,
                 avatarUrl: user.avatarUrl,
+                employee: (user as any).employee,
             },
             permissions,
         };

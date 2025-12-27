@@ -12,9 +12,10 @@ import { getBurnoutAnalytics } from '../../controllers/burnout.controller';
 
 const router = Router();
 router.use(authenticate);
+router.use(authorize(['Super Admin', 'HR Admin']));
 
 router.get('/dashboard', analyticsController.getDashboard);
 router.get('/departments', analyticsController.getDepartmentStats);
-router.get('/burnout', authorize(['Super Admin', 'HR Admin']), getBurnoutAnalytics);
+router.get('/burnout', getBurnoutAnalytics);
 
 export default router;

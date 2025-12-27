@@ -36,7 +36,7 @@ async function fetchPublicSiteName(): Promise<string> {
   })
 
   try {
-    const response = await fetch(`${apiBase}/api/organization/branding/public`, {
+    const response = await fetch(`${apiBase}/api/org/branding/public`, {
       next: { revalidate: 3600 },
       headers: {
         ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),

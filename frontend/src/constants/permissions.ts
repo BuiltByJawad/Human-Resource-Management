@@ -56,6 +56,9 @@ export const PERMISSIONS = {
 
   MANAGE_RECRUITMENT: 'recruitment.manage',
 
+  VIEW_TRAINING: 'training.view',
+  MANAGE_TRAINING: 'training.manage',
+
   MANAGE_SYSTEM_SETTINGS: 'settings.manage_system_settings',
 } as const
 

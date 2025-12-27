@@ -155,7 +155,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
 
     setIsSavingSettings(true)
     try {
-      const res = await api.put("/organization/settings", orgSettings)
+      const res = await api.put("/org/settings", orgSettings)
       if (res.data.success) {
         const data = res.data.data
         updateOrg({
@@ -184,7 +184,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
       formData.append("logo", file)
 
       try {
-        const res = await api.post("/organization/branding/logo", formData, {
+        const res = await api.post("/org/branding/logo", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
         const url = res.data?.data?.logoUrl || res.data?.logoUrl
@@ -212,7 +212,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
       formData.append("favicon", file)
 
       try {
-        const res = await api.post("/organization/branding/favicon", formData, {
+        const res = await api.post("/org/branding/favicon", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         })
         const url = res.data?.data?.faviconUrl || res.data?.faviconUrl
