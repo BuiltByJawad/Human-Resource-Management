@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import axios from 'axios'
 import type { Permission } from '@/constants/permissions'
 import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 
@@ -148,14 +147,6 @@ interface AuthState {
     hasAnyPermission: (permissions: Permission[]) => boolean
     hasAllPermissions: (permissions: Permission[]) => boolean
 }
-
-const envApiUrl = process.env.NEXT_PUBLIC_API_URL
-const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value)
-const isLikelyNextOrigin = (value: string) => /localhost:3000/i.test(value)
-const API_URL =
-  envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)
-    ? envApiUrl
-    : 'http://localhost:5000/api'
 
 export const useAuthStore = create<AuthState>()(
     persist(

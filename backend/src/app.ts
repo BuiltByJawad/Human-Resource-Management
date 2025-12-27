@@ -33,40 +33,27 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.set('io', io);
 
   // Security Middleware
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
-        frameSrc: ["'none'"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
-      },
-    },
-    hsts: {
-      maxAge: 31536000, // 1 year
-      includeSubDomains: true,
-      preload: true,
-    },
-    frameguard: {
-      action: 'deny',
-    },
-    noSniff: true,
-    xssFilter: true,
-    referrerPolicy: {
-      policy: 'strict-origin-when-cross-origin',
-    },
-  }));
+  // app.use(helmet({ ... })); // Temporarily disabled to debug 500 error
 
   app.use(compression());
-  app.use(cors({
-    origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001'],
+
+  // CORS Configuration
+  const corsOptions = {
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'http://localhost:3001',
+      'https://human-resource-management-b12l-qpg145xur.vercel.app',
+      'https://human-resource-management-six.vercel.app'
+    ],
     credentials: true,
-  }));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  };
+
+  app.use(cors(corsOptions));
+
+  // Handle preflight requests using the SAME config
+  app.options('*', cors(corsOptions));
 
   // Body parsers
   app.use(express.json({ limit: '10mb' }));
@@ -150,6 +137,10 @@ export const createApp = (): { app: Application; httpServer: any } => {
     }
   });
 
+
+
+  // Mount API Routes
+  app.use('/api', routes); // Use the imported router
 
   // 404 handler
   app.use((req: Request, res: Response) => {
