@@ -1,12 +1,14 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { CompanyDocument, documentService } from '@/services/documentService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DocumentTextIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useToast } from '@/components/ui/ToastProvider';
 
 interface DocumentCardProps {
     doc: CompanyDocument;
@@ -15,18 +17,29 @@ interface DocumentCardProps {
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({ doc, isAdmin, onDelete }) => {
+    const { showToast } = useToast()
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this document?')) return;
+        setIsDeleting(true)
         try {
-            await documentService.deleteDocument(doc.id);
-            if (onDelete) onDelete();
+            await documentService.deleteDocument(doc.id)
+            showToast('Document deleted successfully', 'success')
+            if (onDelete) onDelete()
         } catch (error) {
-            console.error('Failed to delete document:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to delete document:', error);
+            }
+            showToast('Failed to delete document', 'error')
+        } finally {
+            setIsDeleting(false)
+            setIsConfirmOpen(false)
         }
     };
 
     return (
+        <>
         <Card className="shadow-sm hover:shadow-md transition-shadow group bg-white">
             <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
@@ -57,12 +70,24 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ doc, isAdmin, onDele
                         <ArrowDownTrayIcon className="w-4 h-4 text-gray-600" />
                     </Button>
                     {isAdmin && (
-                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-red-600" onClick={handleDelete}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-red-600" onClick={() => setIsConfirmOpen(true)}>
                             <TrashIcon className="w-4 h-4" />
                         </Button>
                     )}
                 </div>
             </CardFooter>
         </Card>
+        <ConfirmDialog
+            isOpen={isConfirmOpen}
+            onClose={() => setIsConfirmOpen(false)}
+            onConfirm={handleDelete}
+            title="Delete document"
+            message={`"${doc.title}" will be removed for everyone. This action cannot be undone.`}
+            confirmText="Delete"
+            cancelText="Keep document"
+            type="danger"
+            loading={isDeleting}
+        />
+        </>
     );
 };

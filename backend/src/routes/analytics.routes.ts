@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getBurnoutAnalytics } from '../controllers/burnout.controller';
+import { getBurnoutAnalytics } from '@/controllers/burnout.controller';
 import { authenticate, authorize } from '@/shared/middleware/auth';
 
 const router = Router();

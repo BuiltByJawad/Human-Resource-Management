@@ -2,13 +2,14 @@ import { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { addHours } from 'date-fns'
-import { asyncHandler } from '@/shared/middleware/errorHandler';
-import { prisma } from '@/shared/config/database';
-import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '@/shared/utils/auth';
-import { UnauthorizedError, BadRequestError, NotFoundError } from '@/shared/utils/errors';
-import { AuthRequest } from '@/shared/middleware/auth';
-import { sendEmail } from '@/shared/utils/email';
-import { createAuditLog } from '@/shared/utils/audit';
+import { asyncHandler } from '@/shared/middleware/errorHandler'
+import { prisma } from '@/shared/config/database'
+import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '@/shared/utils/auth'
+import { UnauthorizedError, BadRequestError, NotFoundError } from '@/shared/utils/errors'
+import { AuthRequest } from '@/shared/middleware/auth'
+import { sendEmail } from '@/shared/utils/email'
+import { createAuditLog } from '@/shared/utils/audit'
+import { authService } from '@/modules/auth/auth.service'
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex')
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
@@ -136,7 +137,7 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
     }
   }
 
-  await prisma.userInvite.deleteMany({ where: { OR: [{ email }, { userId: user.id }] } })
+  await prisma.userInvite.deleteMany({ where: { acceptedAt: null, OR: [{ email }, { userId: user.id }] } })
 
   const token = generateToken()
   const tokenHash = hashToken(token)
@@ -158,13 +159,16 @@ export const inviteUser = asyncHandler(async (req: AuthRequest, res: Response) =
 
   const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}`
 
+  const settings = await prisma.companySettings.findFirst({ select: { siteName: true } })
+  const siteName = settings?.siteName || 'NovaHR'
+
   // Fire-and-forget email sending; failure won't break API response
   sendEmail({
     to: email,
-    subject: 'You have been invited to NovaHR',
+    subject: `You have been invited to ${siteName}`,
     html: `
       <p>Hello,</p>
-      <p>You have been invited to join the HRM system. Click the button below to set your password and activate your account:</p>
+      <p>You have been invited to join ${siteName}. Click the button below to set your password and activate your account:</p>
       <p><a href="${inviteLink}" style="display:inline-block;padding:8px 16px;border-radius:4px;background:#2563eb;color:#ffffff;text-decoration:none;">Accept invite</a></p>
       <p>If the button does not work, copy and paste this link into your browser:</p>
       <p><a href="${inviteLink}">${inviteLink}</a></p>
@@ -305,13 +309,16 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
 
   const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reset-password?token=${token}`
 
+  const settings = await prisma.companySettings.findFirst({ select: { siteName: true } })
+  const siteName = settings?.siteName || 'NovaHR'
+
   // Fire-and-forget password reset email
   sendEmail({
     to: email,
-    subject: 'Reset your NovaHR password',
+    subject: `Reset your ${siteName} password`,
     html: `
       <p>Hello,</p>
-      <p>We received a request to reset the password for your HRM account. Click the button below to set a new password:</p>
+      <p>We received a request to reset the password for your ${siteName} account. Click the button below to set a new password:</p>
       <p><a href="${resetLink}" style="display:inline-block;padding:8px 16px;border-radius:4px;background:#2563eb;color:#ffffff;text-decoration:none;">Reset password</a></p>
       <p>If you did not request this, you can safely ignore this email.</p>
       <p>If the button does not work, copy and paste this link into your browser:</p>
@@ -321,7 +328,7 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
     console.error('Failed to send password reset email', err)
   })
 
-  res.json({ success: true, data: { resetLink } })
+  res.json({ success: true, data: { resetLink: process.env.NODE_ENV !== 'production' ? resetLink : '' } })
 
   // Audit: password reset requested (do not log token)
   await createAuditLog({
@@ -439,73 +446,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         role: user.role.name,
         avatarUrl: user.avatarUrl
       },
-      permissions,
-    },
+      permissions
+    }
   })
 })
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body
-
-  if (!refreshToken) {
-    throw new BadRequestError('Refresh token is required')
-  }
-
-  let payload: any
-  try {
-    payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!)
-  } catch {
-    throw new UnauthorizedError('Invalid or expired refresh token')
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: (payload as any).userId },
-    include: {
-      role: {
-        include: {
-          permissions: {
-            include: {
-              permission: true
-            }
-          }
-        }
-      },
-      employee: true,
-    }
-  })
-
-  if (!user || user.status !== 'active') {
-    throw new UnauthorizedError('User not found or inactive')
-  }
-
-  const { accessToken, refreshToken: newRefreshToken } = generateTokens(
-    user.id,
-    user.email,
-    user.role.name
-  )
-
-  const permissions = user.role.permissions.map(
-    (rp: { permission: { resource: string; action: string } }) =>
-      `${rp.permission.resource}.${rp.permission.action}`
-  )
-
+  const result = await authService.refreshAccessToken(req.body as any)
   res.json({
     success: true,
-    data: {
-      accessToken,
-      refreshToken: newRefreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role.name,
-        avatarUrl: user.avatarUrl,
-        employee: user.employee,
-        status: user.status,
-      },
-      permissions,
-    },
+    data: result
   })
 })
 
@@ -653,7 +603,7 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
 
   const normalizedEmergencyContact =
     emergencyContact &&
-      (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
+    (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone)
       ? emergencyContact
       : null
 

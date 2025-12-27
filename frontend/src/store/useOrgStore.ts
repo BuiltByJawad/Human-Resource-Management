@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 
 interface OrgState {
   siteName: string
@@ -9,20 +10,120 @@ interface OrgState {
   companyAddress: string
   logoUrl: string | null
   faviconUrl: string | null
+  loaded: boolean
 }
 
 interface OrgStore extends OrgState {
   updateOrg: (updates: Partial<OrgState>) => void
+  setLoaded: (loaded: boolean) => void
+}
+
+const ORG_STORAGE_KEY = 'org-config'
+
+const resolveTenantKey = (baseKey: string) => {
+  if (typeof window === 'undefined') return baseKey
+  return buildTenantStorageKey(baseKey, getClientTenantSlug())
 }
 
 const DEFAULTS: OrgState = {
-  siteName: 'NovaHR',
+  siteName: '',
   shortName: 'HR',
-  tagline: 'Workspace',
-  companyName: 'NovaHR Company',
-  companyAddress: '123 Business Road, Tech City',
+  tagline: '',
+  companyName: '',
+  companyAddress: '',
   logoUrl: null,
   faviconUrl: null,
+  // Start false to avoid SSR/CSR mismatch; set true after rehydrate
+  loaded: false,
+}
+
+const getInitialState = (): OrgState => {
+  if (typeof window === 'undefined') return DEFAULTS
+  try {
+    const storage = window.localStorage
+    const tenantKey = resolveTenantKey(ORG_STORAGE_KEY)
+    const raw = storage.getItem(tenantKey)
+    if (raw) {
+      const parsed = JSON.parse(raw)?.state as Partial<OrgState> | undefined
+      if (parsed) {
+        const siteName = parsed.siteName ?? DEFAULTS.siteName
+        return {
+          ...DEFAULTS,
+          ...parsed,
+          shortName: deriveShortName(siteName, parsed.shortName ?? DEFAULTS.shortName),
+          loaded: true,
+        }
+      }
+    }
+
+    const tenantSlug = getClientTenantSlug()
+    if (!tenantSlug && tenantKey !== ORG_STORAGE_KEY) {
+      const legacyRaw = storage.getItem(ORG_STORAGE_KEY)
+      if (legacyRaw) {
+        storage.setItem(tenantKey, legacyRaw)
+        storage.removeItem(ORG_STORAGE_KEY)
+
+        const parsed = JSON.parse(legacyRaw)?.state as Partial<OrgState> | undefined
+        if (parsed) {
+          const siteName = parsed.siteName ?? DEFAULTS.siteName
+          return {
+            ...DEFAULTS,
+            ...parsed,
+            shortName: deriveShortName(siteName, parsed.shortName ?? DEFAULTS.shortName),
+            loaded: true,
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULTS
+}
+
+const orgPersistStorage = {
+  getItem: (name: string) => {
+    if (typeof window === 'undefined') return null
+    try {
+      const tenantKey = resolveTenantKey(name)
+      const value = window.localStorage.getItem(tenantKey)
+      if (value) return value
+
+      const tenantSlug = getClientTenantSlug()
+      if (!tenantSlug && tenantKey !== name) {
+        const legacy = window.localStorage.getItem(name)
+        if (legacy) {
+          window.localStorage.setItem(tenantKey, legacy)
+          window.localStorage.removeItem(name)
+          return legacy
+        }
+      }
+    } catch {
+    }
+    return null
+  },
+  setItem: (name: string, value: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(resolveTenantKey(name), value)
+    } catch {
+    }
+  },
+  removeItem: (name: string) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.removeItem(resolveTenantKey(name))
+    } catch {
+    }
+
+    const tenantSlug = getClientTenantSlug()
+    if (!tenantSlug) {
+      try {
+        window.localStorage.removeItem(name)
+      } catch {
+      }
+    }
+  },
 }
 
 function deriveShortName(name: string | null | undefined, fallback: string): string {
@@ -38,7 +139,7 @@ function deriveShortName(name: string | null | undefined, fallback: string): str
 export const useOrgStore = create<OrgStore>()(
   persist(
     (set, get) => ({
-      ...DEFAULTS,
+      ...getInitialState(),
       updateOrg: (updates) => {
         const current = get()
         const nextSiteName = updates.siteName ?? current.siteName
@@ -48,9 +149,18 @@ export const useOrgStore = create<OrgStore>()(
           shortName: deriveShortName(nextSiteName, current.shortName),
         })
       },
+      setLoaded: (loaded) => set((state) => ({ ...state, loaded })),
     }),
     {
-      name: 'org-config',
+      name: ORG_STORAGE_KEY,
+      storage: createJSONStorage(() => orgPersistStorage),
+      onRehydrateStorage: () => (state, error) => {
+        if (state && !error) {
+          // derive shortName after hydration to keep server/client markup aligned
+          state.updateOrg({ siteName: state.siteName })
+          state.setLoaded(true)
+        }
+      },
     }
   )
 )

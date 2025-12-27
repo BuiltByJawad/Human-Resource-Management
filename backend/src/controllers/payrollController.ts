@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/shared/config/database';
+import { requireRequestOrganizationId } from '@/shared/utils/tenant';
 
 // Generate payroll for a specific period (e.g., "2023-10")
 export const generatePayroll = async (req: Request, res: Response) => {
     try {
         const { payPeriod } = req.body; // Format: "YYYY-MM"
+
+        const organizationId = requireRequestOrganizationId(req as any);
 
         if (!payPeriod) {
             return res.status(400).json({ error: 'Pay period is required (YYYY-MM)' });
@@ -14,7 +15,7 @@ export const generatePayroll = async (req: Request, res: Response) => {
 
         // 1. Get all active employees
         const employees = await prisma.employee.findMany({
-            where: { status: 'active' },
+            where: { status: 'active', organizationId } as any,
             include: {
                 attendance: {
                     where: {
@@ -93,6 +94,7 @@ export const generatePayroll = async (req: Request, res: Response) => {
 // Get all payroll records (for Admin)
 export const getPayrollRecords = async (req: Request, res: Response) => {
     try {
+        const organizationId = requireRequestOrganizationId(req as any);
         const { payPeriod, status } = req.query;
 
         const where: any = {};
@@ -100,7 +102,7 @@ export const getPayrollRecords = async (req: Request, res: Response) => {
         if (status) where.status = String(status);
 
         const records = await prisma.payrollRecord.findMany({
-            where,
+            where: { ...where, employee: { organizationId } } as any,
             include: {
                 employee: {
                     select: {
@@ -123,14 +125,33 @@ export const getPayrollRecords = async (req: Request, res: Response) => {
 // Update payroll status (Approve/Pay)
 export const updatePayrollStatus = async (req: Request, res: Response) => {
     try {
+        const organizationId = requireRequestOrganizationId(req as any);
         const { id } = req.params;
         const { status } = req.body;
 
-        const record = await prisma.payrollRecord.update({
-            where: { id },
+        const updated = await prisma.payrollRecord.updateMany({
+            where: { id, employee: { organizationId } } as any,
             data: {
                 status,
                 processedAt: status === 'paid' ? new Date() : undefined
+            } as any
+        });
+
+        if (!updated.count) {
+            return res.status(404).json({ error: 'Payroll record not found' });
+        }
+
+        const record = await prisma.payrollRecord.findFirst({
+            where: { id, employee: { organizationId } } as any,
+            include: {
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        employeeNumber: true,
+                        department: { select: { name: true } }
+                    }
+                }
             }
         });
 
@@ -143,11 +164,15 @@ export const updatePayrollStatus = async (req: Request, res: Response) => {
 // Get payslips for logged-in employee
 export const getEmployeePayslips = async (req: Request, res: Response) => {
     try {
-        // @ts-ignore - assuming user is attached to req by auth middleware
-        const userId = req.user?.userId;
+        const organizationId = requireRequestOrganizationId(req as any);
+        const userId = (req as any).user?.id || (req as any).user?.userId;
 
-        const employee = await prisma.employee.findUnique({
-            where: { userId }
+        if (!userId) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
+        const employee = await prisma.employee.findFirst({
+            where: { userId, organizationId } as any
         });
 
         if (!employee) {
@@ -155,7 +180,7 @@ export const getEmployeePayslips = async (req: Request, res: Response) => {
         }
 
         const records = await prisma.payrollRecord.findMany({
-            where: { employeeId: employee.id },
+            where: { employeeId: employee.id, employee: { organizationId } } as any,
             orderBy: { payPeriod: 'desc' }
         });
 

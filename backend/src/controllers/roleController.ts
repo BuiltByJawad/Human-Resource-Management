@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
-import { asyncHandler } from '@/shared/middleware/errorHandler';
-import { prisma } from '@/shared/config/database';
-import { BadRequestError, NotFoundError, ConflictError } from '@/shared/utils/errors';
+import { asyncHandler } from '@/shared/middleware/errorHandler'
+import { prisma } from '@/shared/config/database'
+import { BadRequestError, NotFoundError, ConflictError } from '@/shared/utils/errors'
 
 // @desc    Create a new role
 // @route   POST /api/roles

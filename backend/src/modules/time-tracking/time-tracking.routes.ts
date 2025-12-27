@@ -32,6 +32,12 @@ router.post(
     timeController.clockOut
 );
 
+router.post(
+    '/manual-entry',
+    authenticate,
+    timeController.logManualEntry
+);
+
 router.get(
     '/timesheet/:employeeId',
     authenticate,

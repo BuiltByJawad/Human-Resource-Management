@@ -2,9 +2,15 @@
 import { shiftRepository } from './shift.repository';
 import { CreateShiftDto, RequestSwapDto, UpdateSwapStatusDto } from './dto';
 import { BadRequestError, NotFoundError } from '../../shared/utils/errors';
+import { prisma } from '../../shared/config/database';
 
 export class ShiftService {
-    async scheduleShift(data: CreateShiftDto) {
+    async scheduleShift(organizationId: string, data: CreateShiftDto) {
+        const employeeExists = await prisma.employee.findFirst({ where: { id: data.employeeId, organizationId } });
+        if (!employeeExists) {
+            throw new NotFoundError('Employee not found');
+        }
+
         // Basic overlap check could be added here
         return shiftRepository.createShift({
             ...data,
@@ -13,14 +19,21 @@ export class ShiftService {
         });
     }
 
-    async getRoster(startDate: string, endDate: string) {
-        return shiftRepository.getShifts(new Date(startDate), new Date(endDate));
+    async getRoster(organizationId: string, startDate: string, endDate: string) {
+        return shiftRepository.getShifts(organizationId, new Date(startDate), new Date(endDate));
     }
 
-    async requestSwap(requestorId: string, data: RequestSwapDto) {
-        const shift = await shiftRepository.getShiftById(data.shiftId);
+    async requestSwap(organizationId: string, requestorId: string, data: RequestSwapDto) {
+        const shift = await shiftRepository.getShiftById(organizationId, data.shiftId);
         if (!shift) throw new NotFoundError('Shift not found');
         if (shift.employeeId !== requestorId) throw new BadRequestError('You can only swap your own shifts');
+
+        if (data.targetId) {
+            const targetExists = await prisma.employee.findFirst({ where: { id: data.targetId, organizationId } });
+            if (!targetExists) {
+                throw new NotFoundError('Target employee not found');
+            }
+        }
 
         return shiftRepository.createSwapRequest({
             shiftId: data.shiftId,
@@ -31,12 +44,14 @@ export class ShiftService {
         });
     }
 
-    async approveSwap(requestId: string, status: 'approved' | 'rejected') {
-        const swapRequest = await shiftRepository.getSwapRequestById(requestId);
+    async approveSwap(organizationId: string, requestId: string, status: 'approved' | 'rejected') {
+        const swapRequest = await shiftRepository.getSwapRequestById(organizationId, requestId);
         if (!swapRequest) throw new NotFoundError('Swap request not found');
 
         if (status === 'rejected') {
-            return shiftRepository.updateSwapRequest(requestId, { status: 'rejected' });
+            const updated = await shiftRepository.updateSwapRequest(organizationId, requestId, { status: 'rejected' });
+            if (!updated) throw new NotFoundError('Swap request not found');
+            return updated;
         }
 
         // If approved, we need to execute the swap
@@ -46,15 +61,20 @@ export class ShiftService {
 
         if (!swapRequest.targetId) {
             // Just mark approved, allow admin to reassign later
-            return shiftRepository.updateSwapRequest(requestId, { status: 'approved' });
+            const updated = await shiftRepository.updateSwapRequest(organizationId, requestId, { status: 'approved' });
+            if (!updated) throw new NotFoundError('Swap request not found');
+            return updated;
         }
 
         // Execute reassignment
-        await shiftRepository.updateShift(swapRequest.shiftId, {
+        const shiftUpdated = await shiftRepository.updateShift(organizationId, swapRequest.shiftId, {
             employeeId: swapRequest.targetId
         });
+        if (!shiftUpdated) throw new NotFoundError('Shift not found');
 
-        return shiftRepository.updateSwapRequest(requestId, { status: 'approved' });
+        const updated = await shiftRepository.updateSwapRequest(organizationId, requestId, { status: 'approved' });
+        if (!updated) throw new NotFoundError('Swap request not found');
+        return updated;
     }
 }
 

@@ -107,6 +107,7 @@ interface EmployeesListSectionProps {
   onViewEmployee: (employee: Employee) => void
   onEditEmployee: (employee: Employee) => void
   onDeleteEmployee: (employee: Employee) => void
+  onSendInvite?: (employee: Employee) => void
 }
 
 export function EmployeesListSection({
@@ -117,6 +118,7 @@ export function EmployeesListSection({
   onViewEmployee,
   onEditEmployee,
   onDeleteEmployee,
+  onSendInvite,
 }: EmployeesListSectionProps) {
   const employeeColumns: Column<Employee>[] = [
     {
@@ -200,13 +202,23 @@ export function EmployeesListSection({
       key: 'salary',
       header: 'Salary',
       accessorKey: 'salary',
-      cell: (employee) => `$${Number(employee.salary).toLocaleString('en-US')}`,
+      cell: (employee) => `$${Number(employee?.salary).toLocaleString('en-US')}`,
     },
     {
       key: 'actions',
       header: '',
       cell: (employee) => (
-        <div className="flex justify-end gap-2">
+        <div className="ml-auto flex max-w-[260px] flex-wrap items-center justify-end gap-2">
+          {!employee?.user?.verified && onSendInvite && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onSendInvite(employee)}
+              className="text-xs"
+            >
+              Send invite
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -258,7 +270,7 @@ export function EmployeesListSection({
               <DataTable<Employee>
                 data={employees}
                 columns={employeeColumns}
-                pageSize={employees.length || 10}
+                pageSize={employees?.length || 10}
                 loading={false}
                 searchKeys={[]}
               />
@@ -266,7 +278,7 @@ export function EmployeesListSection({
           )}
 
           {/* Pagination */}
-          {employees.length > 0 && (
+          {employees?.length > 0 && (
             <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-6 rounded-lg shadow-sm">
               <div className="flex flex-1 justify-between sm:hidden">
                 <Button

@@ -1,63 +1,85 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { trainingService, EmployeeTraining } from '@/services/trainingService';
 import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { ChevronLeftIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { handleCrudError } from '@/lib/apiError';
+import { useToast } from '@/components/ui/ToastProvider';
 
 export default function CoursePlayerPage() {
     const params = useParams();
     const router = useRouter();
+    const queryClient = useQueryClient();
+    const { showToast } = useToast();
     const trainingId = params.id as string;
 
-    const [mounted, setMounted] = useState(false);
-    const [training, setTraining] = useState<EmployeeTraining | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [updating, setUpdating] = useState(false);
+    const coursesQuery = useQuery<EmployeeTraining[]>({
+        queryKey: ['training', 'my-courses'],
+        queryFn: trainingService.getMyCourses,
+        enabled: !!trainingId,
+        staleTime: 5 * 60 * 1000,
+        initialData: [],
+    });
 
     useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    useEffect(() => {
-        const loadTraining = async () => {
-            try {
-                const courses = await trainingService.getMyCourses();
-                const found = courses.find(c => c.id === trainingId);
-                if (found) setTraining(found);
-            } catch (error) {
-                console.error('Failed to load course:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        if (trainingId && mounted) loadTraining();
-    }, [trainingId, mounted]);
-
-    const handleProgress = async (newProgress: number) => {
-        if (!training) return;
-        setUpdating(true);
-        try {
-            await trainingService.updateProgress(training.id, newProgress);
-            setTraining(prev => prev ? { ...prev, progress: newProgress, status: newProgress === 100 ? 'completed' : 'in-progress' } : null);
-            if (newProgress === 100) {
-                setTimeout(() => router.push('/portal/training'), 2000);
-            }
-        } catch (error) {
-            console.error('Failed to update progress:', error);
-        } finally {
-            setUpdating(false);
+        if (coursesQuery.isError && coursesQuery.error) {
+            handleCrudError({
+                error: coursesQuery.error,
+                resourceLabel: 'Training courses',
+                showToast,
+            });
         }
-    };
+    }, [coursesQuery.isError, coursesQuery.error, showToast]);
 
-    if (!mounted) {
-        return null;
-    }
+    const training = useMemo(
+        () => coursesQuery.data?.find((c) => c.id === trainingId) ?? null,
+        [coursesQuery.data, trainingId]
+    );
+
+    const progressMutation = useMutation({
+        mutationFn: (newProgress: number) => trainingService.updateProgress(trainingId, newProgress),
+        onError: (err) =>
+            handleCrudError({
+                error: err,
+                resourceLabel: 'Training progress',
+                showToast,
+            }),
+        onSuccess: (_, newProgress) => {
+            queryClient.setQueryData<EmployeeTraining[] | undefined>(['training', 'my-courses'], (prev) =>
+                Array.isArray(prev)
+                    ? prev.map((item) =>
+                          item.id === trainingId
+                              ? {
+                                    ...item,
+                                    progress: newProgress,
+                                    status: newProgress === 100 ? 'completed' : 'in-progress',
+                                }
+                              : item
+                      )
+                    : prev
+            );
+
+            if (newProgress === 100) {
+                setTimeout(() => router.push('/portal/training'), 1000);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['training', 'my-courses'] });
+        },
+    });
+
+    const handleProgress = (newProgress: number) => {
+        if (!training) return;
+        progressMutation.mutate(newProgress);
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -66,10 +88,33 @@ export default function CoursePlayerPage() {
                 <Header />
                 <main className="flex-1 p-6">
                     <div className="max-w-4xl mx-auto">
-                        {loading ? (
-                            <div className="text-gray-500">Loading course content...</div>
+                        {coursesQuery.isLoading ? (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <Skeleton className="h-6 w-6" />
+                                    <Skeleton className="h-6 w-40" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Skeleton className="h-8 w-2/3" />
+                                    <Skeleton className="h-4 w-48" />
+                                </div>
+                                <div className="grid gap-6 lg:grid-cols-3">
+                                    <Skeleton className="aspect-video w-full lg:col-span-2" />
+                                    <Skeleton className="h-48 w-full" />
+                                </div>
+                            </div>
+                        ) : coursesQuery.isError ? (
+                            <div className="text-red-600 text-sm">Failed to load course. Please try again.</div>
                         ) : !training ? (
-                            <div className="text-gray-500">Course not found.</div>
+                            <Card className="bg-white">
+                                <CardContent className="py-10 text-center space-y-3">
+                                    <p className="text-gray-700 font-semibold">Course not found</p>
+                                    <p className="text-gray-500 text-sm">This course may have been unassigned or removed.</p>
+                                    <Button variant="outline" onClick={() => router.push('/portal/training')}>
+                                        Back to Training
+                                    </Button>
+                                </CardContent>
+                            </Card>
                         ) : (
                             <>
                                 <Button variant="ghost" className="mb-4 pl-0" onClick={() => router.back()}>
@@ -122,7 +167,7 @@ export default function CoursePlayerPage() {
                                                             className="w-full"
                                                             variant="outline"
                                                             onClick={() => handleProgress(Math.min(training.progress + 25, 100))}
-                                                            disabled={updating || training.progress >= 100}
+                                                            disabled={progressMutation.isPending || training.progress >= 100}
                                                         >
                                                             Mark Next Lesson Complete (+25%)
                                                         </Button>
@@ -132,7 +177,7 @@ export default function CoursePlayerPage() {
                                                                 className="w-full"
                                                                 variant="secondary"
                                                                 onClick={() => handleProgress(100)}
-                                                                disabled={updating}
+                                                                disabled={progressMutation.isPending}
                                                             >
                                                                 Complete Course Now
                                                             </Button>

@@ -3,10 +3,13 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/middleware/errorHandler';
 import { timeTrackingService } from './time-tracking.service';
 import { createProjectSchema, clockInSchema, clockOutSchema, manualEntrySchema } from './dto';
+import { BadRequestError, ForbiddenError } from '../../shared/utils/errors';
+
+const privilegedRoles = ['Super Admin', 'HR Admin', 'Manager'];
 
 export const createProject = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = createProjectSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+    if (error) throw new BadRequestError(error.details[0].message);
 
     const project = await timeTrackingService.createProject(value);
     res.status(201).json({ success: true, data: project });
@@ -19,25 +22,24 @@ export const getProjects = asyncHandler(async (req: Request, res: Response) => {
 
 export const clockIn = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = clockInSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+    if (error) throw new BadRequestError(error.details[0].message);
 
-    const entry = await timeTrackingService.clockIn(value);
+    const employeeId = (req as any).user?.employeeId;
+    if (!employeeId) throw new BadRequestError('Employee ID required');
+
+    const entry = await timeTrackingService.clockIn({
+        ...value,
+        employeeId,
+    });
     res.status(201).json({ success: true, data: entry });
 });
 
 export const clockOut = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = clockOutSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+    if (error) throw new BadRequestError(error.details[0].message);
 
-    // Assuming employee is authenticated and we passed their ID via body or implicit from token? 
-    // Plan DTO only has endTime. Employee ID should come from token or body. 
-    // Plan had ClockOutDto with only endTime. Let's assume we use the authenticated user's ID.
-    // However, the service needs employeeId. Let's start with using the one from the token 
-    // or we might have made a mistake in DTO design not including it if we want admin to clock out others.
-    // For now, let's assume self-service clock out.
-    const employeeId = (req as any).user?.id || req.body.employeeId;
-
-    if (!employeeId) throw new Error("Employee ID required");
+    const employeeId = (req as any).user?.employeeId;
+    if (!employeeId) throw new BadRequestError('Employee ID required');
 
     const entry = await timeTrackingService.clockOut(employeeId, value.endTime);
     res.json({ success: true, data: entry });
@@ -47,10 +49,47 @@ export const getTimesheet = asyncHandler(async (req: Request, res: Response) => 
     const { employeeId } = req.params;
     const { startDate, endDate } = req.query;
 
+    const authReq: any = req as any;
+    const selfEmployeeId: string | undefined = authReq?.user?.employeeId;
+    const role: string | undefined = authReq?.user?.role;
+
+    if (!selfEmployeeId) {
+        throw new BadRequestError('Employee ID required');
+    }
+
+    if (employeeId !== selfEmployeeId && !privilegedRoles.includes(role || '')) {
+        throw new ForbiddenError('You can only view your own timesheet');
+    }
+
     if (!startDate || !endDate) {
-        throw new Error("Start date and end date required");
+        throw new BadRequestError('Start date and end date required');
     }
 
     const entries = await timeTrackingService.getTimesheet(employeeId, startDate as string, endDate as string);
     res.json({ success: true, data: entries });
+});
+
+export const logManualEntry = asyncHandler(async (req: Request, res: Response) => {
+    const { error, value } = manualEntrySchema.validate(req.body);
+    if (error) throw new BadRequestError(error.details[0].message);
+
+    const authReq: any = req as any;
+    const role: string | undefined = authReq?.user?.role;
+    const selfEmployeeId: string | undefined = authReq?.user?.employeeId;
+
+    const requestedEmployeeId = (value as any).employeeId as string | undefined;
+    const employeeId = requestedEmployeeId || selfEmployeeId;
+
+    if (!employeeId) throw new BadRequestError('Employee ID required');
+
+    if (requestedEmployeeId && requestedEmployeeId !== selfEmployeeId && !privilegedRoles.includes(role || '')) {
+        throw new ForbiddenError('You can only log time entries for yourself');
+    }
+
+    const entry = await timeTrackingService.logManualEntry({
+        ...(value as any),
+        employeeId,
+    });
+
+    res.status(201).json({ success: true, data: entry });
 });

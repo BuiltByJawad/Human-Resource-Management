@@ -24,6 +24,14 @@ export const PERMISSIONS = {
   MANAGE_PAYROLL: 'payroll.manage',
   GENERATE_PAYROLL: 'payroll.generate',
   CONFIGURE_PAYROLL: 'payroll.configure',
+  VIEW_BENEFITS: 'benefits.view',
+  MANAGE_BENEFITS: 'benefits.manage',
+  ENROLL_BENEFITS: 'benefits.enroll',
+  VIEW_EXPENSES: 'expenses.view',
+  MANAGE_EXPENSES: 'expenses.manage',
+  APPROVE_EXPENSES: 'expenses.approve',
+  VIEW_OFFBOARDING: 'offboarding.view',
+  MANAGE_OFFBOARDING: 'offboarding.manage',
 
   VIEW_ASSETS: 'assets.view',
   MANAGE_ASSETS: 'assets.manage',
@@ -45,6 +53,8 @@ export const PERMISSIONS = {
   VIEW_PERFORMANCE: 'performance.view',
   MANAGE_PERFORMANCE_CYCLES: 'performance.manage_cycles',
   REVIEW_PERFORMANCE: 'performance.review',
+
+  MANAGE_RECRUITMENT: 'recruitment.manage',
 
   MANAGE_SYSTEM_SETTINGS: 'settings.manage_system_settings',
 } as const

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Input, TextArea, Select } from '@/components/ui/FormComponents'
 import { DataTable, Column } from '@/components/ui/DataTable'
@@ -38,6 +38,8 @@ interface RuleFormProps {
     onClose: () => void
     onSubmit: (data: Partial<ComplianceRule>) => Promise<void>
     loading?: boolean
+    apiErrors?: Partial<Record<RuleFormField, string>>
+    onClearApiErrors?: (field: RuleFormField) => void
 }
 
 const ruleSchema = yup.object().shape({
@@ -48,9 +50,10 @@ const ruleSchema = yup.object().shape({
 })
 
 type RuleFormData = yup.InferType<typeof ruleSchema>
+export type RuleFormField = keyof RuleFormData
 
-export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) => {
-    const { register, handleSubmit, control, reset, formState: { errors } } = useForm<RuleFormData>({
+export const RuleForm = ({ isOpen, onClose, onSubmit, loading, apiErrors, onClearApiErrors }: RuleFormProps) => {
+    const { register, handleSubmit, control, reset, formState: { errors }, setError, clearErrors } = useForm<RuleFormData>({
         resolver: yupResolver(ruleSchema) as any,
         defaultValues: {
             name: '',
@@ -60,6 +63,23 @@ export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) 
         }
     })
 
+    useEffect(() => {
+        if (!apiErrors) return
+        (Object.entries(apiErrors) as [RuleFormField, string | undefined][])
+            .forEach(([field, message]) => {
+                if (message) {
+                    setError(field, { type: 'server', message })
+                } else {
+                    clearErrors(field)
+                }
+            })
+    }, [apiErrors, setError, clearErrors])
+
+    const handleFieldFocus = (field: RuleFormField) => {
+        clearErrors(field)
+        onClearApiErrors?.(field)
+    }
+
     const onFormSubmit = async (data: RuleFormData) => {
         await onSubmit(data)
         reset()
@@ -67,19 +87,25 @@ export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) 
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add Compliance Rule">
-            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-32">
+            <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 pb-6">
                 <Input
                     label="Rule Name"
                     placeholder="e.g. Max Hours Per Week"
                     required
                     error={errors.name?.message}
-                    {...register('name')}
+                    {...register('name', {
+                        onChange: () => handleFieldFocus('name')
+                    })}
+                    onBlur={() => handleFieldFocus('name')}
                 />
                 <TextArea
                     label="Description"
                     placeholder="Description of the rule"
                     error={errors.description?.message}
-                    {...register('description')}
+                    {...register('description', {
+                        onChange: () => handleFieldFocus('description')
+                    })}
+                    onBlur={() => handleFieldFocus('description')}
                 />
                 <Controller
                     control={control}
@@ -88,7 +114,10 @@ export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) 
                         <Select
                             label="Rule Type"
                             value={field.value}
-                            onChange={field.onChange}
+                            onChange={(value) => {
+                                handleFieldFocus('type')
+                                field.onChange(value)
+                            }}
                             options={[
                                 { value: 'max_hours_per_week', label: 'Max Hours Per Week' },
                                 // Add more types as backend supports them
@@ -103,9 +132,12 @@ export const RuleForm = ({ isOpen, onClose, onSubmit, loading }: RuleFormProps) 
                     type="number"
                     required
                     error={errors.threshold?.message}
-                    {...register('threshold')}
+                    {...register('threshold', {
+                        onChange: () => handleFieldFocus('threshold')
+                    })}
+                    onBlur={() => handleFieldFocus('threshold')}
                 />
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="sticky bottom-0 left-0 right-0 bg-white pt-4 pb-2 flex justify-end gap-3 border-t">
                     <button
                         type="button"
                         onClick={onClose}

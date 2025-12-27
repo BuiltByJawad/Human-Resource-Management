@@ -2,22 +2,38 @@ import { prisma } from '../../shared/config/database';
 import { Prisma } from '@prisma/client';
 
 export class RoleRepository {
-    async findAll() {
+    async findAll(organizationId: string) {
         return prisma.role.findMany({
             include: {
+                permissions: {
+                    include: {
+                        permission: true,
+                    },
+                },
                 _count: {
-                    select: { users: true },
+                    select: {
+                        users: {
+                            where: { organizationId },
+                        },
+                        permissions: true,
+                    },
                 },
             },
             orderBy: { name: 'asc' },
         });
     }
 
-    async findById(id: string) {
+    async findById(id: string, organizationId: string) {
         return prisma.role.findUnique({
             where: { id },
             include: {
+                permissions: {
+                    include: {
+                        permission: true,
+                    },
+                },
                 users: {
+                    where: { organizationId },
                     select: {
                         id: true,
                         email: true,
@@ -30,7 +46,12 @@ export class RoleRepository {
                     },
                 },
                 _count: {
-                    select: { users: true },
+                    select: {
+                        users: {
+                            where: { organizationId },
+                        },
+                        permissions: true,
+                    },
                 },
             },
         });
@@ -46,8 +67,13 @@ export class RoleRepository {
         return prisma.role.create({
             data,
             include: {
+                permissions: {
+                    include: {
+                        permission: true,
+                    },
+                },
                 _count: {
-                    select: { users: true },
+                    select: { users: true, permissions: true },
                 },
             },
         });
@@ -58,10 +84,33 @@ export class RoleRepository {
             where: { id },
             data,
             include: {
+                permissions: {
+                    include: {
+                        permission: true,
+                    },
+                },
                 _count: {
-                    select: { users: true },
+                    select: { users: true, permissions: true },
                 },
             },
+        });
+    }
+
+    async syncPermissions(roleId: string, permissionIds: string[]) {
+        await prisma.rolePermission.deleteMany({
+            where: { roleId },
+        });
+
+        if (!permissionIds.length) {
+            return;
+        }
+
+        await prisma.rolePermission.createMany({
+            data: permissionIds.map((permissionId) => ({
+                roleId,
+                permissionId,
+            })),
+            skipDuplicates: true,
         });
     }
 
@@ -71,18 +120,24 @@ export class RoleRepository {
         });
     }
 
-    async assignToUser(userId: string, roleId: string) {
-        return prisma.user.update({
-            where: { id: userId },
+    async assignToUser(userId: string, roleId: string, organizationId: string) {
+        const updated = await prisma.user.updateMany({
+            where: { id: userId, organizationId },
             data: {
                 roleId,
             },
         });
+
+        if (!updated.count) {
+            return null;
+        }
+
+        return prisma.user.findUnique({ where: { id: userId } });
     }
 
-    async getUsersByRole(roleId: string) {
+    async getUsersByRole(roleId: string, organizationId: string) {
         return prisma.user.findMany({
-            where: { roleId },
+            where: { roleId, organizationId },
             include: {
                 employee: {
                     select: {

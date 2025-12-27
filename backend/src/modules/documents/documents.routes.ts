@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { authenticate, authorize } from '../../shared/middleware/auth';
+import { authenticate, checkPermission } from '../../shared/middleware/auth';
 import * as documentsController from './documents.controller';
 
 const router = Router();
@@ -22,21 +22,21 @@ router.get(
 router.post(
     '/',
     authenticate,
-    authorize(['Super Admin', 'HR Admin']),
+    checkPermission('documents', 'manage'),
     documentsController.uploadDocument
 );
 
 router.patch(
     '/:id',
     authenticate,
-    authorize(['Super Admin', 'HR Admin']),
+    checkPermission('documents', 'manage'),
     documentsController.updateDocument
 );
 
 router.delete(
     '/:id',
     authenticate,
-    authorize(['Super Admin', 'HR Admin']),
+    checkPermission('documents', 'manage'),
     documentsController.deleteDocument
 );
 

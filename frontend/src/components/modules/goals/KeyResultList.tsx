@@ -27,7 +27,9 @@ export const KeyResultList: React.FC<KeyResultListProps> = ({ keyResults, onUpda
             setEditingId(null);
             if (onUpdate) onUpdate();
         } catch (error) {
-            console.error('Failed to update progress:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to update progress:', error);
+            }
         }
     };
 

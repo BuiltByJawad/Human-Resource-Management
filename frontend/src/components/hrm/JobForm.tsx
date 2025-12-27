@@ -1,28 +1,24 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
 import { Dialog } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button, Input, Select, TextArea } from '../ui/FormComponents'
-import axios from 'axios'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-
-interface Department {
-    id: string
-    name: string
-}
+import { useMutation, useQuery } from '@tanstack/react-query'
+import api from '@/lib/axios'
+import { fetchDepartments } from '@/lib/hrmData'
+import { handleCrudError } from '@/lib/apiError'
+import { LoadingSpinner } from '../ui/CommonComponents'
 
 interface JobFormProps {
     isOpen: boolean
     onClose: () => void
     onSuccess: () => void
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 const jobSchema = yup.object().shape({
     title: yup.string().required('Job title is required'),
@@ -33,8 +29,6 @@ const jobSchema = yup.object().shape({
 type JobFormData = yup.InferType<typeof jobSchema>
 
 export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
-    const [departments, setDepartments] = useState<Department[]>([])
-    const [loading, setLoading] = useState(false)
     const { token } = useAuthStore()
     const { showToast } = useToast()
 
@@ -47,49 +41,43 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
         }
     })
 
-    const fetchDepartments = useCallback(async () => {
-        try {
-            const res = await axios.get(`${API_URL}/departments`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (res.data.success) {
-                setDepartments(res.data.data)
-            }
-        } catch (error) {
-            console.error('Failed to fetch departments', error)
-            // showToast('Failed to load departments', 'error')
-        }
-    }, [token])
+    const { data: departments = [], isLoading: departmentsLoading } = useQuery({
+        queryKey: ['departments', 'job-form', token, isOpen],
+        queryFn: () => fetchDepartments(token ?? undefined),
+        enabled: !!token && isOpen,
+    })
 
-    useEffect(() => {
-        if (isOpen && token) {
-            fetchDepartments()
-        }
-    }, [isOpen, token, fetchDepartments])
-
-    const onFormSubmit = async (data: JobFormData) => {
-        setLoading(true)
-        try {
-            const res = await axios.post(`${API_URL}/recruitment/jobs`, {
+    const createJob = useMutation({
+        mutationFn: async (data: JobFormData) => {
+            const response = await api.post('/recruitment/jobs', {
                 ...data,
                 status: 'open'
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             })
-
-            if (res.data.success) {
-                showToast('Job posting created successfully', 'success')
-                onSuccess()
-                onClose()
-                reset()
-            }
-        } catch (error) {
-            console.error('Failed to create job', error)
-            showToast('Failed to create job posting', 'error')
-        } finally {
-            setLoading(false)
+            return response.data
+        },
+        onSuccess: () => {
+            showToast('Job posting created successfully', 'success')
+            onSuccess()
+            onClose()
+            reset()
+        },
+        onError: (error: any) => {
+            handleCrudError({
+                error,
+                resourceLabel: 'Job posting',
+                showToast,
+                onUnauthorized: () => console.warn('Not authorized to create jobs'),
+            })
         }
+    })
+
+    const onFormSubmit = (data: JobFormData) => {
+        createJob.mutate(data)
     }
+
+    const departmentOptions = Array.isArray(departments)
+        ? departments.map(dept => ({ value: dept.id, label: dept.name }))
+        : []
 
     return (
         <Dialog open={isOpen} onClose={onClose} className="relative z-50">
@@ -117,17 +105,24 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
                             control={control}
                             name="departmentId"
                             render={({ field }) => (
-                                <Select
-                                    label="Department"
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    options={[
-                                        { value: '', label: 'Select Department' },
-                                        ...(Array.isArray(departments) ? departments : []).map(dept => ({ value: dept.id, label: dept.name }))
-                                    ]}
-                                    required
-                                    error={errors.departmentId?.message}
-                                />
+                                departmentsLoading ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <LoadingSpinner size="sm" />
+                                        <span>Loading departments...</span>
+                                    </div>
+                                ) : (
+                                    <Select
+                                        label="Department"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        options={[
+                                            { value: '', label: 'Select Department' },
+                                            ...departmentOptions
+                                        ]}
+                                        required
+                                        error={errors.departmentId?.message}
+                                    />
+                                )
                             )}
                         />
 
@@ -144,7 +139,7 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
                             <Button variant="secondary" onClick={onClose} type="button">
                                 Cancel
                             </Button>
-                            <Button type="submit" loading={loading}>
+                            <Button type="submit" loading={createJob.isPending}>
                                 Create Job
                             </Button>
                         </div>

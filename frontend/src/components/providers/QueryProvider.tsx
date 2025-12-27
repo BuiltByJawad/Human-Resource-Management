@@ -10,8 +10,12 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
             queries: {
-                staleTime: 60 * 1000, // 1 minute
+                // Aggressive caching to keep sidebar navigation instant like top HR dashboards
+                staleTime: 10 * 60 * 1000, // 10 minutes
+                gcTime: 15 * 60 * 1000, // retain caches to reuse across tabs/sections
                 refetchOnWindowFocus: false,
+                refetchOnReconnect: false,
+                refetchOnMount: false,
             },
         },
     }))

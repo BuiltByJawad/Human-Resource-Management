@@ -2,10 +2,12 @@ import { Request, Response } from 'express';
 import { portalService } from './portal.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
+import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const getProfile = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const profile = await portalService.getProfile(userId);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const profile = await portalService.getProfile(userId, organizationId);
 
     res.json({
         success: true,
@@ -15,7 +17,8 @@ export const getProfile = asyncHandler(async (req: any, res: Response) => {
 
 export const updateProfile = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const profile = await portalService.updateProfile(userId, req.body);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const profile = await portalService.updateProfile(userId, organizationId, req.body);
 
     res.json({
         success: true,
@@ -26,7 +29,8 @@ export const updateProfile = asyncHandler(async (req: any, res: Response) => {
 
 export const getPaystubs = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const paystubs = await portalService.getPaystubs(userId);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const paystubs = await portalService.getPaystubs(userId, organizationId);
 
     res.json({
         success: true,
@@ -36,7 +40,8 @@ export const getPaystubs = asyncHandler(async (req: any, res: Response) => {
 
 export const getTimeOff = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const requests = await portalService.getTimeOffRequests(userId);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const requests = await portalService.getTimeOffRequests(userId, organizationId);
 
     res.json({
         success: true,
@@ -46,7 +51,8 @@ export const getTimeOff = asyncHandler(async (req: any, res: Response) => {
 
 export const getDocuments = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const documents = await portalService.getDocuments(userId);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const documents = await portalService.getDocuments(userId, organizationId);
 
     res.json({
         success: true,
@@ -56,7 +62,8 @@ export const getDocuments = asyncHandler(async (req: any, res: Response) => {
 
 export const uploadDocument = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const document = await portalService.uploadDocument(userId, req.body);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const document = await portalService.uploadDocument(userId, organizationId, req.body);
 
     res.status(HTTP_STATUS.CREATED).json({
         success: true,
@@ -67,7 +74,8 @@ export const uploadDocument = asyncHandler(async (req: any, res: Response) => {
 
 export const getEmergencyContacts = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const contacts = await portalService.getEmergencyContacts(userId);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const contacts = await portalService.getEmergencyContacts(userId, organizationId);
 
     res.json({
         success: true,
@@ -77,7 +85,8 @@ export const getEmergencyContacts = asyncHandler(async (req: any, res: Response)
 
 export const addEmergencyContact = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const contact = await portalService.addEmergencyContact(userId, req.body);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const contact = await portalService.addEmergencyContact(userId, organizationId, req.body);
 
     res.status(HTTP_STATUS.CREATED).json({
         success: true,
@@ -88,7 +97,8 @@ export const addEmergencyContact = asyncHandler(async (req: any, res: Response) 
 
 export const updateEmergencyContact = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    const contact = await portalService.updateEmergencyContact(req.params.id, userId, req.body);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const contact = await portalService.updateEmergencyContact(req.params.id, userId, organizationId, req.body);
 
     res.json({
         success: true,
@@ -99,7 +109,8 @@ export const updateEmergencyContact = asyncHandler(async (req: any, res: Respons
 
 export const deleteEmergencyContact = asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.id;
-    await portalService.deleteEmergencyContact(req.params.id, userId);
+    const organizationId = requireRequestOrganizationId(req as any);
+    await portalService.deleteEmergencyContact(req.params.id, userId, organizationId);
 
     res.json({
         success: true,
@@ -108,7 +119,8 @@ export const deleteEmergencyContact = asyncHandler(async (req: any, res: Respons
 });
 
 export const getDirectory = asyncHandler(async (req: Request, res: Response) => {
-    const result = await portalService.getDirectory(req.query);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const result = await portalService.getDirectory(req.query, organizationId);
 
     res.json({
         success: true,

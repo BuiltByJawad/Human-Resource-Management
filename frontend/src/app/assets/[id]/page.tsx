@@ -1,148 +1,194 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import axios from 'axios'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Asset, AssetAssignment, MaintenanceLog, AssignmentModal, MaintenanceModal } from '@/components/hrm/AssetComponents'
+import { Asset, AssignmentModal, MaintenanceModal } from '@/components/hrm/AssetComponents'
 import {
     ArrowLeftIcon,
     CalendarIcon,
     CurrencyDollarIcon,
     UserCircleIcon,
-    WrenchScrewdriverIcon,
-    ClipboardDocumentListIcon
+    WrenchScrewdriverIcon
 } from '@heroicons/react/24/outline'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+import api from '@/lib/axios'
+import { handleCrudError } from '@/lib/apiError'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 export default function AssetDetailsPage() {
     const params = useParams()
     const router = useRouter()
     const { token } = useAuthStore()
     const { showToast } = useToast()
+    const queryClient = useQueryClient()
 
-    const [asset, setAsset] = useState<Asset | null>(null)
-    const [loading, setLoading] = useState(true)
+    const assetId = (params?.id ?? '') as string
+
     const [activeTab, setActiveTab] = useState<'history' | 'maintenance'>('history')
-
-    // Modals
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
     const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false)
-    const [employees, setEmployees] = useState<any[]>([])
+    const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
 
-    const fetchAssetDetails = useCallback(async () => {
-        if (!token || !params.id) return
+    const assetQuery = useQuery<Asset, Error>({
+        queryKey: ['asset', assetId],
+        queryFn: async () => {
+            const response = await api.get(`/assets/${assetId}`)
+            const raw = response.data?.data
+            if (raw?.asset) return raw.asset as Asset
+            return (raw as Asset) ?? null
+        },
+        enabled: !!assetId,
+        retry: false,
+    })
 
-        try {
-            const response = await axios.get(`${API_URL}/assets/${params.id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (response.data.success) {
-                setAsset(response.data.data)
-            }
-        } catch (error) {
-            console.error('Failed to fetch asset details', error)
-            showToast('Failed to load asset details', 'error')
-            router.push('/assets')
-        } finally {
-            setLoading(false)
-        }
-    }, [token, params.id, router, showToast])
+    const employeesQuery = useQuery<any[], Error>({
+        queryKey: ['employees'],
+        queryFn: async () => {
+            const response = await api.get('/employees')
+            const raw = response.data?.data
+            if (Array.isArray(raw)) return raw
+            if (Array.isArray(raw?.employees)) return raw.employees
+            return []
+        },
+        enabled: !!token,
+        retry: false,
+    })
 
-    const fetchEmployees = useCallback(async () => {
-        if (!token) return
-        try {
-            const response = await axios.get(`${API_URL}/employees`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (response.data.success) {
-                setEmployees(response.data.data)
-            }
-        } catch (error) {
-            console.error('Failed to fetch employees', error)
-        }
-    }, [token])
+    const assignMutation = useMutation({
+        mutationFn: async ({ employeeId, notes }: { employeeId: string; notes: string }) => {
+            const response = await api.post(`/assets/${assetId}/assign`, { employeeId, notes })
+            return response.data
+        },
+        onSuccess: () => {
+            showToast('Asset assigned successfully', 'success')
+            queryClient.invalidateQueries({ queryKey: ['asset', assetId] })
+            setIsAssignModalOpen(false)
+        },
+        onError: (error) => handleCrudError({ error, resourceLabel: 'Assign asset', showToast }),
+    })
 
-    useEffect(() => {
-        fetchAssetDetails()
-        fetchEmployees()
-    }, [fetchAssetDetails, fetchEmployees])
+    const returnMutation = useMutation({
+        mutationFn: async () => {
+            const response = await api.post(`/assets/${assetId}/return`)
+            return response.data
+        },
+        onSuccess: () => {
+            showToast('Asset returned successfully', 'success')
+            queryClient.invalidateQueries({ queryKey: ['asset', assetId] })
+        },
+        onError: (error) => handleCrudError({ error, resourceLabel: 'Return asset', showToast }),
+    })
+
+    const maintenanceMutation = useMutation({
+        mutationFn: async (data: any) => {
+            const response = await api.post(`/assets/${assetId}/maintenance`, data)
+            return response.data
+        },
+        onSuccess: () => {
+            showToast('Maintenance log added', 'success')
+            queryClient.invalidateQueries({ queryKey: ['asset', assetId] })
+            setIsMaintenanceModalOpen(false)
+        },
+        onError: (error) => handleCrudError({ error, resourceLabel: 'Add maintenance log', showToast }),
+    })
 
     const handleAssign = async (employeeId: string, notes: string) => {
-        if (!asset) return
-        try {
-            const response = await axios.post(`${API_URL}/assets/${asset.id}/assign`, {
-                employeeId,
-                notes
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-
-            if (response.data.success) {
-                showToast('Asset assigned successfully', 'success')
-                fetchAssetDetails()
-            }
-        } catch (error: any) {
-            const msg = error.response?.data?.error || 'Failed to assign asset'
-            showToast(msg, 'error')
-        }
+        await assignMutation.mutateAsync({ employeeId, notes })
     }
 
-    const handleReturn = async () => {
-        if (!asset) return
-        if (!confirm('Are you sure you want to mark this asset as returned?')) return
-
-        try {
-            const response = await axios.post(`${API_URL}/assets/${asset.id}/return`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-
-            if (response.data.success) {
-                showToast('Asset returned successfully', 'success')
-                fetchAssetDetails()
-            }
-        } catch (error: any) {
-            const msg = error.response?.data?.error || 'Failed to return asset'
-            showToast(msg, 'error')
-        }
+    const handleReturn = () => {
+        setIsReturnDialogOpen(true)
+    }
+    const confirmReturn = async () => {
+        await returnMutation.mutateAsync()
+        setIsReturnDialogOpen(false)
     }
 
     const handleMaintenanceSubmit = async (data: any) => {
-        if (!asset) return
-        try {
-            const response = await axios.post(`${API_URL}/assets/${asset.id}/maintenance`, data, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-
-            if (response.data.success) {
-                showToast('Maintenance log added', 'success')
-                fetchAssetDetails()
-            }
-        } catch (error: any) {
-            const msg = error.response?.data?.error || 'Failed to add maintenance log'
-            showToast(msg, 'error')
-        }
+        await maintenanceMutation.mutateAsync(data)
     }
 
-    if (loading) {
+    if (assetQuery.isLoading) {
         return (
             <div className="flex h-screen bg-gray-50">
                 <Sidebar />
                 <div className="flex-1 flex flex-col">
                     <Header />
-                    <main className="flex-1 p-6 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <main className="flex-1 p-6">
+                        <div className="max-w-5xl mx-auto space-y-6">
+                            <Skeleton className="h-4 w-24" />
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+                                <Skeleton className="h-6 w-1/3" />
+                                <Skeleton className="h-4 w-1/4" />
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                                    <Skeleton className="h-4 w-1/2" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                    <Skeleton className="h-4 w-1/2" />
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-3">
+                                <Skeleton className="h-4 w-1/3" />
+                                <Skeleton className="h-24 w-full" />
+                            </div>
+                        </div>
                     </main>
                 </div>
             </div>
         )
     }
 
-    if (!asset) return null
+    if (assetQuery.isError) {
+        handleCrudError({ error: assetQuery.error, resourceLabel: 'Asset details', showToast })
+        return (
+            <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                <div className="flex-1 flex flex-col">
+                    <Header />
+                    <main className="flex-1 p-6 flex items-center justify-center">
+                        <div className="text-center space-y-3">
+                            <p className="text-gray-700 font-medium">Unable to load asset details.</p>
+                            <button
+                                onClick={() => router.push('/assets')}
+                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Back to Assets
+                            </button>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        )
+    }
+
+    const asset = assetQuery.data
+    if (!asset) {
+        return (
+            <div className="flex h-screen bg-gray-50">
+                <Sidebar />
+                <div className="flex-1 flex flex-col">
+                    <Header />
+                    <main className="flex-1 p-6 flex items-center justify-center">
+                        <div className="text-center text-gray-600">
+                            Asset not found.
+                            <div className="mt-3">
+                                <button
+                                    onClick={() => router.push('/assets')}
+                                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                >
+                                    Back to Assets
+                                </button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        )
+    }
 
     const currentAssignment = asset.assignments.find(a => !a.returnedDate)
 
@@ -192,8 +238,9 @@ export default function AssetDetailsPage() {
                                         <button
                                             onClick={handleReturn}
                                             className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-medium"
+                                            disabled={returnMutation.isPending}
                                         >
-                                            Return Asset
+                                            {returnMutation.isPending ? 'Returning...' : 'Return Asset'}
                                         </button>
                                     )}
                                 </div>
@@ -372,13 +419,24 @@ export default function AssetDetailsPage() {
                 isOpen={isAssignModalOpen}
                 onClose={() => setIsAssignModalOpen(false)}
                 onAssign={handleAssign}
-                employees={employees}
+                employees={employeesQuery.data || []}
             />
 
             <MaintenanceModal
                 isOpen={isMaintenanceModalOpen}
                 onClose={() => setIsMaintenanceModalOpen(false)}
                 onSubmit={handleMaintenanceSubmit}
+            />
+            <ConfirmDialog
+                isOpen={isReturnDialogOpen}
+                onClose={() => setIsReturnDialogOpen(false)}
+                onConfirm={confirmReturn}
+                title="Return asset"
+                message="Mark this asset as returned? It will be available for reassignment."
+                confirmText={returnMutation.isPending ? 'Returning...' : 'Return'}
+                cancelText="Keep assigned"
+                loading={returnMutation.isPending}
+                type="warning"
             />
         </div>
     )

@@ -1,4 +1,4 @@
-import 'module-alias/register';
+import './module-alias';
 import 'reflect-metadata';
 import { createApp } from './app';
 import { prisma } from './app';

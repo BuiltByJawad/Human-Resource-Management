@@ -34,6 +34,8 @@ interface RoleFormProps {
     permissions: Permission[]
     groupedPermissions: Record<string, Permission[]>
     loading?: boolean
+    apiErrors?: Partial<Record<RoleFormField, string>>
+    onClearApiErrors?: (field: RoleFormField) => void
 }
 
 const roleSchema = yup.object().shape({
@@ -43,6 +45,7 @@ const roleSchema = yup.object().shape({
 })
 
 type RoleFormData = yup.InferType<typeof roleSchema>
+export type RoleFormField = keyof RoleFormData
 
 export const RoleForm = ({
     isOpen,
@@ -51,11 +54,13 @@ export const RoleForm = ({
     initialData,
     permissions,
     groupedPermissions,
-    loading
+    loading,
+    apiErrors,
+    onClearApiErrors
 }: RoleFormProps) => {
     const [activeResource, setActiveResource] = useState<string>('')
 
-    const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
+    const { register, handleSubmit, setValue, watch, reset, formState: { errors }, setError, clearErrors } = useForm({
         resolver: yupResolver(roleSchema),
         defaultValues: {
             name: '',
@@ -65,6 +70,12 @@ export const RoleForm = ({
     })
 
     const selectedPermissionIds = watch('permissionIds') || []
+
+    const selectedPermissionDetails = Array.isArray(initialData?.permissions)
+        ? initialData!.permissions
+            .map((p) => p?.permission)
+            .filter((p): p is Permission => !!p && selectedPermissionIds.includes(p.id))
+        : []
 
     useEffect(() => {
         if (initialData) {
@@ -82,12 +93,30 @@ export const RoleForm = ({
         }
     }, [initialData, isOpen, reset])
 
+    useEffect(() => {
+        if (!apiErrors) return
+        (Object.entries(apiErrors) as [RoleFormField, string | undefined][]).forEach(([field, message]) => {
+            if (message) {
+                setError(field, { type: 'server', message })
+            } else {
+                clearErrors(field)
+            }
+        })
+    }, [apiErrors, setError, clearErrors])
+
+    const handleFieldFocus = (field: RoleFormField) => {
+        clearErrors(field)
+        onClearApiErrors?.(field)
+    }
+
     // Set initial active resource
     useEffect(() => {
-        if (isOpen && Object.keys(groupedPermissions).length > 0) {
-            setActiveResource(Object.keys(groupedPermissions)[0])
+        if (!isOpen) return
+        const firstResource = Object.keys(groupedPermissions)[0]
+        if (firstResource && (!activeResource || !groupedPermissions[activeResource])) {
+            setActiveResource(firstResource)
         }
-    }, [isOpen, groupedPermissions])
+    }, [isOpen, groupedPermissions, activeResource])
 
     const onFormSubmit = async (data: RoleFormData) => {
         await onSubmit({
@@ -141,13 +170,19 @@ export const RoleForm = ({
                             placeholder="e.g. HR Manager"
                             disabled={initialData?.isSystem}
                             error={errors.name?.message}
-                            {...register('name')}
+                            {...register('name', {
+                                onChange: () => handleFieldFocus('name')
+                            })}
+                            onBlur={() => handleFieldFocus('name')}
                         />
                         <TextArea
                             label="Description"
                             placeholder="What is this role for?"
                             error={errors.description?.message}
-                            {...register('description')}
+                            {...register('description', {
+                                onChange: () => handleFieldFocus('description')
+                            })}
+                            onBlur={() => handleFieldFocus('description')}
                         />
                     </div>
 
@@ -202,7 +237,33 @@ export const RoleForm = ({
 
                             {/* Right Content: Permissions */}
                             <div className="w-2/3 bg-white overflow-y-auto p-4">
-                                {activeResource && groupedPermissions[activeResource] && (
+                                {!Object.keys(groupedPermissions).length ? (
+                                    <div className="space-y-3">
+                                        <div className="text-sm text-gray-500">No permissions available.</div>
+                                        {selectedPermissionDetails.length > 0 && (
+                                            <div className="border rounded-lg bg-gray-50 p-3">
+                                                <div className="text-xs font-medium text-gray-700 mb-2">
+                                                    Currently selected for this role
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {selectedPermissionDetails.map((perm) => (
+                                                        <div key={perm.id} className="flex items-start rounded-md border bg-white px-3 py-2">
+                                                            <div className="mt-0.5 h-4 w-4 rounded border border-gray-300 bg-blue-600" />
+                                                            <div className="ml-3">
+                                                                <div className="text-sm font-medium text-gray-900">
+                                                                    {perm.resource}.{perm.action}
+                                                                </div>
+                                                                {perm.description && (
+                                                                    <div className="text-xs text-gray-500">{perm.description}</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : activeResource && groupedPermissions[activeResource] ? (
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center pb-4 border-b">
                                             <div>
@@ -226,7 +287,10 @@ export const RoleForm = ({
                                                 return (
                                                     <div
                                                         key={perm.id}
-                                                        onClick={() => togglePermission(perm.id)}
+                                                        onClick={() => {
+                                                    handleFieldFocus('permissionIds')
+                                                    togglePermission(perm.id)
+                                                }}
                                                         className={`
                                                             flex items-start p-3 rounded-lg border cursor-pointer transition-all
                                                             ${isSelected
@@ -256,7 +320,7 @@ export const RoleForm = ({
                                             })}
                                         </div>
                                     </div>
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>

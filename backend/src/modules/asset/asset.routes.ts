@@ -1,6 +1,16 @@
 import { Router } from 'express';
-import * as assetController from './asset.controller';
-import { authenticate } from '../../shared/middleware/auth';
+import {
+  getAssets,
+  createAsset,
+  updateAsset,
+  assignAsset,
+  returnAsset,
+  addMaintenanceLog,
+  getAssetDetails,
+  getEmployeeAssets,
+  deleteAsset,
+} from '../../controllers/assetController';
+import { authenticate, checkPermission } from '../../shared/middleware/auth';
 
 /**
  * @swagger
@@ -37,7 +47,7 @@ router.use(authenticate);
  *       200:
  *         description: List of assets
  */
-router.get('/', assetController.getAll);
+router.get('/', checkPermission('assets', 'view'), getAssets);
 
 /**
  * @swagger
@@ -56,7 +66,9 @@ router.get('/', assetController.getAll);
  *       200:
  *         description: Asset details
  */
-router.get('/:id', assetController.getById);
+router.get('/employee/:employeeId', getEmployeeAssets);
+
+router.get('/:id', checkPermission('assets', 'view'), getAssetDetails);
 
 /**
  * @swagger
@@ -84,7 +96,7 @@ router.get('/:id', assetController.getById);
  *       201:
  *         description: Asset created
  */
-router.post('/', assetController.create);
+router.post('/', checkPermission('assets', 'manage'), createAsset);
 
 /**
  * @swagger
@@ -103,7 +115,8 @@ router.post('/', assetController.create);
  *       200:
  *         description: Asset updated
  */
-router.put('/:id', assetController.update);
+router.put('/:id', checkPermission('assets', 'manage'), updateAsset);
+router.patch('/:id', checkPermission('assets', 'manage'), updateAsset);
 
 /**
  * @swagger
@@ -122,7 +135,11 @@ router.put('/:id', assetController.update);
  *       200:
  *         description: Asset deleted
  */
-router.delete('/:id', assetController.remove);
+router.delete('/:id', checkPermission('assets', 'manage'), deleteAsset);
+
+router.post('/:id/assign', checkPermission('assets', 'assign'), assignAsset);
+router.post('/:id/return', checkPermission('assets', 'assign'), returnAsset);
+router.post('/:id/maintenance', checkPermission('assets', 'manage'), addMaintenanceLog);
 
 /**
  * @swagger
@@ -141,6 +158,4 @@ router.delete('/:id', assetController.remove);
  *       200:
  *         description: Employee assets
  */
-router.get('/employee/:employeeId', assetController.getEmployeeAssets);
-
 export default router;

@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     role: string
     permissions: string[]
     employeeId?: string
+    organizationId?: string | null
   }
 }
 
@@ -47,6 +48,20 @@ export const authenticate = async (
       throw new UnauthorizedError('User not found or inactive')
     }
 
+    const tokenOrgId = decoded?.organizationId as string | undefined
+    const userOrgId = (user as any)?.organizationId as string | null | undefined
+
+    if (userOrgId) {
+      if (!tokenOrgId) {
+        throw new UnauthorizedError('Invalid token (missing organization)')
+      }
+      if (tokenOrgId !== userOrgId) {
+        throw new UnauthorizedError('Invalid token (organization mismatch)')
+      }
+    } else if (tokenOrgId) {
+      throw new UnauthorizedError('Invalid token (user not assigned to organization)')
+    }
+
     const permissions = user.role.permissions.map(rp => `${rp.permission.resource}.${rp.permission.action}`)
 
     req.user = {
@@ -54,7 +69,8 @@ export const authenticate = async (
       email: user.email,
       role: user.role.name,
       permissions,
-      employeeId: user.employee?.id
+      employeeId: user.employee?.id,
+      organizationId: userOrgId || null,
     }
 
     next()

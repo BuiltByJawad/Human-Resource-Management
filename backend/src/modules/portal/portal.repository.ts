@@ -1,9 +1,9 @@
 import { prisma } from '../../shared/config/database';
 
 export class PortalRepository {
-    async getEmployeeProfile(userId: string) {
+    async getEmployeeProfile(userId: string, organizationId: string) {
         return prisma.employee.findFirst({
-            where: { userId },
+            where: { userId, organizationId },
             include: {
                 department: { select: { name: true } },
                 user: { select: { email: true, role: true } },
@@ -11,24 +11,36 @@ export class PortalRepository {
         });
     }
 
-    async updateProfile(employeeId: string, data: any) {
-        return prisma.employee.update({
-            where: { id: employeeId },
+    async updateProfile(employeeId: string, organizationId: string, data: any) {
+        const updated = await prisma.employee.updateMany({
+            where: { id: employeeId, organizationId },
             data,
+        });
+
+        if (!updated.count) {
+            return null;
+        }
+
+        return prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            include: {
+                department: { select: { name: true } },
+                user: { select: { email: true, role: true } },
+            },
         });
     }
 
-    async getPaystubs(employeeId: string) {
+    async getPaystubs(employeeId: string, organizationId: string) {
         return prisma.payrollRecord.findMany({
-            where: { employeeId },
+            where: { employeeId, employee: { organizationId } },
             orderBy: { payPeriod: 'desc' },
             take: 12,
         });
     }
 
-    async getTimeOffRequests(employeeId: string) {
+    async getTimeOffRequests(employeeId: string, organizationId: string) {
         return prisma.leaveRequest.findMany({
-            where: { employeeId },
+            where: { employeeId, employee: { organizationId } },
             orderBy: { createdAt: 'desc' },
         });
     }
@@ -65,7 +77,7 @@ export class PortalRepository {
         return { id };
     }
 
-    async getDirectory(params: { skip: number; take: number; where?: any }) {
+    async getDirectory(params: { skip: number; take: number; where?: any }, organizationId: string) {
         return prisma.employee.findMany({
             ...params,
             select: {
@@ -79,15 +91,16 @@ export class PortalRepository {
             },
             where: {
                 ...params.where,
+                organizationId,
                 status: 'active' as any,
             },
             orderBy: { firstName: 'asc' },
         });
     }
 
-    async countDirectory(where?: any) {
+    async countDirectory(where: any = {}, organizationId: string) {
         return prisma.employee.count({
-            where: { ...where, status: 'active' as any },
+            where: { ...where, organizationId, status: 'active' as any },
         });
     }
 }

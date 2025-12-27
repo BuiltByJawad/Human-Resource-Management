@@ -35,15 +35,15 @@ export const comparePassword = async (
   return bcrypt.compare(password, hashedPassword)
 }
 
-export const generateTokens = (userId: string, email: string, role: string) => {
+export const generateTokens = (userId: string, email: string, role: string, organizationId?: string | null) => {
   const accessToken = jwt.sign(
-    { userId, email, role },
+    { userId, email, role, organizationId: organizationId || undefined },
     process.env.JWT_SECRET!,
     { expiresIn: '15m' }
   )
   
   const refreshToken = jwt.sign(
-    { userId },
+    { userId, organizationId: organizationId || undefined },
     process.env.JWT_REFRESH_SECRET!,
     { expiresIn: '7d' }
   )

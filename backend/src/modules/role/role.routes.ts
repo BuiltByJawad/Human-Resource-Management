@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as roleController from './role.controller';
-import { authenticate } from '../../shared/middleware/auth';
+import { authenticate, checkPermission } from '../../shared/middleware/auth';
 
 /**
  * @swagger
@@ -14,6 +14,11 @@ const router = Router();
 router.use(authenticate);
 
 /**
+ * Get all available permissions
+ */
+router.get('/permissions', checkPermission('roles', 'manage'), roleController.getPermissions);
+
+/**
  * @swagger
  * /roles:
  *   get:
@@ -25,7 +30,7 @@ router.use(authenticate);
  *       200:
  *         description: List of roles
  */
-router.get('/', roleController.getAll);
+router.get('/', checkPermission('roles', 'manage'), roleController.getAll);
 
 /**
  * @swagger
@@ -45,7 +50,7 @@ router.get('/', roleController.getAll);
  *       200:
  *         description: Role details
  */
-router.get('/:id', roleController.getById);
+router.get('/:id', checkPermission('roles', 'manage'), roleController.getById);
 
 /**
  * @swagger
@@ -77,7 +82,7 @@ router.get('/:id', roleController.getById);
  *       201:
  *         description: Role created
  */
-router.post('/', roleController.create);
+router.post('/', checkPermission('roles', 'manage'), roleController.create);
 
 /**
  * @swagger
@@ -97,7 +102,7 @@ router.post('/', roleController.create);
  *       200:
  *         description: Role updated
  */
-router.put('/:id', roleController.update);
+router.put('/:id', checkPermission('roles', 'manage'), roleController.update);
 
 /**
  * @swagger
@@ -117,7 +122,7 @@ router.put('/:id', roleController.update);
  *       200:
  *         description: Role deleted
  */
-router.delete('/:id', roleController.remove);
+router.delete('/:id', checkPermission('roles', 'manage'), roleController.remove);
 
 /**
  * @swagger
@@ -142,7 +147,7 @@ router.delete('/:id', roleController.remove);
  *       200:
  *         description: Role assigned
  */
-router.post('/assign', roleController.assignToUser);
+router.post('/assign', checkPermission('roles', 'assign'), roleController.assignToUser);
 
 /**
  * @swagger
@@ -162,6 +167,6 @@ router.post('/assign', roleController.assignToUser);
  *       200:
  *         description: List of users
  */
-router.get('/:id/users', roleController.getUsersByRole);
+router.get('/:id/users', checkPermission('roles', 'manage'), roleController.getUsersByRole);
 
 export default router;

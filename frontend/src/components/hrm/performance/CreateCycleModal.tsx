@@ -10,6 +10,7 @@ export interface CreateCycleModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSubmit: (data: any) => void;
+    loading?: boolean;
 }
 
 const cycleSchema = yup.object().shape({
@@ -25,7 +26,7 @@ const cycleSchema = yup.object().shape({
 
 type CycleFormData = yup.InferType<typeof cycleSchema>;
 
-export function CreateCycleModal({ isOpen, onClose, onSubmit }: CreateCycleModalProps) {
+export function CreateCycleModal({ isOpen, onClose, onSubmit, loading }: CreateCycleModalProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<CycleFormData>({
         resolver: yupResolver(cycleSchema),
         defaultValues: {
@@ -123,7 +124,7 @@ export function CreateCycleModal({ isOpen, onClose, onSubmit }: CreateCycleModal
                                                         </div>
                                                     </div>
                                                     <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                                                        <Button type="submit" className="w-full sm:ml-3 sm:w-auto">
+                                                        <Button type="submit" className="w-full sm:ml-3 sm:w-auto" loading={loading}>
                                                             Create Cycle
                                                         </Button>
                                                         <Button type="button" variant="secondary" className="mt-3 w-full sm:mt-0 sm:w-auto" onClick={onClose}>

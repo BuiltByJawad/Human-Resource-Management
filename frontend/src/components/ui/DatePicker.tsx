@@ -13,6 +13,7 @@ interface DatePickerProps {
     required?: boolean
     placeholder?: string
     className?: string
+    inputClassName?: string
     minDate?: Date
     maxDate?: Date
     disabled?: boolean
@@ -26,12 +27,22 @@ export function DatePicker({
     required,
     placeholder = 'Select date',
     className = '',
+    inputClassName = '',
     minDate,
     maxDate,
     disabled
 }: DatePickerProps) {
     // Handle string or Date input
     const selectedDate = typeof value === 'string' && value ? parseISO(value) : (value as Date)
+    const baseInputClasses = `
+            block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm
+            ${error
+            ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500'
+            : 'border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
+        }
+            ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white'}
+            ${inputClassName}
+          `
 
     return (
         <div className={className}>
@@ -45,14 +56,7 @@ export function DatePicker({
                 <ReactDatePicker
                     selected={isValid(selectedDate) ? selectedDate : null}
                     onChange={onChange}
-                    className={`
-            block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm
-            ${error
-                            ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500'
-                            : 'border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500'
-                        }
-            ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white'}
-          `}
+                    className={baseInputClasses}
                     placeholderText={placeholder}
                     dateFormat="MMM d, yyyy"
                     minDate={minDate}

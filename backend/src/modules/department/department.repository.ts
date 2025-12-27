@@ -2,8 +2,9 @@ import { prisma } from '../../shared/config/database';
 import { Prisma } from '@prisma/client';
 
 export class DepartmentRepository {
-    async findAll() {
+    async findAll(organizationId: string) {
         return prisma.department.findMany({
+            where: { organizationId },
             include: {
                 _count: {
                     select: { employees: true },
@@ -13,9 +14,9 @@ export class DepartmentRepository {
         });
     }
 
-    async findById(id: string) {
-        return prisma.department.findUnique({
-            where: { id },
+    async findById(id: string, organizationId: string) {
+        return prisma.department.findFirst({
+            where: { id, organizationId },
             include: {
                 employees: {
                     select: {
@@ -33,20 +34,53 @@ export class DepartmentRepository {
         });
     }
 
-    async create(data: Prisma.DepartmentCreateInput) {
-        return prisma.department.create({ data });
+    async findByName(name: string, organizationId: string) {
+        return prisma.department.findUnique({
+            where: {
+                organizationId_name: {
+                    organizationId,
+                    name,
+                },
+            },
+        });
     }
 
-    async update(id: string, data: Prisma.DepartmentUpdateInput) {
-        return prisma.department.update({ where: { id }, data });
+    async create(data: Prisma.DepartmentCreateInput, organizationId: string) {
+        return prisma.department.create({
+            data: {
+                ...(data as any),
+                organizationId,
+            },
+        });
     }
 
-    async delete(id: string) {
-        return prisma.department.delete({ where: { id } });
+    async update(id: string, data: Prisma.DepartmentUpdateInput, organizationId: string) {
+        const result = await prisma.department.updateMany({
+            where: { id, organizationId },
+            data,
+        });
+
+        if (!result.count) {
+            return null;
+        }
+
+        return prisma.department.findFirst({
+            where: { id, organizationId },
+            include: {
+                _count: {
+                    select: { employees: true },
+                },
+            },
+        });
     }
 
-    async count() {
-        return prisma.department.count();
+    async delete(id: string, organizationId: string) {
+        const result = await prisma.department.deleteMany({ where: { id, organizationId } });
+        return result.count;
+    }
+
+    async count(organizationId: string) {
+        return prisma.department.count({ where: { organizationId } });
     }
 }
 

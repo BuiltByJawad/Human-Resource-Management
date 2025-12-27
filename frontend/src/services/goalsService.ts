@@ -23,13 +23,8 @@ export interface PerformanceGoal {
 
 export const goalsService = {
     getMyGoals: async () => {
-        try {
-            const response = await api.get<{ data: PerformanceGoal[] }>('/goals/my-goals');
-            return Array.isArray(response.data?.data) ? response.data.data : [];
-        } catch (error) {
-            console.error('Failed to fetch goals:', error);
-            return [];
-        }
+        const response = await api.get<{ data: PerformanceGoal[] }>('/goals/my-goals');
+        return Array.isArray(response.data?.data) ? response.data.data : [];
     },
 
     createGoal: async (data: Partial<PerformanceGoal>) => {

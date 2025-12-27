@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as payrollController from './payroll.controller';
-import { authenticate } from '../../shared/middleware/auth';
+import { authenticate, checkPermission } from '../../shared/middleware/auth';
 
 /**
  * @swagger
@@ -12,6 +12,12 @@ import { authenticate } from '../../shared/middleware/auth';
 const router = Router();
 
 router.use(authenticate);
+
+router.get('/payslips/:employeeId?', payrollController.getEmployeePayslips);
+
+router.get('/summary/:payPeriod', checkPermission('payroll', 'view'), payrollController.getPeriodSummary);
+
+router.post('/generate', checkPermission('payroll', 'generate'), payrollController.generate);
 
 /**
  * @swagger
@@ -34,7 +40,7 @@ router.use(authenticate);
  *       200:
  *         description: List of payroll records
  */
-router.get('/', payrollController.getAll);
+router.get('/', checkPermission('payroll', 'view'), payrollController.getAll);
 
 /**
  * @swagger
@@ -53,7 +59,7 @@ router.get('/', payrollController.getAll);
  *       200:
  *         description: Payroll record details
  */
-router.get('/:id', payrollController.getById);
+router.get('/:id', checkPermission('payroll', 'view'), payrollController.getById);
 
 /**
  * @swagger
@@ -78,8 +84,6 @@ router.get('/:id', payrollController.getById);
  *       201:
  *         description: Payroll generated
  */
-router.post('/generate', payrollController.generate);
-
 /**
  * @swagger
  * /payroll/{id}/status:
@@ -107,7 +111,7 @@ router.post('/generate', payrollController.generate);
  *       200:
  *         description: Status updated
  */
-router.put('/:id/status', payrollController.updateStatus);
+router.put('/:id/status', checkPermission('payroll', 'manage'), payrollController.updateStatus);
 
 /**
  * @swagger
@@ -125,8 +129,6 @@ router.put('/:id/status', payrollController.updateStatus);
  *       200:
  *         description: Employee payslips
  */
-router.get('/payslips/:employeeId?', payrollController.getEmployeePayslips);
-
 /**
  * @swagger
  * /payroll/summary/{payPeriod}:
@@ -144,6 +146,4 @@ router.get('/payslips/:employeeId?', payrollController.getEmployeePayslips);
  *       200:
  *         description: Payroll summary
  */
-router.get('/summary/:payPeriod', payrollController.getPeriodSummary);
-
 export default router;

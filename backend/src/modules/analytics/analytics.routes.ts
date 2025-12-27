@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as analyticsController from './analytics.controller';
-import { authenticate } from '../../shared/middleware/auth';
+import { authenticate, authorize } from '../../shared/middleware/auth';
+import { getBurnoutAnalytics } from '../../controllers/burnout.controller';
 
 /**
  * @swagger
@@ -14,5 +15,6 @@ router.use(authenticate);
 
 router.get('/dashboard', analyticsController.getDashboard);
 router.get('/departments', analyticsController.getDepartmentStats);
+router.get('/burnout', authorize(['Super Admin', 'HR Admin']), getBurnoutAnalytics);
 
 export default router;

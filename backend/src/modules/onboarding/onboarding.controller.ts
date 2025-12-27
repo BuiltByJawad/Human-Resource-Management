@@ -1,66 +1,71 @@
 
-import { Request, Response } from 'express';
-import { asyncHandler } from '../../shared/middleware/errorHandler';
-import { onboardingService } from './onboarding.service';
-import {
-    createTemplateSchema,
-    createTaskSchema,
-    startOnboardingSchema,
-    updateTaskStatusSchema
-} from './dto';
+import { Request, Response } from 'express'
+import { asyncHandler } from '../../shared/middleware/errorHandler'
+import { onboardingService } from './onboarding.service'
+import { BadRequestError, ForbiddenError } from '../../shared/utils/errors'
+import { requireRequestOrganizationId } from '../../shared/utils/tenant'
 
-export const createTemplate = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = createTemplateSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message); // middleware handles 400? or explicit throw
+const parseDate = (value?: any) => (value ? new Date(value) : undefined)
 
-    const template = await onboardingService.createTemplate(value);
-    res.status(201).json({ success: true, data: template });
-});
+export const startProcess = asyncHandler(async (req: Request, res: Response) => {
+  const employeeId = req.params.employeeId
+  const organizationId = requireRequestOrganizationId(req as any)
+  const process = await onboardingService.startProcess(employeeId, organizationId, (req as any).user?.id, {
+    startDate: parseDate(req.body.startDate),
+    dueDate: parseDate(req.body.dueDate)
+  })
+  res.status(201).json({ success: true, data: process })
+})
 
-export const getTemplates = asyncHandler(async (req: Request, res: Response) => {
-    const templates = await onboardingService.getTemplates();
-    res.json({ success: true, data: templates });
-});
+export const getProcess = asyncHandler(async (req: Request, res: Response) => {
+  const employeeId = req.params.employeeId
+  const authReq: any = req as any
+  const role: string | undefined = authReq?.user?.role
+  const selfEmployeeId: string | undefined = authReq?.user?.employeeId
+  const privilegedRoles = ['Super Admin', 'HR Admin', 'Manager']
 
-export const addTaskToTemplate = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = createTaskSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+  if (!employeeId) throw new BadRequestError('Employee ID required')
 
-    const task = await onboardingService.addTaskToTemplate(value);
-    res.status(201).json({ success: true, data: task });
-});
+  const organizationId = requireRequestOrganizationId(req as any)
+  const isPrivileged = privilegedRoles.includes(role || '')
 
-export const startOnboarding = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = startOnboardingSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+  if (!isPrivileged) {
+    if (!selfEmployeeId) throw new BadRequestError('Employee profile missing')
+    if (employeeId !== selfEmployeeId) {
+      throw new ForbiddenError('You can only view your own onboarding process')
+    }
+  }
 
-    const process = await onboardingService.startOnboarding(value);
-    res.status(201).json({ success: true, data: process });
-});
+  const process = await onboardingService.getProcess(employeeId, organizationId)
+  res.json({ success: true, data: process })
+})
 
-export const getMyOnboarding = asyncHandler(async (req: Request, res: Response) => {
-    // Assuming user id is attached to req.user and we can find employee from it
-    // For now, allow passing employeeId param for flexibility
-    const employeeId = req.params.employeeId;
-    const process = await onboardingService.getEmployeeOnboarding(employeeId);
-    res.json({ success: true, data: process });
-});
+export const createTask = asyncHandler(async (req: Request, res: Response) => {
+  const employeeId = req.params.employeeId
+  const { title, description, assigneeUserId, dueDate } = req.body
+  if (!title) throw new Error('Title is required')
+  const organizationId = requireRequestOrganizationId(req as any)
+  const task = await onboardingService.createTask(employeeId, organizationId, {
+    title,
+    description,
+    assigneeUserId,
+    dueDate: parseDate(dueDate)
+  })
+  res.status(201).json({ success: true, data: task })
+})
 
-export const updateTaskStatus = asyncHandler(async (req: Request, res: Response) => {
-    const taskId = req.params.taskId;
-    const { error, value } = updateTaskStatusSchema.validate(req.body);
-    if (error) throw new Error(error.details[0].message);
+export const updateTask = asyncHandler(async (req: Request, res: Response) => {
+  const taskId = req.params.taskId
+  const organizationId = requireRequestOrganizationId(req as any)
+  const updated = await onboardingService.updateTask(taskId, organizationId, req.body)
+  res.json({ success: true, data: updated })
+})
 
-    // Potentially add completedBy from logged in user
-    const updated = await onboardingService.updateTaskStatus(taskId, {
-        ...value,
-        completedBy: (req as any).user?.id || 'system',
-    });
-
-    res.json({ success: true, data: updated });
-});
-
-export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
-    const data = await onboardingService.getDashboard();
-    res.json({ success: true, data });
-});
+export const completeTask = asyncHandler(async (req: Request, res: Response) => {
+  const taskId = req.params.taskId
+  const userId = (req as any).user?.id
+  if (!userId) throw new BadRequestError('User not authenticated')
+  const organizationId = requireRequestOrganizationId(req as any)
+  const updated = await onboardingService.completeTask(taskId, organizationId, userId)
+  res.json({ success: true, data: updated })
+})

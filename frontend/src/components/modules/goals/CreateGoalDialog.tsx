@@ -26,7 +26,9 @@ export const CreateGoalDialog: React.FC<CreateGoalDialogProps> = ({ onSuccess })
             setTitle('');
             if (onSuccess) onSuccess();
         } catch (error) {
-            console.error('Failed to create goal:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to create goal:', error);
+            }
         } finally {
             setLoading(false);
         }

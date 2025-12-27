@@ -22,13 +22,8 @@ export interface EmployeeTraining {
 export const trainingService = {
     // For Employees: Get their assigned courses
     getMyCourses: async () => {
-        try {
-            const response = await api.get<{ data: EmployeeTraining[] }>('/training/my-courses');
-            return Array.isArray(response.data?.data) ? response.data.data : [];
-        } catch (error) {
-            console.error('Failed to fetch training courses:', error);
-            return [];
-        }
+        const response = await api.get<{ data: EmployeeTraining[] }>('/training/my-courses');
+        return Array.isArray(response.data?.data) ? response.data.data : [];
     },
 
     // Update progress
@@ -43,7 +38,9 @@ export const trainingService = {
             const response = await api.get<{ data: TrainingCourse[] }>('/training/courses');
             return Array.isArray(response.data?.data) ? response.data.data : [];
         } catch (error) {
-            console.error('Failed to fetch all courses:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to fetch all courses:', error);
+            }
             return [];
         }
     },

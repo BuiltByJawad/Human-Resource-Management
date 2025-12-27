@@ -5,7 +5,7 @@ import {
     createReview,
     getEmployeeReviews,
     summarizeFeedback
-} from '../controllers/performance.controller';
+} from '@/controllers/performance.controller';
 import { authenticate, authorize } from '@/shared/middleware/auth';
 
 const router = Router();

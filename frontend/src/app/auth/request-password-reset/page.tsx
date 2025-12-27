@@ -33,7 +33,7 @@ export default function RequestPasswordResetPage() {
     setIsSubmitting(true)
 
     try {
-      const response = await api.post('/auth/password-reset/request', { email: data.email })
+      const response = await api.post('/auth/password/request-reset', { email: data.email })
       const message = response.data?.message || 'If this email exists, a reset link will be sent shortly.'
       setSuccessMessage(message)
     } catch (error: any) {

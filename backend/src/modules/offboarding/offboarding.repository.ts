@@ -10,9 +10,9 @@ export class OffboardingRepository {
         });
     }
 
-    async getProcessByEmployeeId(employeeId: string): Promise<OffboardingProcess | null> {
-        return prisma.offboardingProcess.findUnique({
-            where: { employeeId },
+    async getProcessByEmployeeId(employeeId: string, organizationId: string): Promise<OffboardingProcess | null> {
+        return prisma.offboardingProcess.findFirst({
+            where: { employeeId, employee: { organizationId } },
             include: {
                 tasks: true,
                 employee: {
@@ -28,10 +28,10 @@ export class OffboardingRepository {
         });
     }
 
-    async getProcessById(id: string): Promise<OffboardingProcess | null> {
-        return prisma.offboardingProcess.findUnique({
-            where: { id },
-            include: { tasks: true },
+    async getProcessById(id: string, organizationId: string): Promise<OffboardingProcess | null> {
+        return prisma.offboardingProcess.findFirst({
+            where: { id, employee: { organizationId } },
+            include: { tasks: true, employee: { select: { id: true, firstName: true, lastName: true, email: true, department: { select: { name: true } } } } },
         });
     }
 
@@ -43,22 +43,39 @@ export class OffboardingRepository {
         await prisma.offboardingTask.createMany({ data });
     }
 
-    async updateTask(id: string, data: any): Promise<OffboardingTask> {
+    async updateTask(id: string, data: any, organizationId: string): Promise<OffboardingTask | null> {
+        const existing = await prisma.offboardingTask.findFirst({
+            where: { id, process: { employee: { organizationId } } },
+        });
+        if (!existing) {
+            return null;
+        }
+
         return prisma.offboardingTask.update({
             where: { id },
             data,
         });
     }
 
-    async updateProcess(id: string, data: any): Promise<OffboardingProcess> {
-        return prisma.offboardingProcess.update({
-            where: { id },
+    async updateProcess(id: string, data: any, organizationId: string): Promise<OffboardingProcess | null> {
+        const updated = await prisma.offboardingProcess.updateMany({
+            where: { id, employee: { organizationId } },
             data,
+        });
+
+        if (!updated.count) {
+            return null;
+        }
+
+        return prisma.offboardingProcess.findFirst({
+            where: { id, employee: { organizationId } },
+            include: { tasks: true },
         });
     }
 
-    async getAllProcesses(): Promise<OffboardingProcess[]> {
+    async getAllProcesses(organizationId: string): Promise<OffboardingProcess[]> {
         return prisma.offboardingProcess.findMany({
+            where: { employee: { organizationId } },
             include: {
                 employee: {
                     select: {

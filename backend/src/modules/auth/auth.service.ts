@@ -27,6 +27,7 @@ import {
     AuthResponse,
 } from './dto';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../../shared/config/database';
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex');
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
@@ -36,10 +37,12 @@ export class AuthService {
      * Register a new user
      */
     async register(data: RegisterDto): Promise<AuthResponse> {
-        const { email, password, firstName, lastName } = data;
+        const { email, password, firstName, lastName, organizationId } = data;
 
         // Check if user exists
-        const existingUser = await authRepository.findUserByEmail(email);
+        const existingUser = organizationId
+            ? await authRepository.findUserByEmailAndOrganization(email, organizationId)
+            : await authRepository.findUserByEmail(email);
         if (existingUser) {
             throw new BadRequestError('Email already in use');
         }
@@ -61,11 +64,17 @@ export class AuthService {
             firstName,
             lastName,
             role: { connect: { id: defaultRole.id } },
+            ...(organizationId ? { organization: { connect: { id: organizationId } } } : {}),
             status: 'active',
         });
 
         // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name);
+        const { accessToken, refreshToken } = generateTokens(
+            user.id,
+            user.email,
+            user.role.name,
+            (user as any)?.organizationId
+        );
 
         // Audit log
         await createAuditLog({
@@ -93,6 +102,12 @@ export class AuthService {
     async inviteUser(data: InviteUserDto, invitedBy: string): Promise<{ inviteId: string; inviteLink: string }> {
         const { email, roleId, expiresInHours = 72 } = data;
 
+        const inviter = await authRepository.findUserById(invitedBy);
+        const organizationId = inviter?.organizationId;
+        if (!organizationId) {
+            throw new BadRequestError('Inviter organization not found');
+        }
+
         // Validate role exists
         const role = await authRepository.findRoleById(roleId);
         if (!role) {
@@ -100,10 +115,10 @@ export class AuthService {
         }
 
         // Check for existing employee
-        const employeeForEmail = await authRepository.findEmployeeByEmail(email);
+        const employeeForEmail = await authRepository.findEmployeeByEmailAndOrganization(email, organizationId);
 
         // Check for existing user
-        let user = await authRepository.findUserByEmail(email);
+        let user = await authRepository.findUserByEmailAndOrganization(email, organizationId);
 
         if (user && user.verified) {
             throw new BadRequestError('User is already active and verified');
@@ -118,6 +133,7 @@ export class AuthService {
                 email,
                 password: hashedRandomPassword,
                 role: { connect: { id: roleId } },
+                organization: { connect: { id: organizationId } },
                 status: 'active',
                 verified: false,
                 firstName: employeeForEmail?.firstName ?? null,
@@ -163,19 +179,25 @@ export class AuthService {
 
         // Link employee to user
         if (employeeForEmail && user) {
-            await authRepository.updateEmployeeUserId(email, user.id);
+            await authRepository.updateEmployeeUserIdScoped(email, organizationId, user.id);
         }
 
         // Generate invite link
         const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}`;
 
+        const settings = await prisma.companySettings.findFirst({
+            where: { organizationId: organizationId ?? null },
+            select: { siteName: true },
+        });
+        const siteName = settings?.siteName || 'NovaHR';
+
         // Send email (fire and forget)
         sendEmail({
             to: email,
-            subject: 'You have been invited to NovaHR',
+            subject: `You have been invited to ${siteName}`,
             html: `
         <p>Hello,</p>
-        <p>You have been invited to join the HRM system. Click the button below to set your password and activate your account:</p>
+        <p>You have been invited to join ${siteName}. Click the button below to set your password and activate your account:</p>
         <p><a href="${inviteLink}" style="display:inline-block;padding:8px 16px;border-radius:4px;background:#2563eb;color:#ffffff;text-decoration:none;">Accept invite</a></p>
         <p>If the button does not work, copy and paste this link into your browser:</p>
         <p><a href="${inviteLink}">${inviteLink}</a></p>
@@ -284,13 +306,19 @@ export class AuthService {
 
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reset-password?token=${token}`;
 
+        const settings = await prisma.companySettings.findFirst({
+            where: { organizationId: user.organizationId ?? null },
+            select: { siteName: true },
+        });
+        const siteName = settings?.siteName || 'NovaHR';
+
         // Send email (fire and forget)
         sendEmail({
             to: email,
-            subject: 'Reset your NovaHR password',
+            subject: `Reset your ${siteName} password`,
             html: `
         <p>Hello,</p>
-        <p>We received a request to reset the password for your HRM account. Click the button below to set a new password:</p>
+        <p>We received a request to reset the password for your ${siteName} account. Click the button below to set a new password:</p>
         <p><a href="${resetLink}" style="display:inline-block;padding:8px 16px;border-radius:4px;background:#2563eb;color:#ffffff;text-decoration:none;">Reset password</a></p>
         <p>If you did not request this, you can safely ignore this email.</p>
         <p>If the button does not work, copy and paste this link into your browser:</p>
@@ -307,7 +335,7 @@ export class AuthService {
             resourceId: user.id,
         });
 
-        return { resetLink };
+        return { resetLink: process.env.NODE_ENV !== 'production' ? resetLink : '' };
     }
 
     /**
@@ -349,9 +377,11 @@ export class AuthService {
      * Login user
      */
     async login(data: LoginDto): Promise<AuthResponse> {
-        const { email, password } = data;
+        const { email, password, organizationId } = data;
 
-        const user = await authRepository.findUserByEmail(email);
+        const user = organizationId
+            ? await authRepository.findUserByEmailAndOrganization(email, organizationId)
+            : await authRepository.findUserByEmail(email);
 
         if (!user || user.status !== 'active') {
             throw new UnauthorizedError('Invalid credentials or inactive account');
@@ -370,7 +400,12 @@ export class AuthService {
         }
 
         // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name);
+        const { accessToken, refreshToken } = generateTokens(
+            user.id,
+            user.email,
+            user.role.name,
+            (user as any)?.organizationId
+        );
 
         // Update last login
         await authRepository.updateUser(user.id, {
@@ -418,15 +453,21 @@ export class AuthService {
             throw new UnauthorizedError('Invalid or expired refresh token');
         }
 
-        // Get user
-        const user = await authRepository.findUserByEmail(payload.email);
+        if (!payload || (!payload.userId && !payload.email)) {
+            throw new UnauthorizedError('Invalid refresh token payload');
+        }
+
+        // Get user (prefer userId from token, fallback to email)
+        const user = payload?.userId
+            ? await authRepository.findUserById(payload.userId)
+            : await authRepository.findUserByEmail(payload.email);
 
         if (!user || user.status !== 'active') {
             throw new UnauthorizedError('User not found or inactive');
         }
 
         // Generate new tokens
-        const tokens = generateTokens(user.id, user.email, user.role!.name);
+        const tokens = generateTokens(user.id, user.email, user.role!.name, (user as any)?.organizationId);
 
         // Get permissions
         const userWithPerms = await authRepository.findUserByEmail(user.email);

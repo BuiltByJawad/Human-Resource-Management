@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import Image from 'next/image'
 
@@ -16,6 +16,10 @@ export default function AvatarUpload({ currentAvatarUrl, onUpload, onRemove, cla
     const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatarUrl || null)
     const [isDragging, setIsDragging] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        setPreviewUrl(currentAvatarUrl || null)
+    }, [currentAvatarUrl])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (disabled) return

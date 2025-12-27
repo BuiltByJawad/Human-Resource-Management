@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
@@ -103,7 +104,13 @@ export default function MobileMenu({ isOpen, onClose, user }: MobileMenuProps) {
                     <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg overflow-hidden">
                             {logoUrl ? (
-                                <img src={logoUrl} alt={siteName} className="h-full w-full object-cover" />
+                                <Image
+                                    src={logoUrl}
+                                    alt={siteName}
+                                    fill
+                                    sizes="36px"
+                                    className="object-cover"
+                                />
                             ) : (
                                 <span>{shortName}</span>
                             )}

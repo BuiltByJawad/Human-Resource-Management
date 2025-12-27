@@ -1,7 +1,8 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { authService } from './auth.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { AuthRequest } from '../../shared/middleware/auth';
+import { TenantRequest } from '../../shared/middleware/tenant';
 import { BadRequestError, UnauthorizedError } from '../../shared/utils/errors';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../../shared/constants';
 
@@ -9,7 +10,13 @@ import { HTTP_STATUS, SUCCESS_MESSAGES } from '../../shared/constants';
  * Register a new user
  */
 export const register = asyncHandler(async (req: Request, res: Response) => {
-    const result = await authService.register(req.body as any);
+    const tenantReq = req as TenantRequest;
+    const organizationId = tenantReq.tenant?.id;
+
+    const result = await authService.register({
+        ...(req.body as any),
+        organizationId,
+    } as any);
     res.status(HTTP_STATUS.CREATED).json({
         success: true,
         data: result,
@@ -66,7 +73,13 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
  * Login
  */
 export const login = asyncHandler(async (req: Request, res: Response) => {
-    const result = await authService.login(req.body as any);
+    const tenantReq = req as TenantRequest;
+    const organizationId = tenantReq.tenant?.id;
+
+    const result = await authService.login({
+        ...(req.body as any),
+        organizationId,
+    } as any);
     res.json({
         success: true,
         data: result,

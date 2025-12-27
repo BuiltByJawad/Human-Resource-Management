@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { authenticate, authorize } from '../../shared/middleware/auth';
+import { authenticate } from '../../shared/middleware/auth';
 import * as expenseController from './expense.controller';
 
 const router = Router();
@@ -23,7 +23,6 @@ router.get(
 router.get(
     '/pending',
     authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager']),
     expenseController.getPendingClaims
 );
 
@@ -31,7 +30,6 @@ router.get(
 router.patch(
     '/:id/status',
     authenticate,
-    authorize(['Super Admin', 'HR Admin', 'Manager']),
     expenseController.updateStatus
 );
 

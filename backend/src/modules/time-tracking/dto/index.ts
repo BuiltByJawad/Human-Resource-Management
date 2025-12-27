@@ -39,7 +39,7 @@ export const createProjectSchema = Joi.object({
 });
 
 export const clockInSchema = Joi.object({
-    employeeId: Joi.string().uuid().required(),
+    employeeId: Joi.string().uuid().optional(),
     projectId: Joi.string().uuid().optional(),
     date: Joi.date().iso().required(),
     startTime: Joi.date().iso().required(),
@@ -51,7 +51,7 @@ export const clockOutSchema = Joi.object({
 });
 
 export const manualEntrySchema = Joi.object({
-    employeeId: Joi.string().uuid().required(),
+    employeeId: Joi.string().uuid().optional(),
     projectId: Joi.string().uuid().optional(),
     date: Joi.date().iso().required(),
     startTime: Joi.date().iso().required(),

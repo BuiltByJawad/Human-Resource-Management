@@ -1,14 +1,14 @@
 import { Router } from 'express'
+import Joi from 'joi'
 import {
   createDepartment,
   getDepartments,
   getDepartmentById,
   updateDepartment,
   deleteDepartment
-} from '../controllers/departmentController'
-import { authenticate, authorize } from '@/shared/middleware/auth';
-import { validateRequest } from '@/shared/middleware/validation';
-import Joi from 'joi'
+} from '@/controllers/departmentController'
+import { authenticate, authorize } from '@/shared/middleware/auth'
+import { validateRequest } from '@/shared/middleware/validation'
 
 const router = Router()
 

@@ -1,32 +1,35 @@
 import { prisma } from '../../shared/config/database';
 
 export class AnalyticsRepository {
-    async getEmployeeCount() {
-        return prisma.employee.count();
+    async getEmployeeCount(organizationId: string) {
+        return prisma.employee.count({ where: { organizationId } });
     }
 
-    async getActiveEmployeeCount() {
-        return prisma.employee.count({ where: { status: 'active' } });
+    async getActiveEmployeeCount(organizationId: string) {
+        return prisma.employee.count({ where: { organizationId, status: 'active' } });
     }
 
-    async getNewHiresCount(startDate: Date, endDate: Date) {
+    async getNewHiresCount(organizationId: string, startDate: Date, endDate: Date) {
         return prisma.employee.count({
             where: {
+                organizationId,
                 hireDate: { gte: startDate, lte: endDate },
             },
         });
     }
 
-    async getAvgSalary() {
+    async getAvgSalary(organizationId: string) {
         const result = await prisma.employee.aggregate({
+            where: { organizationId },
             _avg: { salary: true },
         });
         return result._avg.salary || 0;
     }
 
-    async getDepartmentCounts() {
+    async getDepartmentCounts(organizationId: string) {
         return prisma.employee.groupBy({
             by: ['departmentId'],
+            where: { organizationId },
             _count: true,
         });
     }

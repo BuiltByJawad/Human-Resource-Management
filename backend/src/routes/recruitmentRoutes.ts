@@ -1,12 +1,12 @@
 import express from 'express'
-import { authenticate, checkPermission } from '@/shared/middleware/auth';
+import { authenticate, checkPermission } from '@/shared/middleware/auth'
 import {
     getJobPostings,
     createJobPosting,
     getApplicants,
     createApplicant,
     updateApplicantStatus
-} from '../controllers/recruitmentController'
+} from '@/controllers/recruitmentController'
 
 const router = express.Router()
 

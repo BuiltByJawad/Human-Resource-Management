@@ -2,12 +2,14 @@ import { Request, Response } from 'express';
 import { employeeService } from './employee.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
+import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 /**
  * Get all employees with pagination and filters
  */
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const result = await employeeService.getAll(req.query);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const result = await employeeService.getAll(req.query, organizationId);
 
     res.json({
         status: 'success',
@@ -19,7 +21,8 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
  * Get employee by ID
  */
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const employee = await employeeService.getById(req.params.id);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const employee = await employeeService.getById(req.params.id, organizationId);
 
     res.json({
         status: 'success',
@@ -31,7 +34,8 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
  * Create new employee
  */
 export const create = asyncHandler(async (req: Request, res: Response) => {
-    const employee = await employeeService.create(req.body);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const employee = await employeeService.create(req.body, organizationId);
 
     res.status(HTTP_STATUS.CREATED).json({
         status: 'success',
@@ -43,7 +47,8 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
  * Update employee
  */
 export const update = asyncHandler(async (req: Request, res: Response) => {
-    const employee = await employeeService.update(req.params.id, req.body);
+    const organizationId = requireRequestOrganizationId(req as any);
+    const employee = await employeeService.update(req.params.id, req.body, organizationId);
 
     res.json({
         status: 'success',
@@ -55,7 +60,8 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
  * Delete employee
  */
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-    await employeeService.delete(req.params.id);
+    const organizationId = requireRequestOrganizationId(req as any);
+    await employeeService.delete(req.params.id, organizationId);
 
     res.json({
         status: 'success',

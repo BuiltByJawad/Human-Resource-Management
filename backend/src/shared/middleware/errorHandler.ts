@@ -3,12 +3,37 @@ import { AppError } from '../utils/errors'
 import { logger } from '../config/database'
 
 export const errorHandler = (
-  error: AppError,
+  error: any,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const { statusCode = 500, message, isOperational = false } = error
+  // Prisma errors (avoid leaking internals; return actionable 4xx)
+  if (error?.name === 'PrismaClientKnownRequestError') {
+    const code = error?.code
+    if (code === 'P2002') {
+      const target = Array.isArray(error?.meta?.target) ? error.meta.target.join(', ') : String(error?.meta?.target || 'field')
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: `Duplicate value for unique field(s): ${target}`,
+          ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
+        },
+      })
+    }
+    if (code === 'P2003') {
+      const field = String(error?.meta?.field_name || 'foreign key')
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: `Invalid reference for ${field}`,
+          ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
+        },
+      })
+    }
+  }
+
+  const { statusCode = 500, message, isOperational = false } = error as AppError
   
   if (!isOperational) {
     logger.error('Non-operational error:', {
