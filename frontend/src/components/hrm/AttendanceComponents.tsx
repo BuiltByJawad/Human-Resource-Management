@@ -3,20 +3,9 @@
 import { Button, Card } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 import { ClockIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from '@heroicons/react/24/outline'
+import type { AttendanceRecord as AttendanceRecordBase } from '@/types/hrm'
 
-export interface AttendanceRecord {
-    id: string
-    checkIn: string
-    checkOut?: string
-    status: 'present' | 'absent' | 'late' | 'half_day'
-    workHours?: number
-    employee: {
-        id: string
-        firstName: string
-        lastName: string
-        email: string
-    }
-}
+export type AttendanceRecord = AttendanceRecordBase
 
 interface AttendanceCardProps {
     status: 'checked_in' | 'checked_out'

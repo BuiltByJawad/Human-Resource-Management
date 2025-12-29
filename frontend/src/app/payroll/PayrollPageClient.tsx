@@ -11,10 +11,11 @@ import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
+import { handleCrudError } from "@/lib/apiError"
+import { fetchPayrollRecords, generatePayroll, updatePayrollStatus } from "@/lib/hrmData"
 
 import { PayrollRecord } from "./types"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 const STALE_TIME = 10 * 60 * 1000
 const GC_TIME = 15 * 60 * 1000
 
@@ -32,23 +33,7 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
 
   const payrollQuery = useQuery<PayrollRecord[]>({
     queryKey: ["payroll", "list"],
-    queryFn: async () => {
-      const res = await fetch(`${API_URL}/payroll`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        const message = data?.error || data?.message || "Failed to fetch payroll"
-        throw new Error(message)
-      }
-      const listCandidates = [
-        Array.isArray(data) ? data : null,
-        Array.isArray(data?.data) ? data.data : null,
-        Array.isArray((data as any)?.items) ? (data as any).items : null,
-        Array.isArray((data as any)?.payrolls) ? (data as any).payrolls : null,
-      ]
-      return (listCandidates.find((c) => Array.isArray(c)) ?? []) as PayrollRecord[]
-    },
+    queryFn: () => fetchPayrollRecords(token ?? undefined),
     enabled: !!token,
     staleTime: STALE_TIME,
     gcTime: GC_TIME,
@@ -65,52 +50,31 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
   }, [payrollQuery.data])
 
   const generateMutation = useMutation({
-    mutationFn: async (payPeriod: string) => {
-      const res = await fetch(`${API_URL}/payroll/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ payPeriod }),
-      })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData?.details || errData?.message || "Failed to generate payroll")
-      }
-      return res.json()
-    },
+    mutationFn: (payPeriod: string) => generatePayroll(payPeriod, token ?? undefined),
     onSuccess: () => {
       showToast("Payroll generated successfully!", "success")
       queryClient.invalidateQueries({ queryKey: ["payroll", "list"] })
     },
-    onError: (error: any) => {
-      showToast(error?.message || "An error occurred while generating payroll", "error")
-    },
+    onError: (error: unknown) =>
+      handleCrudError({
+        error,
+        resourceLabel: "Payroll generation",
+        showToast,
+      }),
   })
 
   const statusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await fetch(`${API_URL}/payroll/${id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status }),
-      })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData?.message || "Failed to update status")
-      }
-      return res.json()
-    },
+    mutationFn: ({ id, status }: { id: string; status: PayrollRecord["status"] }) =>
+      updatePayrollStatus(id, status, token ?? undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll", "list"] })
     },
-    onError: (error: any) => {
-      showToast(error?.message || "Error updating status", "error")
-    },
+    onError: (error: unknown) =>
+      handleCrudError({
+        error,
+        resourceLabel: "Payroll status",
+        showToast,
+      }),
   })
 
   const columns: Column<PayrollRecord>[] = [
@@ -139,8 +103,8 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
     {
       header: "Status",
       key: "status",
-      render: (val) => {
-        const colors: Record<string, string> = {
+      render: (val: PayrollRecord["status"]) => {
+        const colors: Record<PayrollRecord["status"], string> = {
           draft: "bg-yellow-100 text-yellow-800",
           processed: "bg-blue-100 text-blue-800",
           paid: "bg-green-100 text-green-800",

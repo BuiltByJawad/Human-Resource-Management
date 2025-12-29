@@ -9,15 +9,16 @@ import Header from "@/components/ui/Header"
 import { Button } from "@/components/ui/FormComponents"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
-import { Asset, AssetCard, AssetForm, AssignmentModal } from "@/components/hrm/AssetComponents"
+import { Asset, AssetCard, AssetForm, AssignmentModal, type AssetFormData } from "@/components/hrm/AssetComponents"
 import { useDebounce } from "@/hooks/useDebounce"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+import { handleCrudError } from "@/lib/apiError"
+import { fetchAssets, fetchEmployees, createAsset, updateAsset, assignAsset, returnAsset } from "@/lib/hrmData"
+import type { Employee } from "@/types/hrm"
 
 interface AssetsPageClientProps {
   initialAssets?: Asset[]
-  initialEmployees?: any[]
+  initialEmployees?: Employee[]
 }
 
 export function AssetsPageClient({
@@ -39,45 +40,26 @@ export function AssetsPageClient({
   const debouncedSearch = useDebounce(searchQuery, 500)
 
   const assetsQuery = useQuery<Asset[]>({
-    queryKey: ["assets", filterStatus || "all", debouncedSearch || ""],
-    queryFn: async () => {
-      const params = new URLSearchParams()
-      if (filterStatus) params.append("status", filterStatus)
-      if (debouncedSearch) params.append("search", debouncedSearch)
-
-      const response = await fetch(`${API_URL}/assets?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) {
-        const message = payload?.message || "Failed to fetch assets"
-        throw new Error(message)
-      }
-      if (Array.isArray(payload?.data)) return payload.data as Asset[]
-      if (Array.isArray(payload?.assets)) return payload.assets
-      if (Array.isArray(payload)) return payload
-      return []
-    },
+    queryKey: ["assets", filterStatus || "all", debouncedSearch || "", token],
+    queryFn: () =>
+			fetchAssets(
+				{
+					status: filterStatus || undefined,
+					search: debouncedSearch || undefined,
+				},
+				token ?? undefined,
+			),
     enabled: !!token,
     initialData: filterStatus === "" && !debouncedSearch ? initialAssets : undefined,
     refetchOnWindowFocus: false,
   })
 
-  const employeesQuery = useQuery<any[]>({
-    queryKey: ["assets", "employees"],
+  const employeesQuery = useQuery<Employee[]>({
+    queryKey: ["assets", "employees", token],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/employees`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) {
-        throw new Error(payload?.message || "Failed to fetch employees")
-      }
-      if (Array.isArray(payload?.data)) return payload.data
-      if (Array.isArray(payload?.employees)) return payload.employees
-      if (Array.isArray(payload)) return payload
-      return []
-    },
+			const page = await fetchEmployees({ page: 1, limit: 200 }, token ?? undefined)
+			return page.employees
+		},
     enabled: !!token,
     initialData: initialEmployees,
     staleTime: 5 * 60 * 1000,
@@ -88,59 +70,40 @@ export function AssetsPageClient({
   }
 
   const createAssetMutation = useMutation({
-    mutationFn: async (assetData: any) => {
-      const response = await fetch(`${API_URL}/assets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(assetData),
-      })
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err?.message || "Failed to create asset")
-      }
-    },
+    mutationFn: (assetData: AssetFormData) => createAsset(assetData, token ?? undefined),
     onSuccess: () => {
       showToast("Asset created successfully", "success")
       invalidateAssets()
       setIsFormOpen(false)
       setSelectedAsset(null)
     },
-    onError: (error: any) => {
-      showToast(error?.message || "Failed to create asset", "error")
-    },
+    onError: (error: unknown) =>
+			handleCrudError({
+				error,
+				resourceLabel: "Asset",
+				showToast,
+			}),
   })
 
   const updateAssetMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const response = await fetch(`${API_URL}/assets/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      })
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err?.message || "Failed to update asset")
-      }
-    },
+    mutationFn: ({ id, data }: { id: string; data: AssetFormData }) =>
+			updateAsset(id, data, token ?? undefined),
     onSuccess: () => {
       showToast("Asset updated successfully", "success")
       invalidateAssets()
       setIsFormOpen(false)
       setSelectedAsset(null)
     },
-    onError: (error: any) => {
-      showToast(error?.message || "Failed to update asset", "error")
-    },
+    onError: (error: unknown) =>
+			handleCrudError({
+				error,
+				resourceLabel: "Asset",
+				showToast,
+			}),
   })
 
   const assignAssetMutation = useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       assetId,
       employeeId,
       notes,
@@ -148,52 +111,36 @@ export function AssetsPageClient({
       assetId: string
       employeeId: string
       notes: string
-    }) => {
-      const response = await fetch(`${API_URL}/assets/${assetId}/assign`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ employeeId, notes }),
-      })
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err?.message || "Failed to assign asset")
-      }
-    },
+    }) => assignAsset(assetId, { employeeId, notes }, token ?? undefined),
     onSuccess: () => {
       showToast("Asset assigned successfully", "success")
       invalidateAssets()
       setIsAssignModalOpen(false)
       setSelectedAsset(null)
     },
-    onError: (error: any) => {
-      showToast(error?.message || "Failed to assign asset", "error")
-    },
+    onError: (error: unknown) =>
+			handleCrudError({
+				error,
+				resourceLabel: "Asset assignment",
+				showToast,
+			}),
   })
 
   const returnAssetMutation = useMutation({
-    mutationFn: async (assetId: string) => {
-      const response = await fetch(`${API_URL}/assets/${assetId}/return`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err?.message || "Failed to return asset")
-      }
-    },
+    mutationFn: (assetId: string) => returnAsset(assetId, token ?? undefined),
     onSuccess: () => {
       showToast("Asset returned successfully", "success")
       invalidateAssets()
     },
-    onError: (error: any) => {
-      showToast(error?.message || "Failed to return asset", "error")
-    },
+    onError: (error: unknown) =>
+			handleCrudError({
+				error,
+				resourceLabel: "Asset return",
+				showToast,
+			}),
   })
 
-  const handleSubmitAsset = async (assetData: any) => {
+  const handleSubmitAsset = async (assetData: AssetFormData) => {
     if (selectedAsset) {
       await updateAssetMutation.mutateAsync({ id: selectedAsset.id, data: assetData })
     } else {

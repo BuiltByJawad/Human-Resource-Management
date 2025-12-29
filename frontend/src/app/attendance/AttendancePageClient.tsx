@@ -8,9 +8,9 @@ import Header from '@/components/ui/Header'
 import { AttendanceCard, AttendanceHistory, type AttendanceRecord } from '@/components/hrm/AttendanceComponents'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
-import api from '@/lib/axios'
 import { handleCrudError } from '@/lib/apiError'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { clockIn, clockOut, fetchAttendanceRecords } from '@/lib/hrmData'
 
 interface AttendancePageClientProps {
   initialAttendance?: AttendanceRecord[]
@@ -23,12 +23,7 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
 
   const attendanceQuery = useQuery<AttendanceRecord[]>({
     queryKey: ['attendance', token],
-    queryFn: async () => {
-      const response = await api.get('/attendance', {
-        params: { limit: 30 },
-      })
-      return Array.isArray(response.data?.data) ? response.data.data : []
-    },
+    queryFn: () => fetchAttendanceRecords(token ?? undefined, 30),
     enabled: !!token,
     retry: false,
     initialData: initialAttendance,
@@ -103,8 +98,7 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
 
   const clockInMutation = useMutation({
     mutationFn: async (locationData: { latitude: number; longitude: number }) => {
-      const response = await api.post('/attendance/clock-in', locationData)
-      return response.data
+      return clockIn(locationData, token ?? undefined)
     },
     onSuccess: () => {
       showToast('Clocked in successfully', 'success')
@@ -123,8 +117,14 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
       attendanceId: string
       locationData: { latitude?: number; longitude?: number }
     }) => {
-      const response = await api.put(`/attendance/clock-out/${attendanceId}`, locationData)
-      return response.data
+      return clockOut(
+        {
+          attendanceId,
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+        },
+        token ?? undefined,
+      )
     },
     onSuccess: () => {
       showToast('Clocked out successfully', 'success')
@@ -141,7 +141,11 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
     try {
       showToast('Acquiring location...', 'info')
       const locationData = await getPosition()
-      await clockInMutation.mutateAsync(locationData)
+      // Use mutate so API errors are handled solely by the mutation's onError
+      // (which already calls handleCrudError and shows a friendly message
+      // such as "Already checked in today"). The catch block below is now
+      // reserved for genuine geolocation failures only.
+      clockInMutation.mutate(locationData)
     } catch (geoError) {
       console.error('Geolocation failed', geoError)
       showToast('Location access is required to clock in. Please enable it.', 'error')

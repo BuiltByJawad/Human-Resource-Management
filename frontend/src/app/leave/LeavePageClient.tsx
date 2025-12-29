@@ -6,14 +6,14 @@ import { PlusIcon, FunnelIcon, ClipboardDocumentListIcon } from '@heroicons/reac
 
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
-import { LeaveRequestCard, LeaveRequestForm, type LeaveRequest } from '@/components/hrm/LeaveComponents'
+import { LeaveRequestCard, LeaveRequestForm, type LeaveRequest, type LeaveRequestFormData } from '@/components/hrm/LeaveComponents'
 import { Modal } from '@/components/ui/Modal'
 import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { PERMISSIONS } from '@/constants/permissions'
-import api from '@/lib/axios'
 import { handleCrudError } from '@/lib/apiError'
+import { fetchLeaveRequests, createLeaveRequest, approveLeave, rejectLeave } from '@/lib/hrmData'
 import { Skeleton } from '@/components/ui/Skeleton'
 
 interface LeavePageClientProps {
@@ -32,12 +32,13 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
 
   const leaveQuery = useQuery<LeaveRequest[], Error>({
     queryKey: ['leave', filterStatus, token],
-    queryFn: async () => {
-      const params: Record<string, string> = {}
-      if (filterStatus !== 'all') params.status = filterStatus
-      const response = await api.get('/leave', { params })
-      return response.data?.data ?? []
-    },
+    queryFn: () =>
+			fetchLeaveRequests(
+				{
+					status: filterStatus,
+				},
+				token ?? undefined,
+			),
     enabled: !!token,
     retry: false,
     initialData: filterStatus === 'all' ? initialRequests : undefined,
@@ -48,7 +49,8 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
   })
 
   const createMutation = useMutation({
-    mutationFn: (payload: any) => api.post('/leave', payload),
+    mutationFn: (payload: LeaveRequestFormData) =>
+			createLeaveRequest(payload, token ?? undefined),
     onSuccess: async () => {
       showToast('Leave request submitted successfully', 'success')
       await queryClient.invalidateQueries({ queryKey: ['leave'] })
@@ -63,7 +65,7 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
   })
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => api.put(`/leave/${id}/approve`),
+		mutationFn: (id: string) => approveLeave(id, token ?? undefined),
     onSuccess: () => {
       showToast('Leave request approved', 'success')
       queryClient.invalidateQueries({ queryKey: ['leave'] })
@@ -77,7 +79,7 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
   })
 
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => api.put(`/leave/${id}/reject`),
+		mutationFn: (id: string) => rejectLeave(id, token ?? undefined),
     onSuccess: () => {
       showToast('Leave request rejected', 'success')
       queryClient.invalidateQueries({ queryKey: ['leave'] })
@@ -90,7 +92,7 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
       })
   })
 
-  const handleCreateRequest = async (data: any) => {
+  const handleCreateRequest = async (data: LeaveRequestFormData) => {
     await createMutation.mutateAsync(data)
   }
 

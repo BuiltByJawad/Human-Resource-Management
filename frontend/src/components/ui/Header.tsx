@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
@@ -16,6 +17,7 @@ import api from '@/lib/axios'
 import { cn } from '@/lib/utils'
 import { useToast } from './ToastProvider'
 import { PERMISSIONS } from '@/constants/permissions'
+import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 
 type NotificationCategory =
   | 'payroll'
@@ -53,49 +55,49 @@ const CATEGORY_RULES: Array<{
   keywords: RegExp
   permission?: (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
 }> = [
-  {
-    category: 'payroll',
-    label: 'Payroll',
-    colorClass: 'bg-emerald-100 text-emerald-700',
-    keywords: /\b(payroll|salary|compensation|payout)\b/i,
-    permission: PERMISSIONS.MANAGE_PAYROLL,
-  },
-  {
-    category: 'leave',
-    label: 'Leave',
-    colorClass: 'bg-blue-100 text-blue-700',
-    keywords: /\b(leave|vacation|time off|pto)\b/i,
-    permission: PERMISSIONS.APPROVE_LEAVE,
-  },
-  {
-    category: 'compliance',
-    label: 'Compliance',
-    colorClass: 'bg-amber-100 text-amber-700',
-    keywords: /\b(compliance|audit|policy|violation)\b/i,
-    permission: PERMISSIONS.MANAGE_COMPLIANCE,
-  },
-  {
-    category: 'recruitment',
-    label: 'Recruitment',
-    colorClass: 'bg-purple-100 text-purple-700',
-    keywords: /\b(recruitment|candidate|applicant|interview)\b/i,
-    permission: PERMISSIONS.MANAGE_RECRUITMENT,
-  },
-  {
-    category: 'expense',
-    label: 'Expenses',
-    colorClass: 'bg-rose-100 text-rose-700',
-    keywords: /\b(expense|reimbursement|claim)\b/i,
-    permission: PERMISSIONS.APPROVE_EXPENSES,
-  },
-  {
-    category: 'performance',
-    label: 'Performance',
-    colorClass: 'bg-indigo-100 text-indigo-700',
-    keywords: /\b(performance|review|feedback|evaluation)\b/i,
-    permission: PERMISSIONS.MANAGE_PERFORMANCE_CYCLES,
-  },
-]
+    {
+      category: 'payroll',
+      label: 'Payroll',
+      colorClass: 'bg-emerald-100 text-emerald-700',
+      keywords: /\b(payroll|salary|compensation|payout)\b/i,
+      permission: PERMISSIONS.MANAGE_PAYROLL,
+    },
+    {
+      category: 'leave',
+      label: 'Leave',
+      colorClass: 'bg-blue-100 text-blue-700',
+      keywords: /\b(leave|vacation|time off|pto)\b/i,
+      permission: PERMISSIONS.APPROVE_LEAVE,
+    },
+    {
+      category: 'compliance',
+      label: 'Compliance',
+      colorClass: 'bg-amber-100 text-amber-700',
+      keywords: /\b(compliance|audit|policy|violation)\b/i,
+      permission: PERMISSIONS.MANAGE_COMPLIANCE,
+    },
+    {
+      category: 'recruitment',
+      label: 'Recruitment',
+      colorClass: 'bg-purple-100 text-purple-700',
+      keywords: /\b(recruitment|candidate|applicant|interview)\b/i,
+      permission: PERMISSIONS.MANAGE_RECRUITMENT,
+    },
+    {
+      category: 'expense',
+      label: 'Expenses',
+      colorClass: 'bg-rose-100 text-rose-700',
+      keywords: /\b(expense|reimbursement|claim)\b/i,
+      permission: PERMISSIONS.APPROVE_EXPENSES,
+    },
+    {
+      category: 'performance',
+      label: 'Performance',
+      colorClass: 'bg-indigo-100 text-indigo-700',
+      keywords: /\b(performance|review|feedback|evaluation)\b/i,
+      permission: PERMISSIONS.MANAGE_PERFORMANCE_CYCLES,
+    },
+  ]
 
 const SEVERITY_COLORS: Record<NotificationSeverity, string> = {
   low: 'bg-slate-400',
@@ -167,20 +169,28 @@ export default function Header() {
   const [notificationsError, setNotificationsError] = useState<string | null>(null)
 
   const { user, logout, hasPermission } = useAuthStore()
-  const { siteName, tagline, loaded: orgLoaded } = useOrgStore()
+  const initialAuth = useInitialAuth()
+  // Prefer server-fetched user on first paint to avoid showing stale
+  // persisted auth data, then fall back to the client store user.
+  const effectiveUser = (initialAuth?.user ?? user) as any
+  const branding = useBranding()
+  const { siteName: storeSiteName, tagline: storeTagline, loaded: orgLoaded } = useOrgStore()
+
+  const siteName = branding?.siteName || storeSiteName
+  const tagline = branding?.tagline || storeTagline
 
   const router = useRouter()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
 
   const avatarUrl = useMemo(() => {
-    const raw = user?.avatarUrl
+    const raw = effectiveUser?.avatarUrl
     if (!raw) return null
     if (/ui-avatars\.com\/api\//i.test(raw)) {
       return raw.includes('format=') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}format=png`
     }
     return raw
-  }, [user?.avatarUrl])
+  }, [effectiveUser?.avatarUrl])
 
   const profileRef = useClickOutside<HTMLDivElement>(() => setIsProfileOpen(false))
   const notificationsRef = useClickOutside<HTMLDivElement>(() => setIsNotificationsOpen(false))
@@ -197,7 +207,7 @@ export default function Header() {
 
   const notificationsQuery = useQuery<NotificationItem[]>({
     queryKey: ['notifications'],
-    enabled: !!user,
+    enabled: !!effectiveUser,
     queryFn: async (): Promise<NotificationItem[]> => {
       try {
         const res = await api.get('/notifications')
@@ -292,50 +302,14 @@ export default function Header() {
     }
   }
 
-  const initials = user?.firstName && user?.lastName
-    ? `${user.firstName[0]}${user.lastName[0]}`
-    : (user?.email?.[0]?.toUpperCase() ?? 'U')
+  const initials = effectiveUser?.firstName && effectiveUser?.lastName
+    ? `${effectiveUser.firstName[0]}${effectiveUser.lastName[0]}`
+    : (effectiveUser?.email?.[0]?.toUpperCase() ?? 'U')
 
-  const userFullName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || (user?.email ?? '')
-  const userRole = user?.role ?? ''
+  const userFullName = `${effectiveUser?.firstName ?? ''} ${effectiveUser?.lastName ?? ''}`.trim() || (effectiveUser?.email ?? '')
+  const userRole = effectiveUser?.role ?? ''
 
-  const hasValidUser = !!user?.id && !!user?.email
-  const shouldShowOrgSkeleton = !orgLoaded && !siteName && !tagline
-  if (!isMounted || !hasValidUser || shouldShowOrgSkeleton) {
-    return (
-      <header className="glass-header sticky top-0 z-30">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-          <div className="md:hidden h-10 w-10 rounded-lg bg-slate-100 animate-pulse mr-3 flex-shrink-0" />
-
-          <div className="flex items-center flex-1 gap-3">
-            <div className="hidden sm:flex flex-col justify-center space-y-1">
-              <div className="h-4 w-28 bg-slate-100 rounded animate-pulse" />
-              <div className="h-7 w-36 bg-slate-100 rounded animate-pulse" />
-            </div>
-
-            <div className="flex-1" />
-
-            <div className="relative w-full max-w-sm hidden md:block">
-              <div className="w-full h-10 rounded-2xl border border-slate-200 bg-slate-50 animate-pulse" />
-            </div>
-
-            <div className="md:hidden h-10 w-10 rounded-full bg-slate-100 animate-pulse" />
-          </div>
-
-          <div className="ml-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse" />
-            <div className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 shadow-sm">
-              <div className="h-8 w-8 rounded-full bg-slate-100 animate-pulse" />
-              <div className="hidden md:flex flex-col gap-1">
-                <div className="h-4 w-24 bg-slate-100 rounded animate-pulse" />
-                <div className="h-3 w-16 bg-slate-100 rounded animate-pulse" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-    )
-  }
+  const hasValidUser = !!effectiveUser?.id && !!effectiveUser?.email
 
   return (
     <header className="glass-header sticky top-0 z-30">
@@ -362,7 +336,7 @@ export default function Header() {
                     setIsMobileSearchOpen(false)
                   }
                 }}
-                className="w-full h-10 rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full h-10 rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -376,12 +350,23 @@ export default function Header() {
             </button>
 
             <div className="flex items-center flex-1 gap-3">
-              <div className="hidden sm:flex flex-col">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{tagline}</p>
-                <h1 className="text-lg font-semibold text-slate-900">{siteName}</h1>
-              </div>
+              {/* Branding Section - Instantly available via server-side fetch & StoreHydrator */}
+              {siteName || tagline ? (
+                <div className="hidden sm:flex flex-col">
+                  {tagline && <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{tagline}</p>}
+                  {siteName && <h1 className="text-lg font-semibold text-slate-900">{siteName}</h1>}
+                </div>
+              ) : (
+                <div className="hidden sm:flex flex-col">
+                  <div className="h-3 w-20 bg-slate-100 rounded animate-pulse mb-1" />
+                  <div className="h-6 w-32 bg-slate-100 rounded animate-pulse" />
+                </div>
+              )}
+
               <div className="flex-1" />
 
+              {/* Desktop search input does not depend on async data, so we render
+                  it directly without a skeleton to avoid flicker on refresh. */}
               <div className="relative w-full max-w-sm hidden md:block">
                 <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" />
                 <input
@@ -394,7 +379,7 @@ export default function Header() {
                       router.push(`/employees?search=${encodeURIComponent(searchQuery)}`)
                     }
                   }}
-                  className="w-full h-10 rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full h-10 rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -407,187 +392,128 @@ export default function Header() {
             </div>
 
             <div className="ml-4 flex items-center gap-3">
-              <div className="relative" ref={notificationsRef}>
-                <button
-                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                  className="relative h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 flex items-center justify-center"
-                >
-                  <BellIcon className="h-5 w-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-                {isNotificationsOpen && (
-                  <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
-                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-800">Notifications</h3>
-
-                      <button
-                        onClick={handleMarkAllRead}
-                        disabled={!notifications.length}
-                        className={cn(
-                          'text-xs font-medium',
-                          notifications.length ? 'text-blue-600 hover:text-blue-700' : 'text-slate-400 cursor-not-allowed'
-                        )}
-                      >
-                        Mark all read
-                      </button>
-                    </div>
-                    <div className="max-h-72 overflow-y-auto">
-                      {notificationsError ? (
-                        <div className="px-4 py-6 text-sm text-rose-500 text-center">{notificationsError}</div>
-                      ) : notificationsLoading && categorizedNotifications.length === 0 ? (
-                        <div className="px-4 py-3 space-y-2">
-                          <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
-                          <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
-                          <div className="h-3 w-1/3 bg-slate-100 rounded animate-pulse" />
-                        </div>
-                      ) : categorizedNotifications.length === 0 ? (
-                        <div className="px-4 py-6 text-sm text-slate-500 text-center">No new notifications</div>
-                      ) : (
-                        <>
-                          {actionableNotifications.length > 0 && (
-                            <>
-                              <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                                Needs your attention
-                              </p>
-                              {actionableNotifications.map((notification) => (
-                                <button
-                                  key={notification.id}
-                                  className={cn(
-                                    'w-full px-4 py-3 text-left hover:bg-slate-50 transition border-l-2',
-                                    notification.read ? 'border-transparent' : 'border-blue-500/70'
-                                  )}
-                                  onClick={() => handleNotificationClick(notification)}
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-slate-900">{notification.title}</span>
-                                        <span
-                                          className={cn(
-                                            'text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                                            notification.categoryColorClass
-                                          )}
-                                        >
-                                          {notification.categoryLabel}
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-slate-500">{notification.message}</p>
-                                      <p className="text-[11px] text-slate-400">{notification.time}</p>
-                                    </div>
-                                    <span
-                                      className={cn(
-                                        'mt-1 h-2 w-2 rounded-full flex-shrink-0',
-                                        SEVERITY_COLORS[notification.severity]
-                                      )}
-                                      aria-label={`${notification.severity} severity`}
-                                    />
-                                  </div>
-                                </button>
-                              ))}
-                            </>
-                          )}
-                          {informationalNotifications.length > 0 && (
-                            <>
-                              <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                                FYI
-                              </p>
-                              {informationalNotifications.map((notification) => (
-                                <div
-                                  key={notification.id}
-                                  className="px-4 py-3 text-left bg-slate-50/80 border-l-2 border-dashed border-slate-200"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-slate-700">{notification.title}</span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                                      {notification.categoryLabel}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-slate-500">{notification.message}</p>
-                                  <p className="text-[11px] text-slate-400 mt-1">{notification.time}</p>
-                                  <p className="text-[11px] text-slate-500 mt-1">
-                                    Shared for awareness. Requires {notification.categoryLabel.toLowerCase()} access to act.
-                                  </p>
-                                </div>
-                              ))}
-                            </>
-                          )}
-                        </>
+              {/* Notification & Profile Section */}
+              {hasValidUser ? (
+                <>
+                  <div className="relative" ref={notificationsRef}>
+                    <button
+                      onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                      className="relative h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 flex items-center justify-center"
+                    >
+                      <BellIcon className="h-5 w-5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
                       )}
-                    </div>
-
-                    <div className="px-4 py-2 border-t border-slate-100">
-                      <button className="text-sm text-blue-600 hover:text-blue-700">View all updates</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative" ref={profileRef}>
-                <button
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 text-sm text-slate-700 shadow-sm"
-                >
-                  {avatarUrl ? (
-                    <div className="relative h-8 w-8 rounded-full overflow-hidden">
-                      <Image
-                        src={avatarUrl}
-                        alt="Profile"
-                        fill
-                        className="object-cover"
-                        sizes="32px"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold">
-                      {initials}
-                    </div>
-                  )}
-                  <div className="hidden md:flex flex-col text-left max-w-32">
-                    <span className="text-sm font-semibold truncate leading-tight">{userFullName}</span>
-                    {userRole ? (
-                      <span className="text-xs text-slate-400 truncate leading-tight">{userRole}</span>
-                    ) : (
-                      <div className="h-2 w-16 bg-slate-100 rounded animate-pulse" />
+                    </button>
+                    {isNotificationsOpen && (
+                      <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-slate-800">Notifications</h3>
+                          <button
+                            onClick={handleMarkAllRead}
+                            disabled={!notifications.length}
+                            className={cn(
+                              'text-xs font-medium',
+                              notifications.length ? 'text-blue-600 hover:text-blue-700' : 'text-slate-400 cursor-not-allowed'
+                            )}
+                          >
+                            Mark all read
+                          </button>
+                        </div>
+                        <div className="max-h-72 overflow-y-auto">
+                          {notificationsError ? (
+                            <div className="px-4 py-6 text-sm text-rose-500 text-center">{notificationsError}</div>
+                          ) : notificationsLoading && categorizedNotifications.length === 0 ? (
+                            <div className="px-4 py-3 space-y-2">
+                              <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
+                              <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
+                            </div>
+                          ) : categorizedNotifications.length === 0 ? (
+                            <div className="px-4 py-6 text-sm text-slate-500 text-center">No new notifications</div>
+                          ) : (
+                            actionableNotifications.map((notification) => (
+                              <button
+                                key={notification.id}
+                                className={cn(
+                                  'w-full px-4 py-3 text-left hover:bg-slate-50 transition border-l-2',
+                                  notification.read ? 'border-transparent' : 'border-blue-500'
+                                )}
+                                onClick={() => handleNotificationClick(notification)}
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-slate-900">{notification.title}</span>
+                                    <span className={cn('h-1.5 w-1.5 rounded-full', SEVERITY_COLORS[notification.severity])} />
+                                  </div>
+                                  <p className="text-xs text-slate-500 line-clamp-2">{notification.message}</p>
+                                  <p className="text-[10px] text-slate-400 uppercase tracking-tight">{notification.time}</p>
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  <ChevronDownIcon className="h-4 w-4 text-slate-400" />
-                </button>
+                  <div className="relative" ref={profileRef}>
+                    <button
+                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 text-sm text-slate-700 shadow-sm"
+                    >
+                      {avatarUrl ? (
+                        <div className="relative h-8 w-8 rounded-full overflow-hidden">
+                          <Image src={avatarUrl} alt="Profile" fill className="object-cover" sizes="32px" />
+                        </div>
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold text-xs">
+                          {initials}
+                        </div>
+                      )}
+                      <div className="hidden md:flex flex-col text-left max-w-32">
+                        <span className="text-sm font-semibold truncate leading-tight">{userFullName}</span>
+                        <span className="text-xs text-slate-400 truncate leading-tight uppercase tracking-wider">{userRole}</span>
+                      </div>
+                      <ChevronDownIcon className="h-4 w-4 text-slate-400" />
+                    </button>
 
-                {user && isProfileOpen && (
-                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
-                    <div className="px-4 py-3 border-b border-slate-100">
-                      <p className="text-sm font-semibold text-slate-900">{userFullName}</p>
-                      <p className="text-xs text-slate-500">{user.email}</p>
-                    </div>
-                    <div className="py-1">
-                      <Link href="/profile" className="block w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
-                        Profile
-                      </Link>
-                      <Link href="/settings" className="block w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
-                        Settings
-                      </Link>
-                    </div>
-                    <div className="border-t border-slate-100">
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-50"
-                      >
-                        Sign out
-                      </button>
+                    {isProfileOpen && (
+                      <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
+                        <div className="px-4 py-3 border-b border-slate-100">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{userFullName}</p>
+                          <p className="text-xs text-slate-500 truncate">{effectiveUser?.email}</p>
+                        </div>
+                        <div className="py-1">
+                          <Link href="/profile" className="block w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Profile</Link>
+                          <Link href="/settings" className="block w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Settings</Link>
+                        </div>
+                        <div className="border-t border-slate-100">
+                          <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-rose-500 hover:bg-rose-50">Sign out</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse" />
+                  <div className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 shadow-sm">
+                    <div className="h-8 w-8 rounded-full bg-slate-100 animate-pulse" />
+                    <div className="hidden md:flex flex-col gap-1">
+                      <div className="h-4 w-20 bg-slate-100 rounded animate-pulse" />
+                      <div className="h-3 w-14 bg-slate-100 rounded animate-pulse" />
                     </div>
                   </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
           </>
         )}
       </div>
-      <MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={user} />
+      <MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={effectiveUser}
+      />
     </header>
   );
 }

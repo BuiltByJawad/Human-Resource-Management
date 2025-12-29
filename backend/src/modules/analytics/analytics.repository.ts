@@ -38,6 +38,45 @@ export class AnalyticsRepository {
             }
         });
     }
+
+    async getUpcomingReviewCycles(organizationId: string, startDate: Date, endDate: Date, limit: number) {
+        return prisma.reviewCycle.findMany({
+            where: {
+                organizationId,
+                endDate: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            orderBy: { endDate: 'asc' },
+            take: limit,
+        });
+    }
+
+    async getUpcomingApprovedLeaves(organizationId: string, startDate: Date, endDate: Date, limit: number) {
+        return prisma.leaveRequest.findMany({
+            where: {
+                status: 'approved',
+                startDate: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+                employee: {
+                    organizationId,
+                },
+            },
+            include: {
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                    },
+                },
+            },
+            orderBy: { startDate: 'asc' },
+            take: limit,
+        });
+    }
 }
 
 export const analyticsRepository = new AnalyticsRepository();

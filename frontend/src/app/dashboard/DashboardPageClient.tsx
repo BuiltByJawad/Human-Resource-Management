@@ -17,6 +17,10 @@ import { StatsCard } from '@/components/ui/DataTable'
 import { Card } from '@/components/ui/FormComponents'
 import api from '@/app/api/api'
 import { useAuthStore } from '@/store/useAuthStore'
+import { PERMISSIONS } from '@/constants/permissions'
+import type { LeaveRequest } from '@/types/hrm'
+import { analyticsService, type DashboardMetrics } from '@/services/analyticsService'
+import { useRouter } from 'next/navigation'
 
 export interface DashboardStats {
   totalEmployees: number
@@ -56,21 +60,16 @@ const FALLBACK_STATS: DashboardStats = {
   attendanceRate: 0
 }
 
-const DEFAULT_ACTIVITIES: RecentActivity[] = [
-  { id: '1', type: 'leave', description: 'requested 3 days leave', timestamp: '2 hours ago', employee: 'John Smith' },
-  { id: '2', type: 'attendance', description: 'checked in late', timestamp: '3 hours ago', employee: 'Sarah Johnson' },
-  { id: '3', type: 'payroll', description: 'payroll processed for October', timestamp: '1 day ago', employee: 'System' },
-  { id: '4', type: 'employee', description: 'new employee onboarded', timestamp: '2 days ago', employee: 'Michael Brown' }
-]
+// Empty defaults; we prefer an explicit empty state over fake placeholder content.
+const DEFAULT_ACTIVITIES: RecentActivity[] = []
 
-const DEFAULT_EVENTS: UpcomingEvent[] = [
-  { id: '1', title: 'Team Meeting', date: 'Today, 2:00 PM', type: 'meeting' },
-  { id: '2', title: 'Performance Reviews', date: 'Tomorrow', type: 'review' },
-  { id: '3', title: 'Payroll Deadline', date: 'Nov 25, 2024', type: 'deadline' }
-]
+const DEFAULT_EVENTS: UpcomingEvent[] = []
 
 export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPageClientProps) {
+  const router = useRouter()
   const token = useAuthStore((state) => state.token)
+  const user = useAuthStore((state) => state.user)
+  const hasPermission = useAuthStore((state) => state.hasPermission)
   const { data: stats = FALLBACK_STATS, isLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', token],
     queryFn: async () => {
@@ -91,8 +90,85 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
     staleTime: 60 * 1000
   })
 
-  const recentActivities = useMemo(() => DEFAULT_ACTIVITIES, [])
-  const upcomingEvents = useMemo(() => DEFAULT_EVENTS, [])
+  const canViewPeopleAnalytics = !!user && hasPermission(PERMISSIONS.VIEW_ANALYTICS)
+
+  const { data: peopleMetrics } = useQuery<DashboardMetrics | null>({
+    queryKey: ['analytics-dashboard', token],
+    queryFn: async () => {
+      const endDate = new Date()
+      const startDate = new Date(endDate)
+      startDate.setDate(endDate.getDate() - 30)
+
+      const metrics = await analyticsService.getDashboardMetrics({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      })
+
+      return metrics ?? null
+    },
+    enabled: !!token && canViewPeopleAnalytics,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Recent Activities: fetch the latest leave requests and map them into
+  // dashboard-friendly activity items. We reuse the same pattern as
+  // PostLoginPrefetcher so this data can be prefetched after login.
+  const { data: recentActivities = DEFAULT_ACTIVITIES } = useQuery<RecentActivity[]>({
+    queryKey: ['dashboard', 'recent-activities', token],
+    queryFn: async () => {
+      const res = await api.get('/leave', { params: { limit: 8, page: 1 } })
+      const raw = res.data?.data
+      const leaveRequests = (Array.isArray(raw) ? raw : raw?.leaveRequests ?? []) as (LeaveRequest & {
+        createdAt?: string | null
+        employee?: { firstName?: string | null; lastName?: string | null } | null
+      })[]
+
+      return leaveRequests.map((leave) => {
+        const createdAt = leave.createdAt ? new Date(leave.createdAt) : null
+        const timestamp = createdAt
+          ? createdAt.toLocaleString(undefined, {
+              hour: '2-digit',
+              minute: '2-digit',
+              day: '2-digit',
+              month: 'short',
+            })
+          : ''
+
+        const employeeName = `${leave.employee?.firstName ?? 'Employee'} ${
+          leave.employee?.lastName ?? ''
+        }`.trim() || 'Employee'
+
+        return {
+          id: leave.id ?? crypto.randomUUID(),
+          type: 'leave' as const,
+          description: leave.reason ? `requested leave: ${leave.reason}` : 'requested leave',
+          timestamp,
+          employee: employeeName,
+        }
+      })
+    },
+    enabled: !!token,
+    initialData: DEFAULT_ACTIVITIES,
+    staleTime: 30_000,
+  })
+  const { data: upcomingEvents = DEFAULT_EVENTS } = useQuery<UpcomingEvent[]>({
+    queryKey: ['analytics-upcoming-events', token],
+    queryFn: async () => {
+      const events = await analyticsService.getUpcomingEvents()
+      return events.map((event) => ({
+        ...event,
+        // Ensure date is a human-readable string; backend returns ISO timestamps.
+        date: new Date(event.date).toLocaleString(undefined, {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      })) as UpcomingEvent[]
+    },
+    enabled: !!token && canViewPeopleAnalytics,
+    staleTime: 5 * 60 * 1000,
+  })
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -111,10 +187,12 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
 
   const getEventIcon = (type: string) => {
     switch (type) {
-      case 'meeting':
-        return '👥'
       case 'review':
         return '📊'
+      case 'leave':
+        return '📅'
+      case 'payroll':
+        return '⏳'
       case 'deadline':
         return '⏳'
       default:
@@ -151,34 +229,65 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
               <StatsCard title="Attendance Rate" value={isLoading ? '...' : `${stats.attendanceRate}%`} change="+2.1% this week" changeType="increase" icon={ChartBarIcon} />
             </div>
 
+            {canViewPeopleAnalytics && peopleMetrics && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 items-stretch">
+                <StatsCard
+                  title="New Hires (30 days)"
+                  value={peopleMetrics.newHires}
+                  change={undefined}
+                  icon={UsersIcon}
+                />
+                <StatsCard
+                  title="Turnover Rate"
+                  value={`${peopleMetrics.turnoverRate.toFixed(1)}%`}
+                  change={undefined}
+                  icon={UsersIcon}
+                />
+                <StatsCard
+                  title="Average Salary"
+                  value={`$${peopleMetrics.avgSalary.toLocaleString()}`}
+                  change={undefined}
+                  icon={BanknotesIcon}
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card title="Recent Activities" className="lg:col-span-2">
                 <div className="space-y-4">
-                  {recentActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
-                      <div className="text-2xl">{getActivityIcon(activity.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900">
-                          <span className="font-medium">{activity.employee}</span> {activity.description}
-                        </p>
-                        <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                  {recentActivities.length === 0 ? (
+                    <p className="text-sm text-gray-500">No recent activity yet.</p>
+                  ) : (
+                    recentActivities.map((activity) => (
+                      <div key={activity.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
+                        <div className="text-2xl">{getActivityIcon(activity.type)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900">
+                            <span className="font-medium">{activity.employee}</span> {activity.description}
+                          </p>
+                          <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </Card>
 
               <Card title="Upcoming Events">
                 <div className="space-y-4">
-                  {upcomingEvents.map((event) => (
-                    <div key={event.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
-                      <div className="text-2xl">{getEventIcon(event.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{event.title}</p>
-                        <p className="text-xs text-gray-500">{event.date}</p>
+                  {upcomingEvents.length === 0 ? (
+                    <p className="text-sm text-gray-500">No upcoming events in the next 30 days.</p>
+                  ) : (
+                    upcomingEvents.map((event) => (
+                      <div key={event.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
+                        <div className="text-2xl">{getEventIcon(event.type)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{event.title}</p>
+                          <p className="text-xs text-gray-500">{event.date}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </Card>
             </div>
@@ -186,25 +295,41 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
             <div className="mt-8">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <button className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center">
+                <button
+                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center"
+                  type="button"
+                  onClick={() => router.push('/employees?new=1')}
+                >
                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
                     <UsersIcon className="h-6 w-6 text-blue-600" />
                   </div>
                   <span className="text-sm font-medium text-gray-900">Add Employee</span>
                 </button>
-                <button className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center">
+                <button
+                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center"
+                  type="button"
+                  onClick={() => router.push('/departments')}
+                >
                   <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
                     <BuildingOfficeIcon className="h-6 w-6 text-green-600" />
                   </div>
                   <span className="text-sm font-medium text-gray-900">Add Department</span>
                 </button>
-                <button className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center">
+                <button
+                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center"
+                  type="button"
+                  onClick={() => router.push('/payroll')}
+                >
                   <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
                     <ClockIcon className="h-6 w-6 text-yellow-600" />
                   </div>
                   <span className="text-sm font-medium text-gray-900">Process Payroll</span>
                 </button>
-                <button className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center">
+                <button
+                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center"
+                  type="button"
+                  onClick={() => router.push('/reports')}
+                >
                   <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
                     <ChartBarIcon className="h-6 w-6 text-purple-600" />
                   </div>

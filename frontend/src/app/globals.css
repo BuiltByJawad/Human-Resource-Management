@@ -3,9 +3,11 @@
 :root {
   --background: #f7f9fc;
   --foreground: #0f172a;
-  --primary: #0ea5e9; /* sky */
+  --primary: #0ea5e9;
+  /* sky */
   --primary-dark: #0369a1;
-  --accent: #2563eb; /* blue to match loader */
+  --accent: #2563eb;
+  /* blue to match loader */
   --card: #ffffff;
 }
 
@@ -16,8 +18,18 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Prevent layout shift when scrollbar appears/disappears */
+html {
+  overflow-y: scroll;
+  /* Always show scrollbar track */
+  scrollbar-gutter: stable;
+  /* Reserve space for scrollbar */
+}
+
 body {
   min-height: 100vh;
+  scrollbar-gutter: stable;
+  /* Prevent layout shift when scrollbar appears/disappears */
   background:
     radial-gradient(circle at 18% 18%, rgba(59, 130, 246, 0.10), transparent 32%),
     radial-gradient(circle at 78% 12%, rgba(59, 130, 246, 0.12), transparent 28%),
@@ -155,10 +167,12 @@ body {
     transform: scale(0.95);
     opacity: 0.6;
   }
+
   50% {
     transform: scale(1.05);
     opacity: 1;
   }
+
   100% {
     transform: scale(0.95);
     opacity: 0.6;
@@ -169,9 +183,11 @@ body {
   0% {
     transform: translateX(-60%);
   }
+
   50% {
     transform: translateX(20%);
   }
+
   100% {
     transform: translateX(120%);
   }
@@ -182,10 +198,12 @@ body {
     opacity: 0.2;
     transform: scale(0.9);
   }
+
   50% {
     opacity: 0.45;
     transform: scale(1.05);
   }
+
   100% {
     opacity: 0.2;
     transform: scale(0.9);

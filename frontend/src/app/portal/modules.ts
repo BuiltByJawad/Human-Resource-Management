@@ -1,4 +1,4 @@
-export type PortalModuleIcon = 'shifts' | 'documents' | 'training' | 'goals'
+export type PortalModuleIcon = 'shifts' | 'documents' | 'training' | 'goals' | 'benefits' | 'expenses' | 'offboarding' | 'leave'
 
 export interface PortalModule {
   title: string
@@ -41,5 +41,37 @@ export const DEFAULT_PORTAL_MODULES: PortalModule[] = [
     color: 'bg-green-50',
     iconColor: 'text-green-600',
     icon: 'goals'
+  },
+  {
+    title: 'My Benefits',
+    description: 'View your insurance and perks.',
+    href: '/portal/benefits',
+    color: 'bg-pink-50',
+    iconColor: 'text-pink-600',
+    icon: 'benefits'
+  },
+  {
+    title: 'My Expenses',
+    description: 'Submit and track reimbursements.',
+    href: '/portal/expenses',
+    color: 'bg-amber-50',
+    iconColor: 'text-amber-600',
+    icon: 'expenses'
+  },
+  {
+    title: 'My Offboarding',
+    description: 'Track your departure requirements.',
+    href: '/portal/offboarding',
+    color: 'bg-red-50',
+    iconColor: 'text-red-600',
+    icon: 'offboarding'
+  },
+  {
+    title: 'My Leave',
+    description: 'Request time off and view balance.',
+    href: '/leave',
+    color: 'bg-emerald-50',
+    iconColor: 'text-emerald-600',
+    icon: 'leave'
   }
 ]

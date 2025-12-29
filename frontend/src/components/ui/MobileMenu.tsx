@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
     HomeIcon,
@@ -76,7 +77,13 @@ const navigation: { label: string; items: NavItem[] }[] = [
 export default function MobileMenu({ isOpen, onClose, user }: MobileMenuProps) {
     const pathname = usePathname()
     const { hasAnyPermission } = useAuthStore()
-    const { siteName, shortName, tagline, logoUrl } = useOrgStore()
+    const branding = useBranding()
+    const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl } = useOrgStore()
+
+    const siteName = branding?.siteName || storeSiteName
+    const shortName = branding?.shortName || storeShortName
+    const tagline = branding?.tagline || storeTagline
+    const logoUrl = branding?.logoUrl || storeLogoUrl
 
     if (!isOpen) return null
 

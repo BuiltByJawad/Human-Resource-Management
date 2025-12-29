@@ -24,31 +24,18 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Button, Card } from '../ui/FormComponents'
 import { UserIcon, PhoneIcon, EnvelopeIcon, CalendarIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline'
+import type {
+    Applicant as ApplicantBase,
+    ApplicantStatus as ApplicantStatusBase,
+    JobPosting as JobPostingBase,
+} from '@/types/hrm'
 
 // Interfaces
-export interface JobPosting {
-    id: string
-    title: string
-    departmentId: string
-    status: 'open' | 'closed' | 'draft'
-    _count?: {
-        applicants: number
-    }
-}
+export type JobPosting = JobPostingBase
 
-export interface Applicant {
-    id: string
-    jobId: string
-    firstName: string
-    lastName: string
-    email: string
-    phone?: string
-    resumeUrl?: string
-    status: ApplicantStatus
-    appliedDate: string
-}
+export type Applicant = ApplicantBase
 
-export type ApplicantStatus = 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected'
+export type ApplicantStatus = ApplicantStatusBase
 
 const COLUMNS: { id: ApplicantStatus; title: string; color: string; borderColor: string }[] = [
     { id: 'applied', title: 'Applied', color: 'text-blue-600', borderColor: 'border-blue-500' },

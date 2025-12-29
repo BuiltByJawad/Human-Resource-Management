@@ -14,3 +14,9 @@ export const getDepartmentStats = asyncHandler(async (req: Request, res: Respons
     const stats = await analyticsService.getDepartmentStats(organizationId);
     res.json({ success: true, data: stats });
 });
+
+export const getUpcomingEvents = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as any);
+    const events = await analyticsService.getUpcomingEvents(organizationId, req.query as any);
+    res.json({ success: true, data: events });
+});

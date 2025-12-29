@@ -11,15 +11,16 @@ import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { PERMISSIONS } from '@/constants/permissions'
-import api from '@/lib/axios'
 import { handleCrudError } from '@/lib/apiError'
+import { fetchLeaveRequests, approveLeave, rejectLeave, cancelLeave } from '@/lib/hrmData'
 import { Skeleton } from '@/components/ui/Skeleton'
 
 interface LeaveRequestsPageClientProps {
   initialRequests: LeaveRequest[]
+  initialHasToken?: boolean
 }
 
-export function LeaveRequestsPageClient({ initialRequests }: LeaveRequestsPageClientProps) {
+export function LeaveRequestsPageClient({ initialRequests, initialHasToken = false }: LeaveRequestsPageClientProps) {
   const { token, hasAnyPermission } = useAuthStore()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
@@ -35,15 +36,20 @@ export function LeaveRequestsPageClient({ initialRequests }: LeaveRequestsPageCl
     PERMISSIONS.MANAGE_LEAVE_POLICIES
   ])
 
+  const hasClientToken = !!token
+  const authLoading = initialHasToken && !hasClientToken
+  const hasAnyToken = hasClientToken || initialHasToken
+
   const leaveQuery = useQuery<LeaveRequest[], Error>({
     queryKey: ['leave-requests', filterStatus, token],
-    queryFn: async () => {
-      const params: Record<string, string> = {}
-      if (filterStatus !== 'all') params.status = filterStatus
-      const response = await api.get('/leave', { params })
-      return response.data?.data ?? []
-    },
-    enabled: !!token && canView,
+    queryFn: () =>
+      fetchLeaveRequests(
+        {
+          status: filterStatus,
+        },
+        token ?? undefined,
+      ),
+    enabled: hasClientToken && canView,
     retry: false,
     initialData: filterStatus === 'pending' ? initialRequests : undefined,
     initialDataUpdatedAt: 0,
@@ -53,7 +59,7 @@ export function LeaveRequestsPageClient({ initialRequests }: LeaveRequestsPageCl
   })
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.put(`/leave/${id}/cancel`),
+    mutationFn: (id: string) => cancelLeave(id, token ?? undefined),
     onSuccess: () => {
       showToast('Leave request cancelled', 'success')
       queryClient.invalidateQueries({ queryKey: ['leave'] })
@@ -68,7 +74,7 @@ export function LeaveRequestsPageClient({ initialRequests }: LeaveRequestsPageCl
   })
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => api.put(`/leave/${id}/approve`),
+    mutationFn: (id: string) => approveLeave(id, token ?? undefined),
     onSuccess: () => {
       showToast('Leave request approved', 'success')
       queryClient.invalidateQueries({ queryKey: ['leave'] })
@@ -83,7 +89,7 @@ export function LeaveRequestsPageClient({ initialRequests }: LeaveRequestsPageCl
   })
 
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => api.put(`/leave/${id}/reject`),
+    mutationFn: (id: string) => rejectLeave(id, token ?? undefined),
     onSuccess: () => {
       showToast('Leave request rejected', 'success')
       queryClient.invalidateQueries({ queryKey: ['leave'] })
@@ -140,7 +146,9 @@ export function LeaveRequestsPageClient({ initialRequests }: LeaveRequestsPageCl
               </div>
             </div>
 
-            {!token ? (
+            {authLoading ? (
+              <div className="text-sm text-gray-500">Loading your access to leave requests…</div>
+            ) : !hasAnyToken ? (
               <div className="text-sm text-gray-600">Please log in to view leave requests.</div>
             ) : !canView ? (
               <div className="text-sm text-red-600">You do not have permission to view leave requests.</div>

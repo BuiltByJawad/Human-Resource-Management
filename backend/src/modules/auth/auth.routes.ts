@@ -19,6 +19,7 @@ router.post('/invite/complete', authRateLimiter, authController.completeInvite);
 router.use(authenticate); // All routes below require authentication
 
 router.get('/profile', authController.getProfile);
+router.get('/me', authController.getProfile); // Alias for frontend compatibility
 router.put('/profile', authController.updateProfile);
 router.post('/avatar', upload.single('avatar'), authController.uploadAvatar);
 router.post('/password/change', authController.changePassword);

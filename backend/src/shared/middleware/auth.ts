@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     role: string
     permissions: string[]
     employeeId?: string
+    employee?: any
     organizationId?: string | null
   }
 }
@@ -70,6 +71,7 @@ export const authenticate = async (
       role: user.role.name,
       permissions,
       employeeId: user.employee?.id,
+      employee: user.employee,
       organizationId: userOrgId || null,
     }
 

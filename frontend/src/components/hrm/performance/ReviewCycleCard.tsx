@@ -1,13 +1,8 @@
 import { CalendarIcon, ClockIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/FormComponents';
+import type { ReviewCycle as ReviewCycleBase } from '@/types/hrm';
 
-export interface ReviewCycle {
-    id: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    status: string;
-}
+export type ReviewCycle = ReviewCycleBase;
 
 export interface ReviewCycleCardProps {
     cycle: ReviewCycle;
