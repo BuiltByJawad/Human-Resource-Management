@@ -218,17 +218,13 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         })
         const url = res.data?.data?.faviconUrl || res.data?.faviconUrl
         if (url) {
-          updateOrg({ faviconUrl: url })
+          updateOrg({ faviconUrl: url, faviconVersion: Date.now() })
           showToast("Favicon updated", "success")
         } else {
           showToast("Favicon uploaded but no URL returned from server", "error")
         }
-      } catch (error: any) {
-        const message =
-          error?.response?.data?.error?.message ||
-          error?.response?.data?.message ||
-          error?.message ||
-          "Failed to upload favicon"
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to upload favicon"
         showToast(message, "error")
       }
     },
