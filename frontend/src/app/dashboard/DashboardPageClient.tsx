@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   UsersIcon,
@@ -31,7 +31,7 @@ export interface DashboardStats {
   attendanceRate: number
 }
 
-interface RecentActivity {
+export interface RecentActivity {
   id: string
   type: 'leave' | 'attendance' | 'payroll' | 'employee'
   description: string
@@ -39,7 +39,7 @@ interface RecentActivity {
   employee: string
 }
 
-interface UpcomingEvent {
+export interface UpcomingEvent {
   id: string
   title: string
   date: string
@@ -48,7 +48,9 @@ interface UpcomingEvent {
 
 interface DashboardPageClientProps {
   initialStats: DashboardStats | null
-  canFetchStats: boolean
+  initialHasSession: boolean
+  initialRecentActivities: RecentActivity[] | null
+  initialUpcomingEvents: UpcomingEvent[] | null
 }
 
 const FALLBACK_STATS: DashboardStats = {
@@ -60,18 +62,40 @@ const FALLBACK_STATS: DashboardStats = {
   attendanceRate: 0
 }
 
-// Empty defaults; we prefer an explicit empty state over fake placeholder content.
+// Empty defaults used only as type-safe fallbacks when queries have no data yet.
 const DEFAULT_ACTIVITIES: RecentActivity[] = []
 
 const DEFAULT_EVENTS: UpcomingEvent[] = []
 
-export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPageClientProps) {
+export function DashboardPageClient({
+  initialStats,
+  initialHasSession,
+  initialRecentActivities,
+  initialUpcomingEvents,
+}: DashboardPageClientProps) {
   const router = useRouter()
   const token = useAuthStore((state) => state.token)
   const user = useAuthStore((state) => state.user)
   const hasPermission = useAuthStore((state) => state.hasPermission)
+
+  // When the page is refreshed, the auth store may be empty until rehydration
+  // and/or refreshSession completes. During that window we show skeletons
+  // immediately to prevent a brief empty-state flash.
+  const [authGraceActive, setAuthGraceActive] = useState(() => initialHasSession)
+
+  useEffect(() => {
+    if (token || !initialHasSession) {
+      setAuthGraceActive(false)
+      return
+    }
+    const timeoutId = window.setTimeout(() => setAuthGraceActive(false), 1200)
+    return () => window.clearTimeout(timeoutId)
+  }, [token, initialHasSession])
+
+  const isAuthHydrating = !token && (initialHasSession || authGraceActive)
+  const isUserHydrating = !user && (initialHasSession || authGraceActive)
   const { data: stats = FALLBACK_STATS, isLoading } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats', token],
+    queryKey: ['dashboard-stats'],
     queryFn: async () => {
       const response = await api.get('/dashboard/stats')
       const payload = response.data?.data ?? response.data
@@ -85,15 +109,21 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
         attendanceRate: Number(data.attendanceRate) || 0
       }
     },
-    enabled: canFetchStats && !!token,
+    enabled: !!token,
     initialData: initialStats ?? FALLBACK_STATS,
-    staleTime: 60 * 1000
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchInterval: 30_000,
   })
+
+  const hasInitialStats = initialStats !== null
+  const statsLoading = (isAuthHydrating && !hasInitialStats) || isLoading
 
   const canViewPeopleAnalytics = !!user && hasPermission(PERMISSIONS.VIEW_ANALYTICS)
 
-  const { data: peopleMetrics } = useQuery<DashboardMetrics | null>({
-    queryKey: ['analytics-dashboard', token],
+  const peopleMetricsQuery = useQuery<DashboardMetrics | null>({
+    queryKey: ['analytics-dashboard'],
     queryFn: async () => {
       const endDate = new Date()
       const startDate = new Date(endDate)
@@ -107,14 +137,14 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
       return metrics ?? null
     },
     enabled: !!token && canViewPeopleAnalytics,
+    // Events change less frequently, so we can cache them a bit longer.
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   })
 
-  // Recent Activities: fetch the latest leave requests and map them into
-  // dashboard-friendly activity items. We reuse the same pattern as
-  // PostLoginPrefetcher so this data can be prefetched after login.
-  const { data: recentActivities = DEFAULT_ACTIVITIES } = useQuery<RecentActivity[]>({
-    queryKey: ['dashboard', 'recent-activities', token],
+  const recentActivitiesQuery = useQuery<RecentActivity[]>({
+    queryKey: ['dashboard', 'recent-activities'],
     queryFn: async () => {
       const res = await api.get('/leave', { params: { limit: 8, page: 1 } })
       const raw = res.data?.data
@@ -148,11 +178,17 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
       })
     },
     enabled: !!token,
-    initialData: DEFAULT_ACTIVITIES,
+    ...(initialRecentActivities !== null ? { initialData: initialRecentActivities } : {}),
+    // Keep results warm for a short period so navigation back to the dashboard
+    // can reuse cached data instead of re-skeletonizing immediately.
     staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchInterval: 30_000,
   })
-  const { data: upcomingEvents = DEFAULT_EVENTS } = useQuery<UpcomingEvent[]>({
-    queryKey: ['analytics-upcoming-events', token],
+
+  const upcomingEventsQuery = useQuery<UpcomingEvent[]>({
+    queryKey: ['analytics-upcoming-events'],
     queryFn: async () => {
       const events = await analyticsService.getUpcomingEvents()
       return events.map((event) => ({
@@ -167,8 +203,29 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
       })) as UpcomingEvent[]
     },
     enabled: !!token && canViewPeopleAnalytics,
+    ...(initialUpcomingEvents !== null ? { initialData: initialUpcomingEvents } : {}),
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchInterval: 60_000,
   })
+
+  // Derive data only after queries exist to avoid ReferenceErrors.
+  const recentActivities = recentActivitiesQuery.data ?? DEFAULT_ACTIVITIES
+  const upcomingEvents = upcomingEventsQuery.data ?? DEFAULT_EVENTS
+
+  const hasKnownRecentActivities = initialRecentActivities !== null
+  const hasKnownUpcomingEvents = initialUpcomingEvents !== null
+
+  const shouldShowRecentActivitiesSkeleton =
+    !hasKnownRecentActivities &&
+    (isAuthHydrating || recentActivitiesQuery.isLoading) &&
+    recentActivities.length === 0
+
+  const shouldShowUpcomingEventsSkeleton =
+    !hasKnownUpcomingEvents &&
+    (isUserHydrating || upcomingEventsQuery.isLoading) &&
+    upcomingEvents.length === 0
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -215,50 +272,74 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8 items-stretch">
-              <StatsCard title="Total Employees" value={isLoading ? '...' : stats.totalEmployees} change="+12 this month" changeType="increase" icon={UsersIcon} />
+              <StatsCard title="Total Employees" value={statsLoading ? '...' : stats.totalEmployees} change="+12 this month" changeType="increase" icon={UsersIcon} />
               <StatsCard
                 title="Active Employees"
-                value={isLoading ? '...' : stats.activeEmployees}
-                change={`${isLoading ? 0 : Math.round((stats.activeEmployees / (stats.totalEmployees || 1)) * 100)}% active rate`}
+                value={statsLoading ? '...' : stats.activeEmployees}
+                change={`${statsLoading ? 0 : Math.round((stats.activeEmployees / (stats.totalEmployees || 1)) * 100)}% active rate`}
                 changeType="increase"
                 icon={UsersIcon}
               />
-              <StatsCard title="Departments" value={isLoading ? '...' : stats.totalDepartments} icon={BuildingOfficeIcon} />
-              <StatsCard title="Pending Leave" value={isLoading ? '...' : stats.pendingLeaveRequests} change="needs review" changeType="warning" icon={ExclamationTriangleIcon} />
-              <StatsCard title="Monthly Payroll" value={isLoading ? '...' : `$${(stats.totalPayroll / 1000).toFixed(1)}k`} icon={BanknotesIcon} />
-              <StatsCard title="Attendance Rate" value={isLoading ? '...' : `${stats.attendanceRate}%`} change="+2.1% this week" changeType="increase" icon={ChartBarIcon} />
+              <StatsCard title="Departments" value={statsLoading ? '...' : stats.totalDepartments} icon={BuildingOfficeIcon} />
+              <StatsCard title="Pending Leave" value={statsLoading ? '...' : stats.pendingLeaveRequests} change="needs review" changeType="warning" icon={ExclamationTriangleIcon} />
+              <StatsCard title="Monthly Payroll" value={statsLoading ? '...' : `$${(stats.totalPayroll / 1000).toFixed(1)}k`} icon={BanknotesIcon} />
+              <StatsCard title="Attendance Rate" value={statsLoading ? '...' : `${stats.attendanceRate}%`} change="+2.1% this week" changeType="increase" icon={ChartBarIcon} />
             </div>
 
-            {canViewPeopleAnalytics && peopleMetrics && (
+            {(isUserHydrating || canViewPeopleAnalytics) && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 items-stretch">
-                <StatsCard
-                  title="New Hires (30 days)"
-                  value={peopleMetrics.newHires}
-                  change={undefined}
-                  icon={UsersIcon}
-                />
-                <StatsCard
-                  title="Turnover Rate"
-                  value={`${peopleMetrics.turnoverRate.toFixed(1)}%`}
-                  change={undefined}
-                  icon={UsersIcon}
-                />
-                <StatsCard
-                  title="Average Salary"
-                  value={`$${peopleMetrics.avgSalary.toLocaleString()}`}
-                  change={undefined}
-                  icon={BanknotesIcon}
-                />
+                {isUserHydrating || (peopleMetricsQuery.isLoading && !peopleMetricsQuery.data) ? (
+                  <>
+                    <div className="h-24 bg-white rounded-xl border border-gray-100 shadow-sm animate-pulse" />
+                    <div className="h-24 bg-white rounded-xl border border-gray-100 shadow-sm animate-pulse" />
+                    <div className="h-24 bg-white rounded-xl border border-gray-100 shadow-sm animate-pulse" />
+                  </>
+                ) : canViewPeopleAnalytics && peopleMetricsQuery.data ? (
+                  <>
+                    <StatsCard
+                      title="New Hires (30 days)"
+                      value={peopleMetricsQuery.data.newHires}
+                      change={undefined}
+                      icon={UsersIcon}
+                    />
+                    <StatsCard
+                      title="Turnover Rate"
+                      value={`${peopleMetricsQuery.data.turnoverRate.toFixed(1)}%`}
+                      change={undefined}
+                      icon={UsersIcon}
+                    />
+                    <StatsCard
+                      title="Average Salary"
+                      value={`$${peopleMetricsQuery.data.avgSalary.toLocaleString()}`}
+                      change={undefined}
+                      icon={BanknotesIcon}
+                    />
+                  </>
+                ) : null}
               </div>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card title="Recent Activities" className="lg:col-span-2">
                 <div className="space-y-4">
-                  {recentActivities.length === 0 ? (
+                  {shouldShowRecentActivitiesSkeleton ? (
+                    // Skeleton while the first page of activities is loading.
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-3 p-3 rounded-lg animate-pulse"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gray-200" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-3/4" />
+                          <div className="h-3 bg-gray-100 rounded w-1/3" />
+                        </div>
+                      </div>
+                    ))
+                  ) : recentActivities.length === 0 ? (
                     <p className="text-sm text-gray-500">No recent activity yet.</p>
                   ) : (
-                    recentActivities.map((activity) => (
+                    recentActivities.map((activity: RecentActivity) => (
                       <div key={activity.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
                         <div className="text-2xl">{getActivityIcon(activity.type)}</div>
                         <div className="flex-1 min-w-0">
@@ -275,10 +356,24 @@ export function DashboardPageClient({ initialStats, canFetchStats }: DashboardPa
 
               <Card title="Upcoming Events">
                 <div className="space-y-4">
-                  {upcomingEvents.length === 0 ? (
+                  {shouldShowUpcomingEventsSkeleton ? (
+                    // Skeleton while loading upcoming events for the first time.
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-3 p-3 rounded-lg animate-pulse"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gray-200" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-2/3" />
+                          <div className="h-3 bg-gray-100 rounded w-1/3" />
+                        </div>
+                      </div>
+                    ))
+                  ) : upcomingEvents.length === 0 ? (
                     <p className="text-sm text-gray-500">No upcoming events in the next 30 days.</p>
                   ) : (
-                    upcomingEvents.map((event) => (
+                    upcomingEvents.map((event: UpcomingEvent) => (
                       <div key={event.id} className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg">
                         <div className="text-2xl">{getEventIcon(event.type)}</div>
                         <div className="flex-1 min-w-0">

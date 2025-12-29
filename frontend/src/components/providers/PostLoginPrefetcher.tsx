@@ -71,7 +71,7 @@ export function PostLoginPrefetcher() {
         await Promise.all([
           // Dashboard stats
           queryClient.prefetchQuery<DashboardStats>({
-            queryKey: ['dashboard-stats', token],
+            queryKey: ['dashboard-stats'],
             queryFn: async () => {
               const response = await api.get('/dashboard/stats')
               const raw = response.data?.data
@@ -90,7 +90,7 @@ export function PostLoginPrefetcher() {
 
           // Dashboard recent activities (leave requests)
           queryClient.prefetchQuery<DashboardRecentActivity[]>({
-            queryKey: ['dashboard', 'recent-activities', token],
+            queryKey: ['dashboard', 'recent-activities'],
             queryFn: async () => {
               const res = await api.get('/leave', { params: { limit: 8, page: 1 } })
               const raw = res.data?.data

@@ -14,9 +14,16 @@ const DEFAULT_TITLE = 'HRM Platform'
 export function FaviconManager() {
   const pathname = usePathname()
   const branding = useBranding()
-  const { siteName: storeSiteName } = useOrgStore()
+  const { siteName: storeSiteName, faviconUrl: storeFaviconUrl, faviconVersion } = useOrgStore()
 
   const siteName = branding?.siteName || storeSiteName
+  const effectiveFaviconUrl = storeFaviconUrl ?? branding?.faviconUrl ?? '/favicon.ico'
+
+  const buildVersionedUrl = (url: string, version: number) => {
+    if (!version) return url
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}v=${version}`
+  }
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -27,6 +34,29 @@ export function FaviconManager() {
       document.title = derivedTitle
     }
   }, [siteName, pathname])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const href = buildVersionedUrl(effectiveFaviconUrl, faviconVersion)
+
+    const selectors = ['link[rel="icon"]', 'link[rel="shortcut icon"]']
+    const nodes = selectors.flatMap((selector) => Array.from(document.head.querySelectorAll<HTMLLinkElement>(selector)))
+
+    if (nodes.length === 0) {
+      const link = document.createElement('link')
+      link.rel = 'icon'
+      link.href = href
+      document.head.appendChild(link)
+      return
+    }
+
+    nodes.forEach((node) => {
+      if (node.href !== href) {
+        node.href = href
+      }
+    })
+  }, [effectiveFaviconUrl, faviconVersion])
 
   return null
 }

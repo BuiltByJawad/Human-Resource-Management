@@ -50,6 +50,7 @@ export default function LoginClient({ branding }: LoginClientProps) {
   const isSubmittingRef = useRef(false)
 
   useEffect(() => {
+    router.prefetch('/dashboard')
     router.prefetch('/employees')
   }, [router])
 
@@ -91,10 +92,14 @@ export default function LoginClient({ branding }: LoginClientProps) {
     try {
       await login(data.email, data.password, { rememberMe: data.rememberMe })
       showToast('Successfully logged in', 'success')
-      router.replace('/employees')
+
+      const role = useAuthStore.getState().user?.role
+      const isAdminRole = typeof role === 'string' && role.toLowerCase().includes('admin')
+      router.replace(isAdminRole ? '/dashboard' : '/employees')
       return
-    } catch (error: any) {
-      showToast(error?.message || 'Failed to login', 'error')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to login'
+      showToast(message, 'error')
       setIsLoading(false)
       isSubmittingRef.current = false
     }

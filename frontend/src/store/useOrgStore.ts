@@ -10,6 +10,7 @@ interface OrgState {
   companyAddress: string
   logoUrl: string | null
   faviconUrl: string | null
+  faviconVersion: number
   loaded: boolean
 }
 
@@ -33,6 +34,7 @@ const DEFAULTS: OrgState = {
   companyAddress: '',
   logoUrl: null,
   faviconUrl: null,
+  faviconVersion: 0,
   // Start false to avoid SSR/CSR mismatch; set true after rehydrate
   loaded: false,
 }
