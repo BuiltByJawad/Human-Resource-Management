@@ -177,9 +177,22 @@ export const getPublicBranding = asyncHandler(async (req: Request, res: Response
   const tenantReq = req as TenantRequest
   const organizationId = tenantReq.tenant?.id ?? null
 
-  let settings = await prisma.companySettings.findFirst({
-    where: { organizationId },
-  })
+  let settings = null as Awaited<ReturnType<typeof prisma.companySettings.findFirst>>
+
+  if (organizationId) {
+    // Multi-tenant path: honor the resolved tenant organization only.
+    settings = await prisma.companySettings.findFirst({
+      where: { organizationId },
+    })
+  } else {
+    // Single-tenant / localhost (no tenant slug):
+    // use the most recently updated CompanySettings row so that
+    // public branding (logo, favicon, etc.) matches what admins
+    // configure via /org/settings.
+    settings = await prisma.companySettings.findFirst({
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
 
   if (!settings) {
     settings = await prisma.companySettings.create({

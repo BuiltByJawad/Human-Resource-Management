@@ -27,7 +27,13 @@ export function StoreHydrator({ branding }: StoreHydratorProps) {
     if (!hydrated.current && typeof window !== 'undefined') {
         // Sync branding into the store immediately during first render if possible
         // This reduces the chance of seeing a skeleton
-        updateOrg(branding)
+        updateOrg({
+            siteName: branding.siteName,
+            shortName: branding.shortName,
+            tagline: branding.tagline,
+            ...(branding.logoUrl ? { logoUrl: branding.logoUrl } : {}),
+            ...(branding.faviconUrl ? { faviconUrl: branding.faviconUrl } : {}),
+        })
         hydrated.current = true
     }
 

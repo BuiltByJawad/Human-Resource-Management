@@ -26,6 +26,7 @@ const robotoMono = Roboto_Mono({
 });
 
 const DEFAULT_TITLE = "HRM Platform";
+const DEFAULT_FAVICON = "/favicon.ico";
 
 interface BrandingData {
   siteName: string;
@@ -33,6 +34,17 @@ interface BrandingData {
   tagline: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+}
+
+function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
+  if (typeof url !== 'string') return null
+  const trimmed = url.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
+  if (trimmed.startsWith('//')) return `https:${trimmed}`
+  if (trimmed.startsWith('/')) return `${apiBase}${trimmed}`
+  // If backend returns a relative path without leading slash, treat as relative to apiBase.
+  return `${apiBase}/${trimmed}`
 }
 
 async function fetchBranding(): Promise<BrandingData> {
@@ -52,7 +64,7 @@ async function fetchBranding(): Promise<BrandingData> {
       headers: {
         ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       },
-      cache: 'no-cache'
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -62,12 +74,15 @@ async function fetchBranding(): Promise<BrandingData> {
     const payload = await response.json();
     const data = payload?.data ?? payload;
 
+    const rawLogoUrl = data?.logoUrl || data?.logo || null
+    const rawFaviconUrl = data?.faviconUrl || data?.favicon || null
+
     return {
       siteName: data?.siteName || "",
       shortName: data?.shortName || "HR",
       tagline: data?.tagline || "",
-      logoUrl: data?.logoUrl || null,
-      faviconUrl: data?.faviconUrl || null,
+      logoUrl: normalizeAssetUrl(rawLogoUrl, apiBase),
+      faviconUrl: normalizeAssetUrl(rawFaviconUrl, apiBase),
     };
   } catch (error) {
     console.error("Branding fetch failed:", error);
@@ -99,10 +114,6 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description: "A modern Human Resource Management platform.",
     },
-    icons: {
-      icon: branding.faviconUrl || '/favicon.ico',
-      apple: branding.logoUrl || '/apple-icon.png',
-    },
   };
 }
 
@@ -113,10 +124,13 @@ export default async function RootLayout({
 }>) {
   const branding = await fetchBranding();
   const auth = await getServerAuthContext();
+  const faviconHref = branding.faviconUrl ?? DEFAULT_FAVICON;
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" href={faviconHref} />
+        <link rel="shortcut icon" href={faviconHref} />
         <script
           dangerouslySetInnerHTML={{
             __html: `

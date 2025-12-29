@@ -3,6 +3,16 @@ import { FALLBACK_BRANDING, buildHighlights, deriveHeroTitle, LoginBranding } fr
 import { headers } from 'next/headers'
 import { extractTenantSlug } from '@/lib/tenant'
 
+function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
+  if (typeof url !== 'string') return null
+  const trimmed = url.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed
+  if (trimmed.startsWith('//')) return `https:${trimmed}`
+  if (trimmed.startsWith('/')) return `${apiBase}${trimmed}`
+  return `${apiBase}/${trimmed}`
+}
+
 async function fetchBranding(): Promise<LoginBranding> {
   const apiBase =
     process.env.BACKEND_URL ||
@@ -33,6 +43,9 @@ async function fetchBranding(): Promise<LoginBranding> {
       return FALLBACK_BRANDING
     }
 
+    const rawLogoUrl = data.logoUrl ?? data.logo ?? null
+    const rawFaviconUrl = data.faviconUrl ?? data.favicon ?? null
+
     return {
       siteName: data.siteName || FALLBACK_BRANDING.siteName,
       tagline: data.tagline || FALLBACK_BRANDING.tagline,
@@ -43,7 +56,8 @@ async function fetchBranding(): Promise<LoginBranding> {
         companyName: data.companyName,
         companyAddress: data.companyAddress
       }),
-      logoUrl: data.logoUrl ?? null,
+      logoUrl: normalizeAssetUrl(rawLogoUrl, apiBase),
+      faviconUrl: normalizeAssetUrl(rawFaviconUrl, apiBase),
       companyName: data.companyName,
       companyAddress: data.companyAddress
     }

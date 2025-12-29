@@ -195,12 +195,8 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         } else {
           showToast("Logo uploaded but no URL returned from server", "error")
         }
-      } catch (error: any) {
-        const message =
-          error?.response?.data?.error?.message ||
-          error?.response?.data?.message ||
-          error?.message ||
-          "Failed to upload logo"
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to upload logo"
         showToast(message, "error")
       }
     },
@@ -218,7 +214,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         })
         const url = res.data?.data?.faviconUrl || res.data?.faviconUrl
         if (url) {
-          updateOrg({ faviconUrl: url, faviconVersion: Date.now() })
+          updateOrg({ faviconUrl: url })
           showToast("Favicon updated", "success")
         } else {
           showToast("Favicon uploaded but no URL returned from server", "error")
