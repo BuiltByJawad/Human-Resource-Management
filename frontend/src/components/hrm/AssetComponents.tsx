@@ -12,44 +12,18 @@ import { CreatableSelect } from '../ui/CreatableSelect'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+import type {
+    Asset as AssetBase,
+    AssetAssignment as AssetAssignmentBase,
+    MaintenanceLog as MaintenanceLogBase,
+    Employee,
+} from '@/types/hrm'
 
-export interface AssetAssignment {
-    id: string
-    assetId: string
-    employeeId: string
-    assignedDate: string
-    returnedDate?: string | null
-    notes?: string
-    employee: {
-        id: string
-        firstName: string
-        lastName: string
-        employeeNumber: string
-    }
-}
+export type AssetAssignment = AssetAssignmentBase
 
-export interface MaintenanceLog {
-    id: string
-    assetId: string
-    description: string
-    cost?: number
-    date: string
-    performedBy?: string
-}
+export type MaintenanceLog = MaintenanceLogBase
 
-export interface Asset {
-    id: string
-    name: string
-    serialNumber: string
-    type: string
-    status: 'available' | 'assigned' | 'maintenance' | 'retired'
-    purchaseDate: string
-    purchasePrice?: number
-    vendor?: string
-    description?: string
-    assignments: AssetAssignment[]
-    maintenance?: MaintenanceLog[]
-}
+export type Asset = AssetBase
 
 interface AssetCardProps {
     asset: Asset
@@ -163,7 +137,7 @@ const assetSchema = yup.object().shape({
     purchasePrice: yup.number().nullable().transform((value, originalValue) => originalValue === '' ? null : value).notRequired()
 })
 
-type AssetFormData = yup.InferType<typeof assetSchema>
+export type AssetFormData = yup.InferType<typeof assetSchema>
 
 export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormProps) => {
     const [loading, setLoading] = useState(false)
@@ -317,7 +291,7 @@ interface AssignmentModalProps {
     isOpen: boolean
     onClose: () => void
     onAssign: (employeeId: string, notes: string) => Promise<void>
-    employees: any[]
+    employees: Employee[]
 }
 
 const assignmentSchema = yup.object().shape({

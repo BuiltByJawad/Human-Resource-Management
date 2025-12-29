@@ -23,5 +23,11 @@ export const analyticsService = {
     getDepartmentStats: async (): Promise<DepartmentStat[]> => {
         const response = await api.get('/analytics/departments');
         return response.data.data;
-    }
+    },
+
+    getUpcomingEvents: async (): Promise<{ id: string; title: string; date: string; type: string }[]> => {
+        const response = await api.get('/analytics/events');
+        const raw = response.data?.data ?? response.data;
+        return Array.isArray(raw) ? raw : [];
+    },
 };

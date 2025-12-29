@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/ToastProvider"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useOrgStore } from "@/store/useOrgStore"
 import { PERMISSIONS } from "@/constants/permissions"
+import DashboardShell from "@/components/ui/DashboardShell"
 
 const passwordSchema = yup.object().shape({
   currentPassword: yup.string().required("Current password is required"),
@@ -425,151 +426,143 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-        <div className="mb-6">
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center justify-center p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-900"
-            aria-label="Go back"
-          >
-            <ArrowLeftIcon className="h-6 w-6" />
-          </button>
-        </div>
+    <DashboardShell>
+      <div className="py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
-
-        <div className="space-y-6">
-          {adminSections
-            .filter((section) => hasPermission(section.permission))
-            .map((section) => (
-              <div key={section.permission} className="bg-white shadow rounded-lg p-6 border border-gray-100">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">{section.title}</h2>
-                    <p className="mt-1 text-sm text-gray-500">{section.description}</p>
+          <div className="space-y-6">
+            {adminSections
+              .filter((section) => hasPermission(section.permission))
+              .map((section) => (
+                <div key={section.permission} className="bg-white shadow rounded-lg p-6 border border-gray-100">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">{section.title}</h2>
+                      <p className="mt-1 text-sm text-gray-500">{section.description}</p>
+                    </div>
+                    {section.action && section.actionLabel && (
+                      <button
+                        onClick={section.action}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        {section.actionLabel}
+                      </button>
+                    )}
                   </div>
-                  {section.action && section.actionLabel && (
-                    <button
-                      onClick={section.action}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      {section.actionLabel}
-                    </button>
-                  )}
+                  {section.content && <div className="mt-4">{section.content}</div>}
                 </div>
-                {section.content && <div className="mt-4">{section.content}</div>}
-              </div>
-            ))}
+              ))}
 
-          {hasPermission(PERMISSIONS.CHANGE_OWN_PASSWORD) && (
-            <div className="bg-white shadow rounded-lg p-6 border border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Security</h2>
-              <p className="mt-1 text-sm text-gray-500">Manage your password and keep your account secure.</p>
-              <div className="mt-4">
-                <button
-                  onClick={() => {
-                    setShowPasswordModal(true)
-                    reset()
-                  }}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Change password
-                </button>
-              </div>
-            </div>
-          )}
-
-          {hasPermission(PERMISSIONS.UPDATE_OWN_NOTIFICATIONS) && (
-            <div className="bg-white shadow rounded-lg p-6 border border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">My notifications</h2>
-              <p className="mt-1 text-sm text-gray-500">Choose how you want to be notified about HR updates.</p>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center">
-                  <input
-                    id="personal-email-notifs"
-                    name="personal-email-notifs"
-                    type="checkbox"
-                    checked={notifications.emailNotifs}
-                    onChange={(e) => setNotifications({ ...notifications, emailNotifs: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="personal-email-notifs" className="ml-3 text-sm text-gray-700">
-                    Email notifications
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="personal-push-notifs"
-                    name="personal-push-notifs"
-                    type="checkbox"
-                    checked={notifications.pushNotifs}
-                    onChange={(e) => setNotifications({ ...notifications, pushNotifs: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label htmlFor="personal-push-notifs" className="ml-3 text-sm text-gray-700">
-                    Push notifications
-                  </label>
-                </div>
-                <div>
+            {hasPermission(PERMISSIONS.CHANGE_OWN_PASSWORD) && (
+              <div className="bg-white shadow rounded-lg p-6 border border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900">Security</h2>
+                <p className="mt-1 text-sm text-gray-500">Manage your password and keep your account secure.</p>
+                <div className="mt-4">
                   <button
-                    onClick={handleSaveNotifications}
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    onClick={() => {
+                      setShowPasswordModal(true)
+                      reset()
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
-                    Save my preferences
+                    Change password
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        <Modal
-          isOpen={showPasswordModal}
-          onClose={() => {
-            setShowPasswordModal(false)
-            reset()
-          }}
-          title="Change Password"
-        >
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Current Password"
-              type="password"
-              required
-              error={errors.currentPassword?.message}
-              {...register("currentPassword")}
-            />
-            <Input label="New Password" type="password" required error={errors.newPassword?.message} {...register("newPassword")} />
-            <Input
-              label="Confirm New Password"
-              type="password"
-              required
-              error={errors.confirmPassword?.message}
-              {...register("confirmPassword")}
-            />
-            <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
-              <button
-                type="submit"
-                disabled={isChangingPassword}
-                className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto sm:text-sm disabled:opacity-50"
-              >
-                {isChangingPassword ? "Changing..." : "Change Password"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPasswordModal(false)
-                  reset()
-                }}
-                className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </Modal>
+            {hasPermission(PERMISSIONS.UPDATE_OWN_NOTIFICATIONS) && (
+              <div className="bg-white shadow rounded-lg p-6 border border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900">My notifications</h2>
+                <p className="mt-1 text-sm text-gray-500">Choose how you want to be notified about HR updates.</p>
+                <div className="mt-4 space-y-4">
+                  <div className="flex items-center">
+                    <input
+                      id="personal-email-notifs"
+                      name="personal-email-notifs"
+                      type="checkbox"
+                      checked={notifications.emailNotifs}
+                      onChange={(e) => setNotifications({ ...notifications, emailNotifs: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="personal-email-notifs" className="ml-3 text-sm text-gray-700">
+                      Email notifications
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      id="personal-push-notifs"
+                      name="personal-push-notifs"
+                      type="checkbox"
+                      checked={notifications.pushNotifs}
+                      onChange={(e) => setNotifications({ ...notifications, pushNotifs: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="personal-push-notifs" className="ml-3 text-sm text-gray-700">
+                      Push notifications
+                    </label>
+                  </div>
+                  <div>
+                    <button
+                      onClick={handleSaveNotifications}
+                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Save my preferences
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Modal
+            isOpen={showPasswordModal}
+            onClose={() => {
+              setShowPasswordModal(false)
+              reset()
+            }}
+            title="Change Password"
+          >
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <Input
+                label="Current Password"
+                type="password"
+                required
+                error={errors.currentPassword?.message}
+                {...register("currentPassword")}
+              />
+              <Input label="New Password" type="password" required error={errors.newPassword?.message} {...register("newPassword")} />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                required
+                error={errors.confirmPassword?.message}
+                {...register("confirmPassword")}
+              />
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto sm:text-sm disabled:opacity-50"
+                >
+                  {isChangingPassword ? "Changing..." : "Change Password"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false)
+                    reset()
+                  }}
+                  className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </Modal>
+        </div>
       </div>
-    </div>
+    </DashboardShell>
   )
 }

@@ -7,7 +7,11 @@ import {
   DocumentTextIcon,
   AcademicCapIcon,
   FlagIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  HeartIcon,
+  CreditCardIcon,
+  ArrowTrendingDownIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline'
 
 import Sidebar from '@/components/ui/Sidebar'
@@ -20,7 +24,11 @@ const ICON_MAP: Record<PortalModuleIcon, typeof CalendarDaysIcon> = {
   shifts: CalendarDaysIcon,
   documents: DocumentTextIcon,
   training: AcademicCapIcon,
-  goals: FlagIcon
+  goals: FlagIcon,
+  benefits: HeartIcon,
+  expenses: CreditCardIcon,
+  offboarding: ArrowTrendingDownIcon,
+  leave: ClipboardDocumentListIcon
 }
 
 interface PortalDashboardClientProps {

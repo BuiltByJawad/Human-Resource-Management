@@ -182,14 +182,21 @@ export const getPublicBranding = asyncHandler(async (req: Request, res: Response
   })
 
   if (!settings) {
-    settings = await prisma.companySettings.create({ data: { organizationId } })
+    settings = await prisma.companySettings.create({
+      data: {
+        organizationId,
+        siteName: 'NovaHR',
+        tagline: 'Workforce Management',
+      }
+    })
   }
 
   res.json({
     success: true,
     data: {
-      siteName: settings.siteName,
-      tagline: settings.tagline,
+      siteName: settings.siteName || 'NovaHR',
+      tagline: settings.tagline || 'Workforce Management',
+      shortName: 'HR', // Schema doesn't have shortName yet
       companyName: settings.companyName,
       companyAddress: settings.companyAddress,
       logoUrl: settings.logoUrl,

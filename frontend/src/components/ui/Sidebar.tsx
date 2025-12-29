@@ -1,5 +1,6 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
+import { useBranding } from '@/components/providers/BrandingProvider'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -31,6 +32,7 @@ import {
 import { useAuthStore } from '@/store/useAuthStore'
 import { useOrgStore } from '@/store/useOrgStore'
 import { PERMISSIONS, type Permission } from '@/constants/permissions'
+import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 
 type NavIcon = typeof HomeIcon
 
@@ -105,14 +107,23 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
   },
 ]
 
+// Track whether the sidebar has already hydrated once in this browser tab.
+// On the very first load, we start with isMounted=false so SSR and the
+// first client render match. After that, all subsequent mounts (client-side
+// navigations) start with isMounted=true so we don't re-show skeletons.
+let sidebarHydratedOnce = false
+
 function useSidebarState() {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
+  const [isMounted, setIsMounted] = useState(() =>
+    typeof window !== 'undefined' ? sidebarHydratedOnce : false,
+  )
 
   useEffect(() => {
     // Check if the class was set by the inline script in layout
     const hasClass = document.documentElement.classList.contains('sidebar-collapsed')
     setIsCollapsed(hasClass)
+    sidebarHydratedOnce = true
     setIsMounted(true)
   }, [])
 
@@ -136,10 +147,22 @@ function useSidebarState() {
 export default function Sidebar() {
   const { toggle, isMounted } = useSidebarState()
   const router = useRouter()
-  const user = useAuthStore((state) => state.user)
-  const hasAnyPermission = useAuthStore((state) => state.hasAnyPermission)
-  const { siteName, shortName, tagline, logoUrl, loaded: orgLoaded } = useOrgStore()
+  const storeUser = useAuthStore((state) => state.user)
+  const branding = useBranding()
+  const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl, loaded: orgLoaded } = useOrgStore()
+  const initialAuth = useInitialAuth()
+  // Prefer server-fetched user for SSR/first paint; fall back to client store
+  const user = (initialAuth?.user ?? storeUser) as any
+
+  // Prioritize server-fetched data from context to ensure SSR/CSR match
+  const siteName = branding?.siteName || storeSiteName
+  const shortName = branding?.shortName || storeShortName
+  const tagline = branding?.tagline || storeTagline
+  const logoUrl = branding?.logoUrl || storeLogoUrl
+
   const pathname = usePathname()
+  const isSuperAdmin = user?.role === 'Super Admin'
+  const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : []
 
   const avatarUrl = useMemo(() => {
     const raw = user?.avatarUrl
@@ -159,20 +182,19 @@ export default function Sidebar() {
     return matches.sort((a, b) => b.length - a.length)[0]
   })()
 
-  // canSeeItem handles hydration: on server (not mounted), hide permission-gated items
-  // This ensures server and client render the same items
+  // canSeeItem uses the server-fetched user permissions so SSR and
+  // first client render see the same navigation items.
   const canSeeItem = (item: NavItem) => {
     if (item.requiresEmployeeProfile) {
-      if (!isMounted) return false
       return !!user?.employee?.id
     }
     if (!item.permissions || item.permissions.length === 0) return true
-    // Before mount, hide permission-gated items to prevent hydration mismatch
-    if (!isMounted) return false
-    return hasAnyPermission(item.permissions)
+    if (isSuperAdmin) return true
+    if (!userPermissions.length) return false
+    return item.permissions.some((perm) => userPermissions.includes(perm))
   }
 
-  const hasUser = isMounted && !!user
+  const hasUser = !!user
 
   const initials = hasUser && user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
@@ -194,7 +216,7 @@ export default function Sidebar() {
         // ignore prefetch errors (e.g., during rapid mounts/unmounts)
       }
     })
-  }, [isMounted, router, user, hasAnyPermission])
+  }, [isMounted, router, userPermissions.join(','), isSuperAdmin])
 
   const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
     const isActive = activeHref === item.href
@@ -225,8 +247,9 @@ export default function Sidebar() {
     )
   }
 
-  // Keep server/client markup aligned: while not mounted, always show skeleton even if org store is hydrated
-  const showOrgSkeleton = !isMounted || !orgLoaded
+  // Show branding immediately if it's in the store (hydrated on server or from localStorage)
+  // This prevents the flickering logo/name on refresh
+  const showOrgSkeleton = !orgLoaded && !siteName && !tagline
 
   return (
     <aside
@@ -305,6 +328,9 @@ export default function Sidebar() {
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-6 no-scrollbar">
         {navigation.map((section, sectionIndex) => {
+          // Hide "My Workspace" section for Super Admin role (system admin, not an employee)
+          if (section.isPersonal && isSuperAdmin) return null
+
           const visibleItems = section.items.filter(canSeeItem)
           if (visibleItems.length === 0) return null
 
@@ -313,8 +339,8 @@ export default function Sidebar() {
 
           return (
             <div key={section.label}>
-              {/* Divider between personal and admin sections */}
-              {isFirstAdminSection && (
+              {/* Divider between personal and admin sections - only show if personal section is visible */}
+              {isFirstAdminSection && !isSuperAdmin && (
                 <div className="mb-6 pt-2 border-t border-white/10 [.sidebar-collapsed_&]:border-0">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500/70 px-2 mt-2 [.sidebar-collapsed_&]:hidden">
                     Administration

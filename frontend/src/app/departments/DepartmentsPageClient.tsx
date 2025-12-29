@@ -4,27 +4,30 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon } from '@heroicons/react/24/outline'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
+import DashboardShell from '@/components/ui/DashboardShell'
 import {
   Department,
   DepartmentForm,
   type DepartmentFormErrors,
   DepartmentList,
 } from '@/components/hrm/DepartmentComponents'
+import type { EmployeeSummary } from '@/types/hrm'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { LoadingSpinner } from '@/components/ui/CommonComponents'
-import api from '@/lib/axios'
-import { fetchDepartments, fetchEmployeesForManagers } from '@/lib/hrmData'
+import {
+  fetchDepartments,
+  fetchEmployeesForManagers,
+  createDepartment,
+  updateDepartment,
+  deleteDepartmentById,
+} from '@/lib/hrmData'
 import { handleCrudError } from '@/lib/apiError'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 interface DepartmentsPageClientProps {
   initialDepartments?: Department[]
-  initialEmployees?: any[]
+  initialEmployees?: EmployeeSummary[]
 }
 
 export function DepartmentsPageClient({
@@ -33,6 +36,7 @@ export function DepartmentsPageClient({
 }: DepartmentsPageClientProps) {
   const { token } = useAuthStore()
   const { showToast } = useToast()
+  // State
   const queryClient = useQueryClient()
 
   const [formErrors, setFormErrors] = useState<DepartmentFormErrors>({})
@@ -43,26 +47,24 @@ export function DepartmentsPageClient({
   const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null)
 
   const {
-    data: departments = initialDepartments,
-    isLoading: departmentsLoading,
+    data: departments = [],
+    isPending: departmentsPending,
   } = useQuery<Department[]>({
     queryKey: ['departments', token],
     queryFn: () => fetchDepartments(token ?? undefined),
-    enabled: !!token,
-    initialData: initialDepartments,
+    initialData: initialDepartments.length > 0 ? initialDepartments : undefined,
   })
 
   const {
     data: employees = initialEmployees,
-    isLoading: employeesLoading,
-  } = useQuery<any[]>({
+    isPending: employeesPending,
+  } = useQuery<EmployeeSummary[]>({
     queryKey: ['employees', 'manager-list', token],
     queryFn: () => fetchEmployeesForManagers(token ?? undefined),
-    enabled: !!token,
-    initialData: initialEmployees,
+    initialData: initialEmployees.length > 0 ? initialEmployees : undefined,
   })
 
-  const listLoading = departmentsLoading || employeesLoading
+  const listLoading = departmentsPending || employeesPending || !token
 
   const refetchLists = () => {
     queryClient.invalidateQueries({ queryKey: ['departments', token] })
@@ -95,10 +97,10 @@ export function DepartmentsPageClient({
       department?: Department | null
     }) => {
       if (department) {
-        await api.put(`${API_URL}/departments/${department.id}`, payload)
+        await updateDepartment(department.id, payload)
         return 'updated'
       }
-      await api.post(`${API_URL}/departments`, payload)
+      await createDepartment(payload)
       return 'created'
     },
     onSuccess: (action) => {
@@ -127,7 +129,7 @@ export function DepartmentsPageClient({
 
   const deleteDepartment = useMutation({
     mutationFn: async (departmentId: string) => {
-      await api.delete(`${API_URL}/departments/${departmentId}`)
+      await deleteDepartmentById(departmentId)
     },
     onSuccess: () => {
       showToast('Department deleted successfully', 'success')
@@ -158,43 +160,45 @@ export function DepartmentsPageClient({
   const currentEmployees = useMemo(() => employees ?? [], [employees])
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {listLoading && !departments.length ? (
-              <div className="flex flex-col items-center justify-center py-24">
+    <DashboardShell>
+      <div className="py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+          <div className="space-y-6">
+            {departmentsPending ? (
+              <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <LoadingSpinner size="lg" />
-                <p className="mt-4 text-sm text-gray-500">Loading departments…</p>
+                <p className="mt-4 text-sm font-medium text-gray-500">Loading departments…</p>
               </div>
+            ) : departments.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-500">No departments found.</div>
             ) : (
-              <>
-                <div className="flex justify-between items-center">
+              <div className="space-y-8">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
-                    <p className="text-sm text-gray-500">Manage company organizational structure</p>
+                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Departments</h1>
+                    <p className="mt-1 text-sm text-gray-500">Manage company organizational structure and hierarchy</p>
                   </div>
                   <button
                     onClick={handleCreate}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-4 py-2.5 border border-transparent rounded-xl shadow-lg shadow-blue-600/20 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
                     Add Department
                   </button>
                 </div>
 
-                <DepartmentList
-                  departments={departments}
-                  onEdit={handleEdit}
-                  onDelete={handleDeleteClick}
-                  loading={departmentsLoading && !departments.length}
-                />
-              </>
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <DepartmentList
+                    departments={departments}
+                    onEdit={handleEdit}
+                    onDelete={handleDeleteClick}
+                    loading={departmentsPending && !departments.length}
+                  />
+                </div>
+              </div>
             )}
           </div>
-        </main>
+        </div>
       </div>
 
       <DepartmentForm
@@ -227,6 +231,6 @@ export function DepartmentsPageClient({
         type="danger"
         loading={deleteDepartment.isPending}
       />
-    </div>
+    </DashboardShell>
   )
 }

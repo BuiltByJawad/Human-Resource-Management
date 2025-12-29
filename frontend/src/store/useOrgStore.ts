@@ -38,46 +38,11 @@ const DEFAULTS: OrgState = {
 }
 
 const getInitialState = (): OrgState => {
-  if (typeof window === 'undefined') return DEFAULTS
-  try {
-    const storage = window.localStorage
-    const tenantKey = resolveTenantKey(ORG_STORAGE_KEY)
-    const raw = storage.getItem(tenantKey)
-    if (raw) {
-      const parsed = JSON.parse(raw)?.state as Partial<OrgState> | undefined
-      if (parsed) {
-        const siteName = parsed.siteName ?? DEFAULTS.siteName
-        return {
-          ...DEFAULTS,
-          ...parsed,
-          shortName: deriveShortName(siteName, parsed.shortName ?? DEFAULTS.shortName),
-          loaded: true,
-        }
-      }
-    }
-
-    const tenantSlug = getClientTenantSlug()
-    if (!tenantSlug && tenantKey !== ORG_STORAGE_KEY) {
-      const legacyRaw = storage.getItem(ORG_STORAGE_KEY)
-      if (legacyRaw) {
-        storage.setItem(tenantKey, legacyRaw)
-        storage.removeItem(ORG_STORAGE_KEY)
-
-        const parsed = JSON.parse(legacyRaw)?.state as Partial<OrgState> | undefined
-        if (parsed) {
-          const siteName = parsed.siteName ?? DEFAULTS.siteName
-          return {
-            ...DEFAULTS,
-            ...parsed,
-            shortName: deriveShortName(siteName, parsed.shortName ?? DEFAULTS.shortName),
-            loaded: true,
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
+  // IMPORTANT: Initial org state must be identical on the server and on the
+  // first client render to avoid hydration mismatches. We rely on the
+  // BrandingProvider (server-fetched) for SSR values and let the persist
+  // middleware rehydrate from localStorage *after* mount via onRehydrateStorage.
+  // So we intentionally do NOT read from localStorage here.
   return DEFAULTS
 }
 

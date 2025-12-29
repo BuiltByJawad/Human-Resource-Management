@@ -17,5 +17,6 @@ router.use(authorize(['Super Admin', 'HR Admin']));
 router.get('/dashboard', analyticsController.getDashboard);
 router.get('/departments', analyticsController.getDepartmentStats);
 router.get('/burnout', getBurnoutAnalytics);
+router.get('/events', analyticsController.getUpcomingEvents);
 
 export default router;

@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import axios from 'axios'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import Sidebar from '@/components/ui/Sidebar'
@@ -15,41 +14,21 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useDebounce } from '@/hooks/useDebounce'
 import { EmployeesToolbar, EmployeesListSection } from '@/components/hrm/EmployeesPageComponents'
-
-const envApiUrl = process.env.NEXT_PUBLIC_API_URL
-const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value)
-const isLikelyNextOrigin = (value: string) => /localhost:3000/i.test(value)
-const API_URL =
-  envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)
-    ? envApiUrl
-    : 'http://localhost:5000/api'
-
-interface Department {
-  id: string
-  name: string
-}
-
-interface Role {
-  id: string
-  name: string
-}
-
-interface Pagination {
-  page: number
-  limit: number
-  total: number
-  pages: number
-}
-
-interface EmployeesPayload {
-  employees: Employee[]
-  pagination: Pagination
-}
+import type { Department, EmployeesPage, EmployeesPagination, Role } from '@/types/hrm'
+import {
+  fetchDepartments,
+  fetchRolesWithToken,
+  fetchEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployeeById,
+  sendEmployeeInvite,
+} from '@/lib/hrmData'
 
 interface EmployeesPageClientProps {
   initialDepartments?: Department[]
   initialRoles?: Role[]
-  initialEmployees?: EmployeesPayload | null
+  initialEmployees?: EmployeesPage | null
 }
 
 function EmployeesContent({
@@ -65,7 +44,7 @@ function EmployeesContent({
   const defaultPagination = initialEmployees?.pagination ?? { page: 1, limit: 9, total: 0, pages: 0 }
 
   const [mounted, setMounted] = useState(false)
-  const [pagination, setPagination] = useState<Pagination>(defaultPagination)
+  const [pagination, setPagination] = useState<EmployeesPagination>(defaultPagination)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | undefined>(undefined)
@@ -91,12 +70,10 @@ function EmployeesContent({
       if (!employee.email || !employee.role?.id) {
         throw new Error('Employee email and role are required to send an invite')
       }
-      const response = await axios.post(
-        `${API_URL}/auth/invite`,
+      await sendEmployeeInvite(
         { email: employee.email, roleId: employee.role.id },
-        { headers: { Authorization: `Bearer ${token}` } }
+        token ?? undefined,
       )
-      return response.data
     },
     onSuccess: () => {
       showToast('Invite link sent to employee', 'success')
@@ -108,28 +85,18 @@ function EmployeesContent({
   })
 
   const departmentsQuery = useQuery<Department[]>({
-    queryKey: ['departments', token],
-    queryFn: async () => {
-      const response = await axios.get(`${API_URL}/departments`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      return response.data.data as Department[]
-    },
-    enabled: !!token,
-    initialData: initialDepartments
-  })
+		queryKey: ['departments', token],
+		queryFn: () => fetchDepartments(token ?? undefined),
+		enabled: !!token,
+		initialData: initialDepartments,
+	})
 
-  const rolesQuery = useQuery<Role[]>({
-    queryKey: ['roles', token],
-    queryFn: async () => {
-      const response = await axios.get(`${API_URL}/roles`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      return response.data.data as Role[]
-    },
-    enabled: !!token,
-    initialData: initialRoles
-  })
+	const rolesQuery = useQuery<Role[]>({
+		queryKey: ['roles', token],
+		queryFn: () => fetchRolesWithToken(token ?? undefined),
+		enabled: !!token,
+		initialData: initialRoles,
+	})
 
   const isDefaultFilters =
     pagination.page === defaultPagination.page &&
@@ -138,24 +105,19 @@ function EmployeesContent({
     filterDepartment === 'all' &&
     !debouncedSearch
 
-  const employeesQuery = useQuery<EmployeesPayload>({
+  const employeesQuery = useQuery<EmployeesPage>({
     queryKey: ['employees', token, pagination.page, pagination.limit, debouncedSearch, filterStatus, filterDepartment],
-    queryFn: async () => {
-      const params: Record<string, string | number> = {
-        page: pagination.page,
-        limit: pagination.limit
-      }
-
-      if (debouncedSearch) params.search = debouncedSearch
-      if (filterStatus !== 'all') params.status = filterStatus
-      if (filterDepartment !== 'all') params.departmentId = filterDepartment
-
-      const response = await axios.get(`${API_URL}/employees`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params
-      })
-      return response.data.data
-    },
+    queryFn: () =>
+			fetchEmployees(
+			  {
+			    page: pagination.page,
+			    limit: pagination.limit,
+			    search: debouncedSearch,
+			    status: filterStatus,
+			    departmentId: filterDepartment,
+			  },
+			  token ?? undefined,
+			),
     enabled: !!token,
     placeholderData: (previousData) => previousData,
     initialData: isDefaultFilters ? initialEmployees ?? undefined : undefined
@@ -163,7 +125,7 @@ function EmployeesContent({
 
   useEffect(() => {
     if (employeesQuery.data?.pagination) {
-      setPagination((prev) => ({
+      setPagination((prev: EmployeesPagination) => ({
         ...prev,
         ...employeesQuery.data!.pagination
       }))
@@ -172,33 +134,30 @@ function EmployeesContent({
 
   const employees = employeesQuery.data?.employees || []
 
-  const createEmployeeMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await axios.post(`${API_URL}/employees`, data, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      return response.data
-    },
+	const createEmployeeMutation = useMutation({
+		mutationFn: async (data: any) => {
+			const created = await createEmployee(data, token ?? undefined)
+			return created
+		},
     onSuccess: async (_data, variables) => {
       showToast('Employee created successfully', 'success')
       queryClient.invalidateQueries({ queryKey: ['employees', token] })
       setIsModalOpen(false)
 
       if (variables.email && variables.roleId) {
-        try {
-          await axios.post(
-            `${API_URL}/auth/invite`,
-            { email: variables.email, roleId: variables.roleId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          showToast('Invite link sent to employee', 'success')
-        } catch (inviteError: any) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error('Failed to send invite', inviteError)
-          }
-          showToast(inviteError.response?.data?.message || 'Failed to send invite', 'error')
-        }
-      }
+			try {
+				await sendEmployeeInvite(
+				  { email: variables.email, roleId: variables.roleId },
+				  token ?? undefined,
+				)
+				showToast('Invite link sent to employee', 'success')
+			} catch (inviteError: any) {
+				if (process.env.NODE_ENV !== 'production') {
+					console.error('Failed to send invite', inviteError)
+				}
+				showToast(inviteError.response?.data?.message || 'Failed to send invite', 'error')
+			}
+		}
     },
     onError: (error: any) => {
       showToast(error.response?.data?.message || 'Failed to create employee', 'error')
@@ -208,10 +167,8 @@ function EmployeesContent({
   const updateEmployeeMutation = useMutation({
     mutationFn: async (data: any) => {
       const { id, ...payload } = data
-      const response = await axios.patch(`${API_URL}/employees/${id}`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      return response.data
+      const updated = await updateEmployee(id, payload, token ?? undefined)
+      return updated
     },
     onSuccess: () => {
       showToast('Employee updated successfully', 'success')
@@ -225,9 +182,7 @@ function EmployeesContent({
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async (id: string) => {
-      await axios.delete(`${API_URL}/employees/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await deleteEmployeeById(id, token ?? undefined)
     },
     onSuccess: () => {
       showToast('Employee deleted successfully', 'success')
@@ -277,7 +232,7 @@ function EmployeesContent({
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.pages) {
-      setPagination((prev) => ({ ...prev, page: newPage }))
+      setPagination((prev: EmployeesPagination) => ({ ...prev, page: newPage }))
     }
   }
 

@@ -86,17 +86,11 @@ export class EmployeeRepository {
     }
 
     async update(id: string, data: Prisma.EmployeeUpdateInput, organizationId: string) {
-        const result = await prisma.employee.updateMany({
-            where: { id, organizationId },
+        // Organization ownership is already validated in the service via getById,
+        // so we can safely update by primary key here to allow relational updates.
+        return prisma.employee.update({
+            where: { id },
             data,
-        });
-
-        if (!result.count) {
-            return null;
-        }
-
-        return prisma.employee.findFirst({
-            where: { id, organizationId },
             include: {
                 department: {
                     select: { id: true, name: true },

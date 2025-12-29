@@ -6,28 +6,9 @@ import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+import type { Department as DepartmentBase, EmployeeSummary } from '@/types/hrm'
 
-export interface Department {
-  id: string
-  name: string
-  description?: string
-  managerId?: string
-  parentDepartmentId?: string
-  manager?: {
-    id: string
-    firstName: string
-    lastName: string
-    email: string
-  }
-  parentDepartment?: {
-    id: string
-    name: string
-  }
-  _count?: {
-    employees: number
-    subDepartments: number
-  }
-}
+export type Department = DepartmentBase
 
 interface DepartmentFormProps {
   isOpen: boolean
@@ -35,7 +16,7 @@ interface DepartmentFormProps {
   onSubmit: (data: Partial<Department>) => Promise<void>
   initialData?: Department | null
   departments: Department[] // For parent selection
-  employees: any[] // For manager selection - replace any with Employee type if available
+  employees: EmployeeSummary[] // For manager selection - replace any with Employee type if available
   loading?: boolean
   apiErrors?: Partial<Record<keyof DepartmentFormData, string>>
   onClearApiErrors?: (field: DepartmentFormField) => void

@@ -6,8 +6,25 @@ export class DepartmentRepository {
         return prisma.department.findMany({
             where: { organizationId },
             include: {
+                manager: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                    },
+                },
+                parentDepartment: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
                 _count: {
-                    select: { employees: true },
+                    select: {
+                        employees: true,
+                        subDepartments: true,
+                    },
                 },
             },
             orderBy: { name: 'asc' },
@@ -48,27 +65,44 @@ export class DepartmentRepository {
     async create(data: Prisma.DepartmentCreateInput, organizationId: string) {
         return prisma.department.create({
             data: {
+                // Spread caller-provided fields (name, description, manager, parentDepartment, ...)
                 ...(data as any),
-                organizationId,
+                // Always set the owning organization via relation connect. Prisma's
+                // DepartmentCreateInput does not accept the scalar `organizationId`
+                // directly here.
+                organization: {
+                    connect: { id: organizationId },
+                },
             },
         });
     }
 
     async update(id: string, data: Prisma.DepartmentUpdateInput, organizationId: string) {
-        const result = await prisma.department.updateMany({
-            where: { id, organizationId },
+        // Existence and organization ownership are validated in the service layer.
+        // Use `update` here so relational fields (manager, parentDepartment) are supported.
+        return prisma.department.update({
+            where: { id },
             data,
-        });
-
-        if (!result.count) {
-            return null;
-        }
-
-        return prisma.department.findFirst({
-            where: { id, organizationId },
             include: {
+                manager: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                    },
+                },
+                parentDepartment: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
                 _count: {
-                    select: { employees: true },
+                    select: {
+                        employees: true,
+                        subDepartments: true,
+                    },
                 },
             },
         });

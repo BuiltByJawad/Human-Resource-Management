@@ -27,6 +27,9 @@ export class DepartmentService {
             name: data.name,
             description: data.description,
             manager: data.managerId ? { connect: { id: data.managerId } } : undefined,
+            parentDepartment: data.parentDepartmentId
+                ? { connect: { id: data.parentDepartmentId } }
+                : undefined,
         }, organizationId);
 
         return department;
@@ -46,6 +49,9 @@ export class DepartmentService {
         if (data.name) updateData.name = data.name;
         if (data.description !== undefined) updateData.description = data.description;
         if (data.managerId) updateData.manager = { connect: { id: data.managerId } };
+        if (data.parentDepartmentId) {
+            updateData.parentDepartment = { connect: { id: data.parentDepartmentId } };
+        }
 
         const updated = await departmentRepository.update(id, updateData, organizationId);
         if (!updated) {

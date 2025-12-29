@@ -7,7 +7,9 @@ import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
-import { ExpenseClaim, getPendingExpenses, updateExpenseStatus } from "@/services/expenseService"
+import { handleCrudError } from "@/lib/apiError"
+import { fetchPendingExpenses, updateExpenseStatus, type UpdateExpenseStatusPayload } from "@/lib/hrmData"
+import type { ExpenseClaim } from "@/types/hrm"
 import { format } from "date-fns"
 
 interface ExpensesAdminPageClientProps {
@@ -28,20 +30,23 @@ export function ExpensesAdminPageClient({ initialClaims, initialCanApprove }: Ex
 
   const claimsQuery = useQuery({
     queryKey: ["expenses", "pending"],
-    queryFn: () => getPendingExpenses(),
+    queryFn: () => fetchPendingExpenses(),
     initialData: initialClaims,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
 
-  const handleStatus = async (id: string, status: "approved" | "rejected", rejectionReason?: string) => {
+  const handleStatus = async (id: string, status: UpdateExpenseStatusPayload["status"], rejectionReason?: string) => {
     try {
       await updateExpenseStatus(id, { status, rejectionReason })
       showToast(`Claim ${status}`, "success")
       queryClient.invalidateQueries({ queryKey: ["expenses", "pending"] })
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || "Failed to update status"
-      showToast(message, "error")
+    } catch (error: unknown) {
+      handleCrudError({
+        error,
+        resourceLabel: "Expense claim",
+        showToast,
+      })
     }
   }
 

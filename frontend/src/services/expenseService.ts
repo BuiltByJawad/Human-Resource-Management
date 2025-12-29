@@ -1,18 +1,7 @@
 import api from '@/lib/axios'
+import type { ExpenseClaim as ExpenseClaimBase } from '@/types/hrm'
 
-export interface ExpenseClaim {
-  id: string
-  employeeId: string
-  amount: number
-  currency: string
-  category: string
-  date: string
-  description?: string
-  receiptUrl?: string
-  status: 'pending' | 'approved' | 'rejected' | 'reimbursed'
-  rejectionReason?: string | null
-  approvedBy?: string | null
-}
+export type ExpenseClaim = ExpenseClaimBase
 
 export const submitExpenseClaim = async (payload: {
   employeeId: string

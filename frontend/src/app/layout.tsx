@@ -8,6 +8,10 @@ import { AuthTransitionOverlay } from "@/components/ui/AuthTransitionOverlay";
 import { PostLoginPrefetcher } from "@/components/providers/PostLoginPrefetcher";
 import { headers } from 'next/headers'
 import { extractTenantSlug } from '@/lib/tenant'
+import { StoreHydrator } from "@/components/providers/StoreHydrator";
+import { BrandingProvider } from "@/components/providers/BrandingProvider";
+import { getServerAuthContext } from '@/lib/auth/serverAuth'
+import { AuthBootstrapProvider } from '@/components/providers/AuthBootstrapProvider'
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -23,7 +27,15 @@ const robotoMono = Roboto_Mono({
 
 const DEFAULT_TITLE = "HRM Platform";
 
-async function fetchPublicSiteName(): Promise<string> {
+interface BrandingData {
+  siteName: string;
+  shortName: string;
+  tagline: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+}
+
+async function fetchBranding(): Promise<BrandingData> {
   const apiBase =
     process.env.BACKEND_URL ||
     (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "") : null) ||
@@ -37,28 +49,41 @@ async function fetchPublicSiteName(): Promise<string> {
 
   try {
     const response = await fetch(`${apiBase}/api/org/branding/public`, {
-      next: { revalidate: 3600 },
       headers: {
         ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       },
+      cache: 'no-cache'
     });
 
     if (!response.ok) {
-      return "";
+      throw new Error("Failed to fetch branding");
     }
 
-    const payload = await response.json().catch(() => null);
+    const payload = await response.json();
     const data = payload?.data ?? payload;
-    const siteName = typeof data?.siteName === 'string' ? data.siteName : '';
-    return siteName;
-  } catch {
-    return "";
+
+    return {
+      siteName: data?.siteName || "",
+      shortName: data?.shortName || "HR",
+      tagline: data?.tagline || "",
+      logoUrl: data?.logoUrl || null,
+      faviconUrl: data?.faviconUrl || null,
+    };
+  } catch (error) {
+    console.error("Branding fetch failed:", error);
+    return {
+      siteName: "",
+      shortName: "HR",
+      tagline: "",
+      logoUrl: null,
+      faviconUrl: null,
+    };
   }
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const siteName = (await fetchPublicSiteName()).trim();
-  const title = siteName || DEFAULT_TITLE;
+  const branding = await fetchBranding();
+  const title = branding.siteName || DEFAULT_TITLE;
 
   return {
     title,
@@ -74,14 +99,21 @@ export async function generateMetadata(): Promise<Metadata> {
       title,
       description: "A modern Human Resource Management platform.",
     },
+    icons: {
+      icon: branding.faviconUrl || '/favicon.ico',
+      apple: branding.logoUrl || '/apple-icon.png',
+    },
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const branding = await fetchBranding();
+  const auth = await getServerAuthContext();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -104,15 +136,19 @@ export default function RootLayout({
         className={`${inter.variable} ${robotoMono.variable} bg-[var(--background)] text-[var(--foreground)] antialiased`}
       >
         <QueryProvider>
-          <FaviconManager />
-          <ToastProvider>
-            <div className="min-h-screen">
-              {children}
-              {/* Warm up core dashboard/employee queries right after login so sidebar navigation feels instant */}
-              <PostLoginPrefetcher />
-              <AuthTransitionOverlay />
-            </div>
-          </ToastProvider>
+          <BrandingProvider branding={branding}>
+            <StoreHydrator branding={branding} />
+            <FaviconManager />
+            <ToastProvider>
+              <AuthBootstrapProvider auth={auth}>
+                <div className="min-h-screen">
+                  {children}
+                  <PostLoginPrefetcher />
+                  <AuthTransitionOverlay />
+                </div>
+              </AuthBootstrapProvider>
+            </ToastProvider>
+          </BrandingProvider>
         </QueryProvider>
       </body>
     </html>

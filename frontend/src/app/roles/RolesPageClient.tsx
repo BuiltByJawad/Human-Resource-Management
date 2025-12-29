@@ -19,8 +19,13 @@ import {
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
-import api from "@/lib/axios"
-import { fetchRolesWithToken, fetchRolePermissions } from "@/lib/hrmData"
+import {
+  fetchRolesWithToken,
+  fetchRolePermissions,
+  createRole,
+  updateRole,
+  deleteRoleById,
+} from "@/lib/hrmData"
 
 interface RolesPageClientProps {
   initialRoles: Role[]
@@ -98,12 +103,18 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
   }
 
   const saveRole = useMutation({
-    mutationFn: async ({ payload, roleId }: { payload: Partial<Role> & { permissionIds?: string[] }; roleId?: string }) => {
+    mutationFn: async ({
+      payload,
+      roleId,
+    }: {
+      payload: Partial<Role> & { permissionIds?: string[] }
+      roleId?: string
+    }) => {
       if (roleId) {
-        await api.put(`/roles/${roleId}`, payload)
+        await updateRole(roleId, payload, token ?? undefined)
         return "updated"
       }
-      await api.post("/roles", payload)
+      await createRole(payload, token ?? undefined)
       return "created"
     },
     onSuccess: (action) => {
@@ -129,7 +140,7 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
 
   const deleteRole = useMutation({
     mutationFn: async (roleId: string) => {
-      await api.delete(`/roles/${roleId}`)
+      await deleteRoleById(roleId, token ?? undefined)
     },
     onSuccess: () => {
       showToast("Role deleted successfully", "success")

@@ -1,7 +1,8 @@
 import { Employee } from './EmployeeComponents'
 import { Button, Select } from '@/components/ui/FormComponents'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { UsersIcon, MagnifyingGlassIcon, FunnelIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { UsersIcon, MagnifyingGlassIcon, FunnelIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, RocketLaunchIcon } from '@heroicons/react/24/outline'
+import Link from 'next/link'
 
 interface DepartmentOption {
   id: string
@@ -243,6 +244,17 @@ export function EmployeesListSection({
           >
             Delete
           </Button>
+
+          <Link href={`/onboarding/${employee.id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs flex items-center gap-1 border-blue-200 text-blue-600 hover:bg-blue-50"
+            >
+              <RocketLaunchIcon className="h-3 w-3" />
+              Onboarding
+            </Button>
+          </Link>
         </div>
       ),
     },

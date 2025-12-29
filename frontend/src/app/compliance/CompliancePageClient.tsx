@@ -16,8 +16,14 @@ import {
   type ComplianceLog,
   type RuleFormField,
 } from "@/components/hrm/ComplianceComponents"
-import api from "@/lib/axios"
 import { handleCrudError } from "@/lib/apiError"
+import {
+	createComplianceRule,
+	fetchComplianceLogs,
+	fetchComplianceRules,
+	runComplianceCheck,
+	toggleComplianceRule,
+} from "@/lib/hrmData"
 
 interface CompliancePageClientProps {
   initialRules: ComplianceRule[]
@@ -39,10 +45,7 @@ export function CompliancePageClient({ initialRules, initialLogs }: CompliancePa
     error: rulesError,
   } = useQuery<ComplianceRule[]>({
     queryKey: ["compliance", "rules", token],
-    queryFn: async () => {
-      const res = await api.get("/compliance/rules")
-      return res.data?.data ?? []
-    },
+    queryFn: () => fetchComplianceRules(token ?? undefined),
     enabled: !!token,
     retry: false,
     initialData: initialRules,
@@ -55,10 +58,7 @@ export function CompliancePageClient({ initialRules, initialLogs }: CompliancePa
     error: logsError,
   } = useQuery<ComplianceLog[]>({
     queryKey: ["compliance", "logs", token],
-    queryFn: async () => {
-      const res = await api.get("/compliance/logs")
-      return res.data?.data ?? []
-    },
+    queryFn: () => fetchComplianceLogs(token ?? undefined),
     enabled: !!token,
     retry: false,
     initialData: initialLogs,
@@ -85,7 +85,7 @@ export function CompliancePageClient({ initialRules, initialLogs }: CompliancePa
   }, [isLogsError, logsError, showToast])
 
   const createRuleMutation = useMutation({
-    mutationFn: (data: Partial<ComplianceRule>) => api.post("/compliance/rules", data),
+    mutationFn: (data: Partial<ComplianceRule>) => createComplianceRule(data, token ?? undefined),
     onSuccess: () => {
       showToast("Rule created successfully", "success")
       setFormErrors({})
@@ -106,7 +106,7 @@ export function CompliancePageClient({ initialRules, initialLogs }: CompliancePa
   })
 
   const toggleRuleMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/compliance/rules/${id}/toggle`),
+    mutationFn: (id: string) => toggleComplianceRule(id, token ?? undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["compliance", "rules"] })
     },
@@ -119,9 +119,9 @@ export function CompliancePageClient({ initialRules, initialLogs }: CompliancePa
   })
 
   const runCheckMutation = useMutation({
-    mutationFn: () => api.post("/compliance/run"),
-    onSuccess: (res) => {
-      showToast(res?.data?.message || "Compliance check completed", "success")
+    mutationFn: () => runComplianceCheck(token ?? undefined),
+    onSuccess: (result) => {
+      showToast(result?.message || "Compliance check completed", "success")
       queryClient.invalidateQueries({ queryKey: ["compliance", "logs"] })
     },
     onError: (error: any) =>

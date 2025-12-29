@@ -4,96 +4,125 @@ import bcrypt from 'bcrypt'
 const prisma = new PrismaClient()
 
 async function main() {
+  console.log('🗑️ Clearing database...')
+
+  // Disable foreign key checks for truncation (PostgreSQL specific)
+  // Note: TRUNCATE CASCADE is easier but we want to be explicit
+  const tablenames = await prisma.$queryRaw<
+    Array<{ tablename: string }>
+  >`SELECT tablename FROM pg_tables WHERE schemaname='public'`
+
+  const tables = tablenames
+    .map(({ tablename }) => tablename)
+    .filter((name) => name !== '_prisma_migrations')
+    .map((name) => `"public"."${name}"`)
+    .join(', ')
+
+  try {
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`)
+    console.log('✅ Database cleared')
+  } catch (error) {
+    console.error('❌ Error clearing database:', error)
+    // Fallback if TRUNCATE CASCADE fails for some tables
+  }
+
   console.log('🌱 Starting seeding...')
 
-  const demoOrg = await prisma.organization.upsert({
-    where: { slug: 'demo' },
-    update: { name: 'Demo Company' },
-    create: { name: 'Demo Company', slug: 'demo' },
+  // 0. Create Demo Organization
+  const demoOrg = await prisma.organization.create({
+    data: {
+      name: 'NovaHR Demo Corp',
+      slug: 'novahr',
+    },
   })
 
-  await prisma.companySettings.upsert({
-    where: { organizationId: demoOrg.id },
-    update: {},
-    create: { organizationId: demoOrg.id },
+  await prisma.companySettings.create({
+    data: {
+      organizationId: demoOrg.id,
+      siteName: 'NovaHR Workspace',
+      tagline: 'Empowering Humans',
+      companyName: 'NovaHR Global Solutions',
+    },
   })
 
-  // 1. Create Permissions
+  // 1. Create Comprehensive Permissions based on PERMISSIONS constant
   const permissions = [
+    // Auth & Profile
     { resource: 'auth', action: 'update_own_profile', description: 'Update own profile' },
     { resource: 'auth', action: 'change_own_password', description: 'Change own password' },
 
+    // Notifications
     { resource: 'notifications', action: 'update_own_notifications', description: 'Update own notification preferences' },
     { resource: 'notifications', action: 'manage', description: 'Manage organization notifications' },
     { resource: 'notifications', action: 'manage_templates', description: 'Manage notification templates' },
 
+    // Core HR
     { resource: 'employees', action: 'view', description: 'View employees' },
     { resource: 'employees', action: 'manage', description: 'Create or edit employees' },
-    { resource: 'employees', action: 'view_details', description: 'View employee details' },
-
+    { resource: 'employees', action: 'view_details', description: 'View detailed employee info (salary, etc)' },
     { resource: 'roles', action: 'manage', description: 'Manage roles' },
     { resource: 'roles', action: 'assign', description: 'Assign roles to users' },
-
     { resource: 'departments', action: 'manage', description: 'Manage departments' },
 
+    // Operations
     { resource: 'attendance', action: 'view', description: 'View attendance' },
     { resource: 'attendance', action: 'manage', description: 'Manage attendance' },
-
     { resource: 'leave_requests', action: 'view', description: 'View leave requests' },
     { resource: 'leave_requests', action: 'manage', description: 'Manage leave requests' },
     { resource: 'leave_requests', action: 'approve', description: 'Approve leave requests' },
     { resource: 'leave_policies', action: 'manage', description: 'Manage leave policies' },
-
     { resource: 'payroll', action: 'view', description: 'View payroll' },
     { resource: 'payroll', action: 'manage', description: 'Manage payroll' },
     { resource: 'payroll', action: 'generate', description: 'Generate payroll' },
     { resource: 'payroll', action: 'configure', description: 'Configure payroll settings' },
-    { resource: 'benefits', action: 'view', description: 'View benefit plans and enrollments' },
+    { resource: 'benefits', action: 'view', description: 'View benefit plans' },
     { resource: 'benefits', action: 'manage', description: 'Manage benefit plans' },
     { resource: 'benefits', action: 'enroll', description: 'Enroll employees in benefits' },
     { resource: 'expenses', action: 'view', description: 'View expense claims' },
-    { resource: 'expenses', action: 'manage', description: 'Submit or edit expense claims' },
-    { resource: 'expenses', action: 'approve', description: 'Approve or reject expense claims' },
-    { resource: 'offboarding', action: 'view', description: 'View offboarding processes' },
-    { resource: 'offboarding', action: 'manage', description: 'Initiate or manage offboarding tasks' },
+    { resource: 'expenses', action: 'manage', description: 'Submit/edit expense claims' },
+    { resource: 'expenses', action: 'approve', description: 'Approve expense claims' },
 
+    // Lifecycle
+    { resource: 'onboarding', action: 'view', description: 'View onboarding' },
+    { resource: 'onboarding', action: 'manage', description: 'Manage onboarding' },
+    { resource: 'offboarding', action: 'view', description: 'View offboarding' },
+    { resource: 'offboarding', action: 'manage', description: 'Manage offboarding' },
+
+    // System & Assets
     { resource: 'assets', action: 'view', description: 'View assets' },
     { resource: 'assets', action: 'manage', description: 'Manage assets' },
     { resource: 'assets', action: 'assign', description: 'Assign assets' },
-
     { resource: 'compliance', action: 'view', description: 'View compliance' },
     { resource: 'compliance', action: 'manage', description: 'Manage compliance' },
+    { resource: 'settings', action: 'manage_system_settings', description: 'Manage system settings' },
 
+    // Analytics & Reporting
     { resource: 'reports', action: 'view', description: 'View reports' },
     { resource: 'reports', action: 'export', description: 'Export reports' },
     { resource: 'reports', action: 'configure', description: 'Configure reports' },
-
     { resource: 'analytics', action: 'view', description: 'View analytics' },
     { resource: 'analytics', action: 'manage', description: 'Manage analytics' },
 
+    // Modules
     { resource: 'performance', action: 'view', description: 'View performance module' },
     { resource: 'performance', action: 'manage_cycles', description: 'Manage performance cycles' },
     { resource: 'performance', action: 'review', description: 'Submit performance reviews' },
-
-    { resource: 'onboarding', action: 'view', description: 'View onboarding processes and tasks' },
-    { resource: 'onboarding', action: 'manage', description: 'Manage onboarding processes and tasks' },
-
-    { resource: 'settings', action: 'manage_system_settings', description: 'Manage system settings and branding' },
+    { resource: 'recruitment', action: 'manage', description: 'Manage recruitment (jobs, applicants)' },
+    { resource: 'training', action: 'view', description: 'View training courses' },
+    { resource: 'training', action: 'manage', description: 'Manage training courses' },
   ]
 
   const permissionsMap = new Map<string, string>()
 
   for (const p of permissions) {
-    const permission = await prisma.permission.upsert({
-      where: { resource_action: { resource: p.resource, action: p.action } },
-      update: { description: p.description },
-      create: p,
+    const permission = await prisma.permission.create({
+      data: p,
     })
     permissionsMap.set(`${p.resource}.${p.action}`, permission.id)
   }
-  console.log('✅ Permissions created')
+  console.log(`✅ ${permissions.length} Permissions created`)
 
-  // 2. Create Roles
+  // Role Configuration Helper
   const resolvePermissionIds = (patterns: string[]) => {
     if (patterns.includes('*')) {
       return Array.from(new Set(permissionsMap.values()))
@@ -110,249 +139,195 @@ async function main() {
         }
         continue
       }
-
       const id = permissionsMap.get(pattern)
-      if (id) {
-        ids.add(id)
-      } else {
-        console.warn(`⚠️ Permission not found for pattern: ${pattern}`)
-      }
+      if (id) ids.add(id)
     }
     return Array.from(ids)
   }
 
+  // Define HRM Roles
   const roles = [
     {
       name: 'Super Admin',
-      description: 'Full system access',
+      description: 'System-wide access to all organizations and settings.',
       isSystem: true,
       permissions: ['*']
     },
     {
-      name: 'HR Admin',
-      description: 'HR Department Administrator',
+      name: 'HR Manager',
+      description: 'Full access to human resource operations.',
       isSystem: false,
       permissions: [
-        'employees.*',
-        'departments.manage',
-        'leave_requests.*',
-        'leave_policies.manage',
-        'attendance.*',
-        'payroll.*',
-        'reports.*',
-        'performance.*',
-        'notifications.manage',
-        'notifications.manage_templates',
-        'roles.manage',
-        'roles.assign',
-        'settings.manage_system_settings',
-        'assets.*',
-        'analytics.*',
-        'compliance.*',
-        'onboarding.*',
-        'benefits.*',
-        'expenses.*',
-        'offboarding.*'
+        'employees.*', 'departments.manage', 'roles.manage', 'roles.assign',
+        'attendance.view', 'attendance.manage', 'leave_requests.*', 'leave_policies.manage',
+        'payroll.*', 'benefits.*', 'expenses.*', 'onboarding.*', 'offboarding.*',
+        'assets.*', 'compliance.*', 'reports.*', 'analytics.*', 'training.*',
+        'performance.*', 'recruitment.manage', 'notifications.manage'
       ]
     },
     {
-      name: 'Manager',
-      description: 'Team Manager',
+      name: 'Department Manager',
+      description: 'Management access for department heads.',
       isSystem: false,
       permissions: [
-        'employees.view',
-        'employees.view_details',
-        'leave_requests.view',
-        'leave_requests.approve',
-        'attendance.view',
-        'reports.view',
-        'performance.view',
-        'performance.review',
-        'assets.view',
-        'onboarding.view',
-        'onboarding.manage',
-        'benefits.view',
-        'benefits.enroll',
-        'expenses.view',
-        'expenses.approve',
-        'offboarding.view',
-        'offboarding.manage'
+        'employees.view', 'employees.view_details', 'attendance.view',
+        'leave_requests.view', 'leave_requests.approve',
+        'performance.view', 'performance.review', 'training.view',
+        'reports.view', 'onboarding.view', 'offboarding.view',
+        'expenses.view', 'expenses.approve'
+      ]
+    },
+    {
+      name: 'Recruiter',
+      description: 'Talent acquisition focused access.',
+      isSystem: false,
+      permissions: [
+        'recruitment.manage', 'onboarding.*', 'employees.view',
+        'training.view', 'notifications.manage'
       ]
     },
     {
       name: 'Employee',
-      description: 'Standard Employee',
+      description: 'General employee access for self-service.',
       isSystem: true,
       permissions: [
-        'auth.update_own_profile',
-        'auth.change_own_password',
-        'notifications.update_own_notifications',
-        'employees.view',
-        'leave_requests.view',
-        'leave_requests.manage',
-        'payroll.view',
-        'performance.review',
-        'benefits.view',
-        'expenses.view'
+        'auth.update_own_profile', 'auth.change_own_password',
+        'notifications.update_own_notifications', 'employees.view',
+        'leave_requests.view', 'leave_requests.manage',
+        'payroll.view', 'benefits.view', 'expenses.view', 'training.view', 'performance.review'
       ]
     }
   ]
 
+  const dbRoles = new Map<string, string>()
+
   for (const roleConfig of roles) {
-    const createdRole = await prisma.role.upsert({
-      where: { name: roleConfig.name },
-      update: { description: roleConfig.description },
-      create: {
+    const role = await prisma.role.create({
+      data: {
         name: roleConfig.name,
         description: roleConfig.description,
         isSystem: roleConfig.isSystem
       }
     })
-
-    await prisma.rolePermission.deleteMany({ where: { roleId: createdRole.id } })
+    dbRoles.set(role.name, role.id)
 
     const permissionIds = resolvePermissionIds(roleConfig.permissions)
-
     if (permissionIds.length) {
       await prisma.rolePermission.createMany({
-        data: permissionIds.map(permissionId => ({ roleId: createdRole.id, permissionId })),
-        skipDuplicates: true
+        data: permissionIds.map(permissionId => ({
+          roleId: role.id,
+          permissionId
+        }))
       })
     }
   }
   console.log('✅ Roles & Permissions assigned')
 
   // 3. Create Departments
-  const departments = [
-    { name: 'Engineering', description: 'Product Development and Engineering' },
-    { name: 'Human Resources', description: 'Employee Relations and Recruitment' },
-    { name: 'Sales', description: 'Sales and Marketing' },
-    { name: 'Finance', description: 'Financial Planning and Analysis' }
+  const deptConfigs = [
+    { name: 'Executive', description: 'Company Leadership' },
+    { name: 'Human Resources', description: 'People and Culture' },
+    { name: 'Engineering', description: 'Product and Technology' },
+    { name: 'Talent Acquisition', description: 'Hiring and Onboarding' },
+    { name: 'Marketing', description: 'Growth and Brand' }
   ]
 
-  for (const d of departments) {
-    await prisma.department.upsert({
-      where: { organizationId_name: { organizationId: demoOrg.id, name: d.name } },
-      update: { description: d.description },
-      create: { ...d, organizationId: demoOrg.id }
+  const dbDepts = new Map<string, string>()
+  for (const d of deptConfigs) {
+    const dept = await prisma.department.create({
+      data: { ...d, organizationId: demoOrg.id }
     })
+    dbDepts.set(d.name, dept.id)
   }
   console.log('✅ Departments created')
 
-  // 3. Create Admin User
-  const adminRole = await prisma.role.findUnique({ where: { name: 'Super Admin' } })
+  // 4. Create Users representing each Role
+  const hashedPassword = await bcrypt.hash('password123', 10)
 
-  if (adminRole) {
-    const hashedPassword = await bcrypt.hash('password123', 10)
+  const userConfigs = [
+    {
+      email: 'admin@novahr.com',
+      firstName: 'System',
+      lastName: 'Admin',
+      role: 'Super Admin',
+      dept: 'Executive',
+      empNo: 'EMP001'
+    },
+    {
+      email: 'hr@novahr.com',
+      firstName: 'Sarah',
+      lastName: 'Jenkins',
+      role: 'HR Manager',
+      dept: 'Human Resources',
+      empNo: 'EMP002'
+    },
+    {
+      email: 'manager@novahr.com',
+      firstName: 'David',
+      lastName: 'Chen',
+      role: 'Department Manager',
+      dept: 'Engineering',
+      empNo: 'EMP003'
+    },
+    {
+      email: 'recruiter@novahr.com',
+      firstName: 'Alice',
+      lastName: 'Foster',
+      role: 'Recruiter',
+      dept: 'Talent Acquisition',
+      empNo: 'EMP004'
+    },
+    {
+      email: 'employee@novahr.com',
+      firstName: 'Michael',
+      lastName: 'Scott',
+      role: 'Employee',
+      dept: 'Marketing',
+      empNo: 'EMP005'
+    }
+  ]
 
-    const adminUser = await prisma.user.upsert({
-      where: { email: 'admin@novahr.com' },
-      update: {
-        verified: true,
-        organizationId: demoOrg.id,
-      },
-      create: {
-        email: 'admin@novahr.com',
-        password: hashedPassword,
-        firstName: 'System',
-        lastName: 'Admin',
-        roleId: adminRole.id,
-        organizationId: demoOrg.id,
-        status: 'active',
-        verified: true,
-        avatarUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=0D8ABC&color=fff'
-      }
-    })
-    console.log('✅ Admin user created: admin@novahr.com / password123')
-
-    // 4. Create Employee record for Admin (Required for Performance Reviews)
-    const adminEmployee = await prisma.employee.upsert({
-      where: { userId: adminUser.id },
-      update: {
-        organizationId: demoOrg.id,
-        employeeNumber: 'EMP001',
-        firstName: 'System',
-        lastName: 'Admin',
-        email: 'admin@novahr.com',
-        salary: new Prisma.Decimal('0'),
-        status: 'active',
-      },
-      create: {
-        userId: adminUser.id,
-        organizationId: demoOrg.id,
-        employeeNumber: 'EMP001',
-        firstName: 'System',
-        lastName: 'Admin',
-        email: 'admin@novahr.com',
-        hireDate: new Date(),
-        salary: new Prisma.Decimal('0'),
-        status: 'active'
-      }
-    })
-    console.log('✅ Admin Employee record created')
-
-    await prisma.complianceRule.upsert({
-      where: {
-        organizationId_name: { organizationId: demoOrg.id, name: 'DEMO: Max weekly hours' },
-      },
-      update: {
-        description: 'Demo compliance rule for testing',
-        type: 'max_hours_per_week',
-        threshold: 48,
-        isActive: true,
-      },
-      create: {
-        organizationId: demoOrg.id,
-        name: 'DEMO: Max weekly hours',
-        description: 'Demo compliance rule for testing',
-        type: 'max_hours_per_week',
-        threshold: 48,
-        isActive: true,
-      },
-    })
-
-    const demoAsset = await prisma.asset.upsert({
-      where: {
-        organizationId_serialNumber: { organizationId: demoOrg.id, serialNumber: 'DEMO-LAP-0001' },
-      },
-      update: {
-        name: 'Demo Laptop',
-        type: 'Laptop',
-        status: 'assigned',
-      },
-      create: {
-        organizationId: demoOrg.id,
-        name: 'Demo Laptop',
-        description: 'Seeded demo asset',
-        serialNumber: 'DEMO-LAP-0001',
-        type: 'Laptop',
-        status: 'assigned',
-        purchaseDate: new Date('2024-01-01T00:00:00.000Z'),
-        purchasePrice: new Prisma.Decimal('950.00'),
-        vendor: 'DemoVendor',
-      },
-    })
-
-    await prisma.assetAssignment.deleteMany({
-      where: { assetId: demoAsset.id, employeeId: adminEmployee.id, returnedDate: null },
-    })
-
-    await prisma.assetAssignment.create({
+  for (const u of userConfigs) {
+    const user = await prisma.user.create({
       data: {
-        assetId: demoAsset.id,
-        employeeId: adminEmployee.id,
-        assignedDate: new Date('2025-01-01T00:00:00.000Z'),
-        notes: 'DEMO: Assigned for testing',
-      },
+        email: u.email,
+        password: hashedPassword,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        roleId: dbRoles.get(u.role)!,
+        organizationId: demoOrg.id,
+        status: 'active',
+        verified: true,
+        avatarUrl: `https://ui-avatars.com/api/?name=${u.firstName}+${u.lastName}&background=random&color=fff`
+      }
     })
+
+    // Super Admin is a system administrator, not an employee - skip employee record creation
+    if (u.role !== 'Super Admin') {
+      await prisma.employee.create({
+        data: {
+          userId: user.id,
+          organizationId: demoOrg.id,
+          departmentId: dbDepts.get(u.dept),
+          employeeNumber: u.empNo,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          email: u.email,
+          hireDate: new Date(),
+          salary: new Prisma.Decimal('0'),
+          status: 'active'
+        }
+      })
+    }
+    console.log(`✅ ${u.role} user created: ${u.email} / password123`)
   }
 
-  console.log('🌱 Seeding completed.')
+  console.log('🚀 Seeding completed successfully!')
 }
 
 main()
   .catch((e) => {
-    console.error(e)
+    console.error('❌ Seeding failed:', e)
     process.exit(1)
   })
   .finally(async () => {

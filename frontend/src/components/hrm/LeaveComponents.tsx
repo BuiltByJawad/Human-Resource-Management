@@ -5,28 +5,12 @@ import { format } from 'date-fns'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+import type { LeaveRequest as LeaveRequestBase } from '@/types/hrm'
 
-export interface LeaveRequest {
-    id: string
-    leaveType: string
-    startDate: string
-    endDate: string
-    reason: string
-    status: 'pending' | 'approved' | 'rejected' | 'cancelled'
-    employee: {
-        id: string
-        firstName: string
-        lastName: string
-        email: string
-    }
-    approver?: {
-        firstName: string
-        lastName: string
-    }
-}
+export type LeaveRequest = LeaveRequestBase
 
 interface LeaveRequestFormProps {
-    onSubmit: (data: any) => Promise<void>
+    onSubmit: (data: LeaveRequestFormData) => Promise<void>
     onCancel: () => void
     loading?: boolean
 }
@@ -38,7 +22,7 @@ const leaveRequestSchema = yup.object().shape({
     reason: yup.string().required('Reason is required')
 })
 
-type LeaveRequestFormData = yup.InferType<typeof leaveRequestSchema>
+export type LeaveRequestFormData = yup.InferType<typeof leaveRequestSchema>
 
 export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFormProps) {
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<LeaveRequestFormData>({

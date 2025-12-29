@@ -47,7 +47,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     }
   })
 
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name)
+  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name, user.organizationId)
 
   // Audit: user self-registered
   await createAuditLog({
@@ -67,6 +67,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role.name,
+        organizationId: user.organizationId,
       }
     }
   })
@@ -417,7 +418,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     throw new UnauthorizedError('Invalid credentials')
   }
 
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name)
+  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name, user.organizationId)
 
   await prisma.user.update({
     where: { id: user.id },
@@ -446,6 +447,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         lastName: user.lastName,
         role: user.role.name,
         avatarUrl: user.avatarUrl,
+        organizationId: user.organizationId,
         employee: user.employee  // Include employee data for profile form
       },
       permissions
@@ -490,6 +492,7 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
         lastName: user.lastName,
         role: user.role.name,
         avatarUrl: user.avatarUrl,
+        organizationId: user.organizationId,
         phoneNumber: employee?.phoneNumber ?? null,
         address: employee?.address ?? null,
         dateOfBirth: employee?.dateOfBirth ?? null,

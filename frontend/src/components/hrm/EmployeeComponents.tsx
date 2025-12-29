@@ -6,6 +6,7 @@ import { Badge } from '../ui/CommonComponents'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+import type { Employee as EmployeeBase } from '@/types/hrm'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -18,19 +19,7 @@ function formatIsoDate(iso: string): string {
   return `${day} ${monthName} ${year}`
 }
 
-export interface Employee {
-  id: string
-  employeeNumber: string
-  firstName: string
-  lastName: string
-  email: string
-  department: { id: string, name: string } | null
-  role: { id: string, name: string } | null
-  hireDate: string
-  salary: number
-  status: 'active' | 'inactive' | 'terminated'
-  user?: { id: string; verified: boolean } | null
-}
+export type Employee = EmployeeBase
 
 interface EmployeeCardProps {
   employee: Employee
@@ -172,7 +161,10 @@ const employeeSchema = yup.object().shape({
   departmentId: yup.string().required('Department is required'),
   roleId: yup.string().required('Role is required'),
   hireDate: yup.string().required('Hire date is required'),
-  salary: yup.number().min(0, 'Salary cannot be negative').required('Salary is required'),
+  salary: yup
+    .number()
+    .min(1000, 'Salary must be at least 1000')
+    .required('Salary is required'),
   status: yup.string().oneOf(['active', 'inactive', 'terminated']).required('Status is required')
 })
 
