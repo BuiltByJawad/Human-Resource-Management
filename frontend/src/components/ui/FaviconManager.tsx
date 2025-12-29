@@ -7,24 +7,13 @@ import { useOrgStore } from '@/store/useOrgStore'
 
 const DEFAULT_TITLE = 'HRM Platform'
 
-/**
- * FaviconManager now primarily handles dynamic document title synchronization.
- * Favicon links are now handled server-side in RootLayout's generateMetadata.
- */
 export function FaviconManager() {
   const pathname = usePathname()
   const branding = useBranding()
-  const { siteName: storeSiteName, faviconUrl: storeFaviconUrl, faviconVersion } = useOrgStore()
+  const siteName = branding?.siteName
+  const storeFaviconUrl = useOrgStore((state) => state.faviconUrl)
 
-  const siteName = branding?.siteName || storeSiteName
-  const effectiveFaviconUrl = storeFaviconUrl ?? branding?.faviconUrl ?? '/favicon.ico'
-
-  const buildVersionedUrl = (url: string, version: number) => {
-    if (!version) return url
-    const separator = url.includes('?') ? '&' : '?'
-    return `${url}${separator}v=${version}`
-  }
-
+  // Keep document.title in sync with branding
   useEffect(() => {
     if (typeof document === 'undefined') return
 
@@ -35,28 +24,36 @@ export function FaviconManager() {
     }
   }, [siteName, pathname])
 
+  // Replace dummy favicon with Cloudinary/global one when available
   useEffect(() => {
     if (typeof document === 'undefined') return
 
-    const href = buildVersionedUrl(effectiveFaviconUrl, faviconVersion)
+    const rawHref = storeFaviconUrl || branding?.faviconUrl
+    const faviconHref = rawHref?.trim()
 
-    const selectors = ['link[rel="icon"]', 'link[rel="shortcut icon"]']
-    const nodes = selectors.flatMap((selector) => Array.from(document.head.querySelectorAll<HTMLLinkElement>(selector)))
+    if (!faviconHref) return
 
-    if (nodes.length === 0) {
-      const link = document.createElement('link')
-      link.rel = 'icon'
-      link.href = href
-      document.head.appendChild(link)
-      return
+    const setAll = (rel: string, href: string) => {
+      const nodes = Array.from(document.head.querySelectorAll<HTMLLinkElement>(`link[rel="${rel}"]`))
+
+      if (nodes.length === 0) {
+        const link = document.createElement('link')
+        link.rel = rel
+        link.href = href
+        document.head.appendChild(link)
+        return
+      }
+
+      nodes.forEach((node) => {
+        if (node.href !== href) {
+          node.href = href
+        }
+      })
     }
 
-    nodes.forEach((node) => {
-      if (node.href !== href) {
-        node.href = href
-      }
-    })
-  }, [effectiveFaviconUrl, faviconVersion])
+    setAll('icon', faviconHref)
+    setAll('shortcut icon', faviconHref)
+  }, [storeFaviconUrl, branding?.faviconUrl, pathname])
 
   return null
 }

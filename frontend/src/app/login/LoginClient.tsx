@@ -33,6 +33,7 @@ export type LoginBranding = {
   heroSubtitle: string
   highlights: LoginHighlight[]
   logoUrl?: string | null
+  faviconUrl?: string | null
   companyName?: string | null
   companyAddress?: string | null
 }
@@ -61,6 +62,7 @@ export default function LoginClient({ branding }: LoginClientProps) {
       companyName: branding.companyName ?? '',
       companyAddress: branding.companyAddress ?? '',
       logoUrl: branding.logoUrl ?? null,
+      ...(branding.faviconUrl ? { faviconUrl: branding.faviconUrl } : {}),
     })
   }, [branding, updateOrg])
 

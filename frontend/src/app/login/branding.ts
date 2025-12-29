@@ -10,6 +10,7 @@ export interface LoginBranding {
   heroSubtitle: string
   highlights: LoginHighlight[]
   logoUrl?: string | null
+  faviconUrl?: string | null
   companyName?: string | null
   companyAddress?: string | null
 }
@@ -36,6 +37,7 @@ export const FALLBACK_BRANDING: LoginBranding = {
   heroSubtitle: 'Securely access your organization workspace',
   highlights: FALLBACK_HIGHLIGHTS,
   logoUrl: null,
+  faviconUrl: null,
   companyName: 'Nimbus HR',
   companyAddress: 'Global HQ'
 }

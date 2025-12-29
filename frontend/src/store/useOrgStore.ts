@@ -10,7 +10,6 @@ interface OrgState {
   companyAddress: string
   logoUrl: string | null
   faviconUrl: string | null
-  faviconVersion: number
   loaded: boolean
 }
 
@@ -34,7 +33,6 @@ const DEFAULTS: OrgState = {
   companyAddress: '',
   logoUrl: null,
   faviconUrl: null,
-  faviconVersion: 0,
   // Start false to avoid SSR/CSR mismatch; set true after rehydrate
   loaded: false,
 }
@@ -121,10 +119,13 @@ export const useOrgStore = create<OrgStore>()(
     {
       name: ORG_STORAGE_KEY,
       storage: createJSONStorage(() => orgPersistStorage),
+      partialize: (state) => {
+        const { faviconUrl, ...rest } = state
+        return rest
+      },
       onRehydrateStorage: () => (state, error) => {
         if (state && !error) {
-          // derive shortName after hydration to keep server/client markup aligned
-          state.updateOrg({ siteName: state.siteName })
+          state.updateOrg({ siteName: state.siteName, faviconUrl: null })
           state.setLoaded(true)
         }
       },
