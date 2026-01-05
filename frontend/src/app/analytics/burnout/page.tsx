@@ -1,22 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftIcon, ExclamationTriangleIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/axios';
 import { RiskScoreCard, AtRiskList, WorkPatternChart } from '@/components/analytics/BurnoutComponents';
 import { Select } from '@/components/ui/CustomSelect';
-import { PERMISSIONS } from '@/constants/permissions';
+import { PERMISSIONS } from '@/shared/constants/permissions';
 import { handleCrudError } from '@/lib/apiError';
 import { useToast } from '@/components/ui/ToastProvider';
 import DashboardShell from '@/components/ui/DashboardShell';
+import { useAuth } from '@/features/auth';
 
 export default function BurnoutAnalyticsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user, token, hasPermission } = useAuthStore();
+    const { user, token, hasPermission } = useAuth();
     const initialPeriod = useMemo(() => {
         const param = searchParams.get('period');
         const parsed = param ? parseInt(param, 10) : 30;

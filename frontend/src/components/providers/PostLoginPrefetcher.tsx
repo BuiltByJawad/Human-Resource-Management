@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePathname, useRouter } from 'next/navigation'
 import api from '@/lib/axios'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 
 interface DashboardStats {
   totalEmployees: number
@@ -38,7 +38,7 @@ interface EmployeesResponse {
 export function PostLoginPrefetcher() {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, token, refreshSession } = useAuthStore()
+  const { isAuthenticated, token, refreshSession } = useAuth()
   const queryClient = useQueryClient()
   const didPrefetch = useRef(false)
   const didRehydrate = useRef(false)

@@ -16,16 +16,16 @@ import {
   RoleForm,
   type RoleFormField,
 } from "@/components/hrm/RoleComponents"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
 import {
-  fetchRolesWithToken,
+  fetchRoles,
   fetchRolePermissions,
   createRole,
   updateRole,
   deleteRoleById,
-} from "@/lib/hrmData"
+} from "@/features/roles"
 
 interface RolesPageClientProps {
   initialRoles: Role[]
@@ -36,7 +36,7 @@ interface RolesPageClientProps {
 }
 
 export function RolesPageClient({ initialRoles, initialPermissionsPayload }: RolesPageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -51,7 +51,7 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
     isLoading: rolesLoading,
   } = useQuery<Role[]>({
     queryKey: ["roles", token],
-    queryFn: () => fetchRolesWithToken(token ?? undefined),
+    queryFn: () => fetchRoles(token ?? undefined),
     enabled: !!token,
     initialData: initialRoles,
   })

@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect } from 'react'
 
-import type { CurrentUser } from '@/types/hrm'
-import { useAuthStore } from '@/store/useAuthStore'
+import type { CurrentUser } from '@/features/auth/types/auth.types'
+import { useAuth } from '@/features/auth'
 
 export interface InitialAuthValue {
   user: CurrentUser | null
@@ -18,7 +18,7 @@ interface AuthBootstrapProviderProps {
 }
 
 export function AuthBootstrapProvider({ auth, children }: AuthBootstrapProviderProps) {
-  const bootstrapFromServer = useAuthStore((state) => state.bootstrapFromServer)
+  const bootstrapFromServer = useAuth((state) => state.bootstrapFromServer)
 
   useEffect(() => {
     // Seed the client auth store from the server-fetched user/token

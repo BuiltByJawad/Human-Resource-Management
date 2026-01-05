@@ -12,7 +12,8 @@ import {
     ArrowPathIcon
 } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
-import { analyticsService, type DashboardMetrics, type DepartmentStat } from '@/services/analyticsService'
+import { useAuth } from '@/features/auth'
+import { getDashboardMetrics, getDepartmentStats, type DashboardMetrics, type DepartmentStat } from '@/features/analytics'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -25,20 +26,21 @@ interface AnalyticsDashboardClientProps {
 
 export function AnalyticsDashboardClient({ initialMetrics, initialDeptStats }: AnalyticsDashboardClientProps) {
     const router = useRouter()
+    const { token } = useAuth()
     const [period, setPeriod] = useState('30')
 
     const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery({
-        queryKey: ['analytics-metrics', period],
-        queryFn: () => analyticsService.getDashboardMetrics({
+        queryKey: ['analytics-metrics', period, token],
+        queryFn: () => getDashboardMetrics({
             startDate: new Date(new Date().setDate(new Date().getDate() - parseInt(period))).toISOString(),
             endDate: new Date().toISOString()
-        }),
+        }, token ?? undefined),
         initialData: initialMetrics || undefined
     })
 
     const { data: deptStats = [], isLoading: deptsLoading, refetch: refetchDepts } = useQuery({
-        queryKey: ['analytics-departments'],
-        queryFn: () => analyticsService.getDepartmentStats(),
+        queryKey: ['analytics-departments', token],
+        queryFn: () => getDepartmentStats(token ?? undefined),
         initialData: initialDeptStats
     })
 

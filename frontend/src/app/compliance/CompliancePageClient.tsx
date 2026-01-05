@@ -6,7 +6,7 @@ import { PlusIcon, PlayIcon } from "@heroicons/react/24/outline"
 
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import {
   RuleList,
@@ -18,12 +18,12 @@ import {
 } from "@/components/hrm/ComplianceComponents"
 import { handleCrudError } from "@/lib/apiError"
 import {
-	createComplianceRule,
-	fetchComplianceLogs,
-	fetchComplianceRules,
-	runComplianceCheck,
-	toggleComplianceRule,
-} from "@/lib/hrmData"
+  createComplianceRule,
+  fetchComplianceLogs,
+  fetchComplianceRules,
+  runComplianceCheck,
+  toggleComplianceRule,
+} from "@/features/compliance"
 
 interface CompliancePageClientProps {
   initialRules: ComplianceRule[]
@@ -31,7 +31,7 @@ interface CompliancePageClientProps {
 }
 
 export function CompliancePageClient({ initialRules, initialLogs }: CompliancePageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 

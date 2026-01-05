@@ -5,9 +5,17 @@ import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
-import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
-import { Asset, AssignmentModal, MaintenanceModal } from '@/components/hrm/AssetComponents'
+import { useAuth } from '@/features/auth'
+import {
+    type Asset,
+    AssignmentModal,
+    MaintenanceModal,
+    fetchAssetById,
+    assignAsset,
+    returnAsset,
+    addMaintenanceLog,
+} from '@/features/assets'
 import {
     ArrowLeftIcon,
     CalendarIcon,
@@ -15,15 +23,15 @@ import {
     UserCircleIcon,
     WrenchScrewdriverIcon
 } from '@heroicons/react/24/outline'
-import api from '@/lib/axios'
 import { handleCrudError } from '@/lib/apiError'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { fetchEmployees, type Employee } from '@/features/employees'
 
 export default function AssetDetailsPage() {
     const params = useParams()
     const router = useRouter()
-    const { token } = useAuthStore()
+    const { token } = useAuth()
     const { showToast } = useToast()
     const queryClient = useQueryClient()
 
@@ -34,36 +42,26 @@ export default function AssetDetailsPage() {
     const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false)
     const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false)
 
-    const assetQuery = useQuery<Asset, Error>({
+    const assetQuery = useQuery<Asset | null, Error>({
         queryKey: ['asset', assetId],
-        queryFn: async () => {
-            const response = await api.get(`/assets/${assetId}`)
-            const raw = response.data?.data
-            if (raw?.asset) return raw.asset as Asset
-            return (raw as Asset) ?? null
-        },
+        queryFn: async () => fetchAssetById(assetId, token ?? undefined),
         enabled: !!assetId,
         retry: false,
     })
 
-    const employeesQuery = useQuery<any[], Error>({
+    const employeesQuery = useQuery<Employee[], Error>({
         queryKey: ['employees'],
         queryFn: async () => {
-            const response = await api.get('/employees')
-            const raw = response.data?.data
-            if (Array.isArray(raw)) return raw
-            if (Array.isArray(raw?.employees)) return raw.employees
-            return []
+            const response = await fetchEmployees({ page: 1, limit: 200 }, token ?? undefined)
+            return Array.isArray(response?.employees) ? response.employees : []
         },
         enabled: !!token,
         retry: false,
     })
 
     const assignMutation = useMutation({
-        mutationFn: async ({ employeeId, notes }: { employeeId: string; notes: string }) => {
-            const response = await api.post(`/assets/${assetId}/assign`, { employeeId, notes })
-            return response.data
-        },
+        mutationFn: async ({ employeeId, notes }: { employeeId: string; notes: string }) =>
+            assignAsset(assetId, { employeeId, notes }, token ?? undefined),
         onSuccess: () => {
             showToast('Asset assigned successfully', 'success')
             queryClient.invalidateQueries({ queryKey: ['asset', assetId] })
@@ -73,10 +71,7 @@ export default function AssetDetailsPage() {
     })
 
     const returnMutation = useMutation({
-        mutationFn: async () => {
-            const response = await api.post(`/assets/${assetId}/return`)
-            return response.data
-        },
+        mutationFn: async () => returnAsset(assetId, token ?? undefined),
         onSuccess: () => {
             showToast('Asset returned successfully', 'success')
             queryClient.invalidateQueries({ queryKey: ['asset', assetId] })
@@ -85,10 +80,7 @@ export default function AssetDetailsPage() {
     })
 
     const maintenanceMutation = useMutation({
-        mutationFn: async (data: any) => {
-            const response = await api.post(`/assets/${assetId}/maintenance`, data)
-            return response.data
-        },
+        mutationFn: async (data: any) => addMaintenanceLog(assetId, data, token ?? undefined),
         onSuccess: () => {
             showToast('Maintenance log added', 'success')
             queryClient.invalidateQueries({ queryKey: ['asset', assetId] })
@@ -109,7 +101,7 @@ export default function AssetDetailsPage() {
         setIsReturnDialogOpen(false)
     }
 
-    const handleMaintenanceSubmit = async (data: any) => {
+    const handleMaintenanceSave = async (data: any) => {
         await maintenanceMutation.mutateAsync(data)
     }
 
@@ -425,7 +417,7 @@ export default function AssetDetailsPage() {
             <MaintenanceModal
                 isOpen={isMaintenanceModalOpen}
                 onClose={() => setIsMaintenanceModalOpen(false)}
-                onSubmit={handleMaintenanceSubmit}
+                onSave={handleMaintenanceSave}
             />
             <ConfirmDialog
                 isOpen={isReturnDialogOpen}

@@ -28,8 +28,7 @@ export function FaviconManager() {
   useEffect(() => {
     if (typeof document === 'undefined') return
 
-    const rawHref = storeFaviconUrl || branding?.faviconUrl
-    const faviconHref = rawHref?.trim()
+    const faviconHref = storeFaviconUrl?.trim()
 
     if (!faviconHref) return
 
@@ -53,7 +52,7 @@ export function FaviconManager() {
 
     setAll('icon', faviconHref)
     setAll('shortcut icon', faviconHref)
-  }, [storeFaviconUrl, branding?.faviconUrl, pathname])
+  }, [storeFaviconUrl, pathname])
 
   return null
 }

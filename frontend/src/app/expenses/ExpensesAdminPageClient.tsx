@@ -5,11 +5,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
-import { fetchPendingExpenses, updateExpenseStatus, type UpdateExpenseStatusPayload } from "@/lib/hrmData"
-import type { ExpenseClaim } from "@/types/hrm"
+import {
+  fetchPendingExpenses,
+  updateExpenseStatus,
+  type UpdateExpenseStatusPayload,
+  type ExpenseClaim,
+} from "@/features/expenses"
 import { format } from "date-fns"
 
 interface ExpensesAdminPageClientProps {
@@ -18,7 +22,7 @@ interface ExpensesAdminPageClientProps {
 }
 
 export function ExpensesAdminPageClient({ initialClaims, initialCanApprove }: ExpensesAdminPageClientProps) {
-  const { user } = useAuthStore()
+  const { user } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 

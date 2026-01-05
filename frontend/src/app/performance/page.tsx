@@ -1,8 +1,9 @@
 import { cookies } from "next/headers"
 
 import { PerformancePageClient } from "./PerformancePageClient"
-import { PERMISSIONS } from "@/constants/permissions"
-import { fetchCurrentUser, fetchPerformanceCycles, fetchPerformanceReviews } from "@/lib/hrmData"
+import { PERMISSIONS } from "@/shared/constants/permissions"
+import { fetchCurrentUser } from "@/features/auth/services/auth.api"
+import { fetchPerformanceCycles, fetchPerformanceReviews } from "@/features/performance"
 
 export default async function PerformancePage() {
   const cookieStore = await cookies()

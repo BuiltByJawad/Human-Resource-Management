@@ -5,18 +5,18 @@ import { useBranding } from '@/components/providers/BrandingProvider'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useClickOutside } from '@/hooks/useClickOutside'
+import { useClickOutside } from '@/shared/hooks/useClickOutside'
 import MobileMenu from './MobileMenu'
 import { useOrgStore } from '@/store/useOrgStore'
 import api from '@/lib/axios'
 import { cn } from '@/lib/utils'
 import { useToast } from './ToastProvider'
-import { PERMISSIONS } from '@/constants/permissions'
+import { PERMISSIONS } from '@/shared/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 
 type NotificationCategory =
@@ -168,11 +168,9 @@ export default function Header() {
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const [notificationsError, setNotificationsError] = useState<string | null>(null)
 
-  const { user, logout, hasPermission } = useAuthStore()
-  const initialAuth = useInitialAuth()
-  // Prefer server-fetched user on first paint to avoid showing stale
-  // persisted auth data, then fall back to the client store user.
-  const effectiveUser = (initialAuth?.user ?? user) as any
+  const { user, isAuthenticated, logout, hasPermission } = useAuth()
+  // Treat logged-out state as no user to avoid falling back to initial auth after logout
+  const effectiveUser = isAuthenticated ? (user as any) : null
   const branding = useBranding()
   const { siteName: storeSiteName, tagline: storeTagline, loaded: orgLoaded } = useOrgStore()
 
@@ -201,8 +199,11 @@ export default function Header() {
   }, [])
 
   const handleLogout = async () => {
-    await logout()
+    setIsProfileOpen(false)
+    // Redirect immediately to avoid showing dashboard while logout completes
     router.replace('/login')
+    await logout()
+    router.refresh()
   }
 
   const notificationsQuery = useQuery<NotificationItem[]>({

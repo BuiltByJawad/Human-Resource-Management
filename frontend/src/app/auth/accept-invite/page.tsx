@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import api from '@/app/api/api'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 import { PasswordStrengthBar } from '@/components/ui/PasswordStrengthBar'
 
 import { Suspense } from 'react'
@@ -44,7 +44,7 @@ function AcceptInviteContent() {
   const token =
     searchParams.get('token') ||
     (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') || '' : '')
-  const login = useAuthStore((state) => state.login)
+  const login = useAuth((state) => state.login)
   const [serverError, setServerError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 

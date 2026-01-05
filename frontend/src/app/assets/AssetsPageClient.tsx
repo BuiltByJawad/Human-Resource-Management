@@ -7,14 +7,24 @@ import { PlusIcon, FunnelIcon, MagnifyingGlassIcon } from "@heroicons/react/24/o
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
 import { Button } from "@/components/ui/FormComponents"
-import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
-import { Asset, AssetCard, AssetForm, AssignmentModal, type AssetFormData } from "@/components/hrm/AssetComponents"
-import { useDebounce } from "@/hooks/useDebounce"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { handleCrudError } from "@/lib/apiError"
-import { fetchAssets, fetchEmployees, createAsset, updateAsset, assignAsset, returnAsset } from "@/lib/hrmData"
-import type { Employee } from "@/types/hrm"
+import { useDebounce } from "@/shared/hooks/useDebounce"
+import { useAuth } from "@/features/auth"
+import {
+  type Asset,
+  AssetCard,
+  AssetForm,
+  AssignmentModal,
+  type AssetFormData,
+  fetchAssets,
+  createAsset,
+  updateAsset,
+  assignAsset,
+  returnAsset,
+} from "@/features/assets"
+import { fetchEmployees, type Employee } from "@/features/employees"
 
 interface AssetsPageClientProps {
   initialAssets?: Asset[]
@@ -25,7 +35,7 @@ export function AssetsPageClient({
   initialAssets = [],
   initialEmployees = [],
 }: AssetsPageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 

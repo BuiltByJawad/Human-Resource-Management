@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { BellIcon, CheckIcon } from "@heroicons/react/24/outline"
 import { BellAlertIcon } from "@heroicons/react/24/solid"
 import Link from "next/link"
-import { notificationService, type Notification } from "@/services/notificationService"
+import { useAuth } from "@/features/auth"
+import {
+    getNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    type Notification,
+} from "@/features/notifications"
 import { useToast } from "@/components/ui/ToastProvider"
 
 const typeColors: Record<string, string> = {
@@ -17,6 +23,7 @@ const typeColors: Record<string, string> = {
 
 export function NotificationBell() {
     const { showToast } = useToast()
+    const { token } = useAuth()
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [isOpen, setIsOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -27,14 +34,14 @@ export function NotificationBell() {
     const loadNotifications = useCallback(async () => {
         setIsLoading(true)
         try {
-            const data = await notificationService.getNotifications()
+            const data = await getNotifications(token ?? undefined)
             setNotifications(data)
         } catch {
             // Silently fail - don't show error for background fetch
         } finally {
             setIsLoading(false)
         }
-    }, [])
+    }, [token])
 
     useEffect(() => {
         loadNotifications()
@@ -57,7 +64,7 @@ export function NotificationBell() {
 
     const handleMarkAsRead = async (notificationId: string) => {
         try {
-            await notificationService.markAsRead(notificationId)
+            await markNotificationAsRead(notificationId, token ?? undefined)
             setNotifications((prev) =>
                 prev.map((n) =>
                     n.id === notificationId ? { ...n, readAt: new Date().toISOString() } : n
@@ -70,7 +77,7 @@ export function NotificationBell() {
 
     const handleMarkAllAsRead = async () => {
         try {
-            await notificationService.markAllAsRead()
+            await markAllNotificationsAsRead(token ?? undefined)
             setNotifications((prev) =>
                 prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
             )

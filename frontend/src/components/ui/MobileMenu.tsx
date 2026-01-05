@@ -6,23 +6,23 @@ import { usePathname } from 'next/navigation'
 import { useBranding } from '@/components/providers/BrandingProvider'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import {
-    HomeIcon,
-    UsersIcon,
-    BuildingOfficeIcon,
-    ClipboardDocumentListIcon,
-    ClockIcon,
-    BanknotesIcon,
-    ChartBarIcon,
-    Cog6ToothIcon,
-    SparklesIcon,
-    ShieldCheckIcon,
-    KeyIcon,
-    UserGroupIcon,
-    ComputerDesktopIcon
+  HomeIcon,
+  UsersIcon,
+  BuildingOfficeIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  BanknotesIcon,
+  ChartBarIcon,
+  Cog6ToothIcon,
+  SparklesIcon,
+  ShieldCheckIcon,
+  KeyIcon,
+  UserGroupIcon,
+  ComputerDesktopIcon
 } from '@heroicons/react/24/outline'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 import { useOrgStore } from '@/store/useOrgStore'
-import { PERMISSIONS, type Permission } from '@/constants/permissions'
+import { PERMISSIONS, type Permission } from '@/shared/constants/permissions'
 
 type NavIcon = typeof HomeIcon
 
@@ -76,7 +76,7 @@ const navigation: { label: string; items: NavItem[] }[] = [
 
 export default function MobileMenu({ isOpen, onClose, user }: MobileMenuProps) {
     const pathname = usePathname()
-    const { hasAnyPermission } = useAuthStore()
+    const hasAnyPermission = useAuth((state) => state.hasAnyPermission)
     const branding = useBranding()
     const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl } = useOrgStore()
 

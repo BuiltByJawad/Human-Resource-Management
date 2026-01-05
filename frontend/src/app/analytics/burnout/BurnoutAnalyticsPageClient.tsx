@@ -10,11 +10,11 @@ import {
   UserGroupIcon,
 } from "@heroicons/react/24/outline"
 
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import { RiskScoreCard, AtRiskList, WorkPatternChart } from "@/components/analytics/BurnoutComponents"
 import { Select } from "@/components/ui/CustomSelect"
-import { PERMISSIONS } from "@/constants/permissions"
+import { PERMISSIONS } from '@/shared/constants/permissions'
 import api from "@/lib/axios"
 import { handleCrudError } from "@/lib/apiError"
 
@@ -33,7 +33,7 @@ export function BurnoutAnalyticsPageClient({
 }: BurnoutAnalyticsPageClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, token, hasPermission } = useAuthStore()
+  const { user, token, hasPermission } = useAuth()
   const { showToast } = useToast()
 
   const periodFromSearch = useMemo(() => {

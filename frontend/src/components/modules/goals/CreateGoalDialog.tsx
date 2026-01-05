@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { goalsService } from '@/services/goalsService';
+import { createGoal } from '@/features/goals';
+import { useAuth } from '@/features/auth';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
 interface CreateGoalDialogProps {
@@ -13,6 +14,7 @@ interface CreateGoalDialogProps {
 }
 
 export const CreateGoalDialog: React.FC<CreateGoalDialogProps> = ({ onSuccess }) => {
+    const { token } = useAuth();
     const [open, setOpen] = useState(false);
     const [title, setTitle] = useState('');
     const [loading, setLoading] = useState(false);
@@ -21,7 +23,7 @@ export const CreateGoalDialog: React.FC<CreateGoalDialogProps> = ({ onSuccess })
         e.preventDefault();
         setLoading(true);
         try {
-            await goalsService.createGoal({ title, status: 'in-progress' });
+            await createGoal({ title, status: 'in-progress' }, token ?? undefined);
             setOpen(false);
             setTitle('');
             if (onSuccess) onSuccess();

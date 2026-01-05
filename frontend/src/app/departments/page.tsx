@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 import { cookies } from 'next/headers'
 
 import { DepartmentsPageClient } from './DepartmentsPageClient'
-import { fetchDepartments, fetchEmployeesForManagers } from '@/lib/hrmData'
+import { fetchDepartments } from '@/features/departments'
+import { fetchEmployeesForManagers } from '@/features/employees'
 
 export default async function DepartmentsPage() {
   const cookieStore = await cookies()

@@ -32,7 +32,7 @@ export function StoreHydrator({ branding }: StoreHydratorProps) {
             shortName: branding.shortName,
             tagline: branding.tagline,
             ...(branding.logoUrl ? { logoUrl: branding.logoUrl } : {}),
-            ...(branding.faviconUrl ? { faviconUrl: branding.faviconUrl } : {}),
+            faviconUrl: branding.faviconUrl,
         })
         hydrated.current = true
     }

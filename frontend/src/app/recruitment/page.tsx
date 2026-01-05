@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
 import { RecruitmentPageClient } from './RecruitmentPageClient'
-import { fetchApplicantsByJob, fetchRecruitmentJobs } from '@/lib/hrmData'
+import { fetchApplicantsByJob, fetchRecruitmentJobs } from '@/features/recruitment'
 
 export default async function RecruitmentPage() {
     const cookieStore = await cookies()

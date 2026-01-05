@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 
 import { AttendancePageClient } from "./AttendancePageClient";
-import { fetchAttendanceRecords } from "@/lib/hrmData";
+import { fetchAttendanceRecords } from "@/features/attendance";
 
 export default async function AttendancePage() {
   const cookieStore = await cookies();

@@ -5,13 +5,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
-import { KanbanBoard, type Applicant, type JobPosting, type ApplicantStatus } from "@/components/hrm/RecruitmentComponents"
-import JobForm from "@/components/hrm/JobForm"
+import { KanbanBoard, type Applicant, type JobPosting, type ApplicantStatus } from "@/features/recruitment"
+import JobForm from "@/features/recruitment/components/JobForm"
 import { Button, Select } from "@/components/ui/FormComponents"
 import { LoadingSpinner } from "@/components/ui/CommonComponents"
 import { useToast } from "@/components/ui/ToastProvider"
-import { useAuthStore } from "@/store/useAuthStore"
-import { fetchRecruitmentJobs, fetchApplicantsByJob, updateApplicantStatus } from "@/lib/hrmData"
+import { useAuth } from "@/features/auth/hooks/useAuth"
+import {
+  fetchRecruitmentJobs,
+  fetchApplicantsByJob,
+  updateApplicantStatus,
+} from "@/features/recruitment"
 import { handleCrudError } from "@/lib/apiError"
 
 interface RecruitmentPageClientProps {
@@ -25,7 +29,7 @@ export function RecruitmentPageClient({
   initialApplicants,
   initialSelectedJobId,
 }: RecruitmentPageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -70,7 +74,7 @@ export function RecruitmentPageClient({
 
   const statusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ApplicantStatus }) => {
-      await updateApplicantStatus(id, status)
+      await updateApplicantStatus(id, status, token ?? undefined)
     },
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: applicantsQueryKey })

@@ -1,19 +1,23 @@
+'use client'
+
 import { useState, useEffect } from 'react'
+
 import { Modal } from '@/components/ui/Modal'
 import { Input, TextArea, Select } from '@/components/ui/FormComponents'
-import { DataTable, Column } from '@/components/ui/DataTable'
+import { DataTable, type Column } from '@/components/ui/DataTable'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import type { Department as DepartmentBase, EmployeeSummary } from '@/types/hrm'
-
-export type Department = DepartmentBase
+import type { Department } from '@/features/departments'
+import type { EmployeeSummary } from '@/features/employees'
 
 interface DepartmentFormProps {
   isOpen: boolean
   onClose: () => void
+
   onSubmit: (data: Partial<Department>) => Promise<void>
+
   initialData?: Department | null
   departments: Department[] // For parent selection
   employees: EmployeeSummary[] // For manager selection - replace any with Employee type if available
@@ -219,7 +223,7 @@ export const DepartmentList = ({ departments, onEdit, onDelete, loading }: Depar
     {
       header: 'Name',
       key: 'name',
-      render: (value, dept) => (
+      render: (_value: unknown, dept: Department) => (
         <div>
           <div className="font-medium text-gray-900">{dept.name}</div>
           {dept.description && <div className="text-xs text-gray-500">{dept.description}</div>}
@@ -229,17 +233,18 @@ export const DepartmentList = ({ departments, onEdit, onDelete, loading }: Depar
     {
       header: 'Parent Department',
       key: 'parentDepartment',
-      render: (value, dept) => dept.parentDepartment?.name || '-'
+      render: (_value: unknown, dept: Department) => dept.parentDepartment?.name || '-'
     },
     {
       header: 'Manager',
       key: 'manager',
-      render: (value, dept) => dept.manager ? `${dept.manager.firstName} ${dept.manager.lastName}` : '-'
+      render: (_value: unknown, dept: Department) =>
+        dept.manager ? `${dept.manager.firstName} ${dept.manager.lastName}` : '-'
     },
     {
       header: 'Employees',
       key: '_count',
-      render: (value, dept) => (
+      render: (_value: unknown, dept: Department) => (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           {dept._count?.employees || 0}
         </span>
@@ -248,7 +253,7 @@ export const DepartmentList = ({ departments, onEdit, onDelete, loading }: Depar
     {
       header: 'Actions',
       key: 'actions',
-      render: (value, dept) => (
+      render: (_value: unknown, dept: Department) => (
         <div className="flex space-x-2 justify-end">
           <button
             onClick={() => onEdit(dept)}

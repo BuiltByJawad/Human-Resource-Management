@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 
-import { shiftService, type Shift } from '@/services/shiftService'
+import { useAuth } from '@/features/auth'
+import { getShifts, type Shift } from '@/features/shifts'
 import { ShiftCard } from '@/components/modules/shift/ShiftCard'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
@@ -21,6 +22,7 @@ interface ShiftsPageClientProps {
 
 export function ShiftsPageClient({ initialShifts = [], initialDateISO }: ShiftsPageClientProps) {
   const { showToast } = useToast()
+  const { token } = useAuth()
   const [selectedDate, setSelectedDate] = useState<Date>(initialDateISO ? new Date(initialDateISO) : new Date())
 
   const monthRange = useMemo(() => {
@@ -36,8 +38,8 @@ export function ShiftsPageClient({ initialShifts = [], initialDateISO }: ShiftsP
     error,
     refetch
   } = useQuery<Shift[], Error>({
-    queryKey: ['shifts', monthRange.start, monthRange.end],
-    queryFn: () => shiftService.getShifts(monthRange.start, monthRange.end),
+    queryKey: ['shifts', monthRange.start, monthRange.end, token],
+    queryFn: () => getShifts(monthRange.start, monthRange.end, token ?? undefined),
     retry: false,
     initialData: monthRange.start === startOfMonth(new Date(initialDateISO ?? Date.now())).toISOString() ? initialShifts : undefined
   })

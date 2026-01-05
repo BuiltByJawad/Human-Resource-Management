@@ -1,6 +1,6 @@
 import { LeaveRequestsPageClient } from './LeaveRequestsPageClient'
 import { cookies } from 'next/headers'
-import { fetchLeaveRequests } from '@/lib/hrmData'
+import { fetchLeaveRequests } from '@/features/leave'
 
 export default async function LeaveRequestsPage() {
 	const cookieStore = await cookies()

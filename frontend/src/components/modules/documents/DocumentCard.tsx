@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import { CompanyDocument, documentService } from '@/services/documentService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,8 @@ import { DocumentTextIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/react
 import { format } from 'date-fns';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/ToastProvider';
+import { useAuth } from '@/features/auth';
+import { deleteDocument, type CompanyDocument } from '@/features/documents';
 
 interface DocumentCardProps {
     doc: CompanyDocument;
@@ -18,13 +19,14 @@ interface DocumentCardProps {
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({ doc, isAdmin, onDelete }) => {
     const { showToast } = useToast()
+    const { token } = useAuth()
     const [isConfirmOpen, setIsConfirmOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
     const handleDelete = async () => {
         setIsDeleting(true)
         try {
-            await documentService.deleteDocument(doc.id)
+            await deleteDocument(doc.id, token ?? undefined)
             showToast('Document deleted successfully', 'success')
             if (onDelete) onDelete()
         } catch (error) {

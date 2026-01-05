@@ -9,12 +9,10 @@ import { PayslipModal } from "@/components/hrm/PayslipModal"
 import GeneratePayrollModal from "@/components/hrm/GeneratePayrollModal"
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
-import { fetchPayrollRecords, generatePayroll, updatePayrollStatus } from "@/lib/hrmData"
-
-import { PayrollRecord } from "./types"
+import { fetchPayrollRecords, generatePayroll, updatePayrollStatus, type PayrollRecord } from "@/features/payroll"
 
 const STALE_TIME = 10 * 60 * 1000
 const GC_TIME = 15 * 60 * 1000
@@ -24,7 +22,7 @@ interface PayrollPageClientProps {
 }
 
 export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null)

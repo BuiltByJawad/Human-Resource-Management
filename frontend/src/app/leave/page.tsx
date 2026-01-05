@@ -1,7 +1,9 @@
-import { LeavePageClient } from './LeavePageClient'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { fetchCurrentUser, fetchLeaveRequests } from '@/lib/hrmData'
+
+import { LeavePageClient } from './LeavePageClient'
+import { fetchLeaveRequests } from '@/features/leave'
+import { fetchCurrentUser } from '@/features/auth/services/auth.api'
 
 export default async function LeavePage() {
 	const cookieStore = await cookies()

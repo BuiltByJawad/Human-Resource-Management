@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 import { useToast } from '@/components/ui/ToastProvider'
-import api from '@/lib/axios'
 import {
-  BenefitPlan,
+  type BenefitPlan,
   createBenefitPlan,
   enrollEmployeeInBenefit,
-  getBenefitPlans
-} from '@/services/benefitsService'
+  getBenefitPlans,
+} from '@/features/benefits'
+import { fetchEmployeesForManagers } from '@/features/employees'
 import { format } from 'date-fns'
 import { DatePicker } from '@/components/ui/FormComponents'
 
@@ -24,7 +24,7 @@ interface EmployeeOption {
 const planTypes = ['Health', 'Dental', 'Vision', 'Retirement', 'Other']
 
 export default function BenefitsAdminPage() {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const [plans, setPlans] = useState<BenefitPlan[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
@@ -52,13 +52,8 @@ export default function BenefitsAdminPage() {
       setLoading(true)
       try {
         const [plansResp, employeesResp] = await Promise.all([
-          getBenefitPlans(),
-          api
-            .get('/employees', {
-              params: { limit: 200 },
-              headers: { Authorization: `Bearer ${token}` }
-            })
-            .then((res) => res.data.data?.employees || res.data.data || res.data || [])
+          getBenefitPlans(token ?? undefined),
+          fetchEmployeesForManagers(token ?? undefined),
         ])
         setPlans(plansResp || [])
         setEmployees(

@@ -16,22 +16,16 @@ import { format } from 'date-fns'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button, DatePicker } from '@/components/ui/FormComponents'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 import { useToast } from '@/components/ui/ToastProvider'
-import api from '@/lib/axios'
+import { fetchEmployeesForManagers } from '@/features/employees'
+import { getOnboardingProcess, startOnboardingProcess, createOnboardingTask, completeOnboardingTask, type OnboardingTaskPayload } from '@/features/onboarding'
 import DashboardShell from '@/components/ui/DashboardShell'
-import {
-  startOnboardingProcess,
-  getOnboardingProcess,
-  createOnboardingTask,
-  completeOnboardingTask,
-  OnboardingTaskPayload
-} from '@/services/onboardingService'
 
 export default function OnboardingEmployeePage() {
   const { employeeId } = useParams<{ employeeId: string }>()
   const router = useRouter()
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -45,8 +39,8 @@ export default function OnboardingEmployeePage() {
   const employeeQuery = useQuery({
     queryKey: ['employee', employeeId, token],
     queryFn: async () => {
-      const res = await api.get(`/employees/${employeeId}`)
-      return res.data.data || res.data
+      const employees = await fetchEmployeesForManagers(token ?? undefined)
+      return (employees ?? []).find((e) => e.id === employeeId)
     },
     enabled: !!employeeId && !!token,
   })
@@ -55,14 +49,14 @@ export default function OnboardingEmployeePage() {
   const onboardingQuery = useQuery({
     queryKey: ['onboarding-process', employeeId, token],
     queryFn: async () => {
-      await startOnboardingProcess(employeeId as string)
-      return await getOnboardingProcess(employeeId as string)
+      await startOnboardingProcess(employeeId as string, undefined, token ?? undefined)
+      return await getOnboardingProcess(employeeId as string, token ?? undefined)
     },
     enabled: !!employeeId && !!token,
   })
 
   const createTaskMutation = useMutation({
-    mutationFn: (data: OnboardingTaskPayload) => createOnboardingTask(employeeId as string, data),
+    mutationFn: (data: OnboardingTaskPayload) => createOnboardingTask(employeeId as string, data, token ?? undefined),
     onSuccess: () => {
       showToast('Task added successfully', 'success')
       setNewTask({ title: '', description: '', dueDate: '' })
@@ -74,7 +68,7 @@ export default function OnboardingEmployeePage() {
   })
 
   const completeTaskMutation = useMutation({
-    mutationFn: (taskId: string) => completeOnboardingTask(taskId),
+    mutationFn: (taskId: string) => completeOnboardingTask(taskId, token ?? undefined),
     onSuccess: () => {
       showToast('Task marked as complete', 'success')
       queryClient.invalidateQueries({ queryKey: ['onboarding-process', employeeId] })

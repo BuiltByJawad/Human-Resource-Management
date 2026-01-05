@@ -6,23 +6,23 @@ import { PlusIcon } from '@heroicons/react/24/outline'
 
 import DashboardShell from '@/components/ui/DashboardShell'
 import {
-  Department,
   DepartmentForm,
   type DepartmentFormErrors,
   DepartmentList,
 } from '@/components/hrm/DepartmentComponents'
-import type { EmployeeSummary } from '@/types/hrm'
-import { useAuthStore } from '@/store/useAuthStore'
+import type { Department } from '@/features/departments'
+import type { EmployeeSummary } from '@/features/employees'
+import { useAuth } from '@/features/auth'
 import { useToast } from '@/components/ui/ToastProvider'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { LoadingSpinner } from '@/components/ui/CommonComponents'
 import {
   fetchDepartments,
-  fetchEmployeesForManagers,
   createDepartment,
   updateDepartment,
   deleteDepartmentById,
-} from '@/lib/hrmData'
+} from '@/features/departments'
+import { fetchEmployeesForManagers } from '@/features/employees'
 import { handleCrudError } from '@/lib/apiError'
 
 interface DepartmentsPageClientProps {
@@ -34,7 +34,7 @@ export function DepartmentsPageClient({
   initialDepartments = [],
   initialEmployees = [],
 }: DepartmentsPageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   // State
   const queryClient = useQueryClient()
@@ -97,10 +97,10 @@ export function DepartmentsPageClient({
       department?: Department | null
     }) => {
       if (department) {
-        await updateDepartment(department.id, payload)
+        await updateDepartment(department.id, payload, token ?? undefined)
         return 'updated'
       }
-      await createDepartment(payload)
+      await createDepartment(payload, token ?? undefined)
       return 'created'
     },
     onSuccess: (action) => {
@@ -129,7 +129,7 @@ export function DepartmentsPageClient({
 
   const deleteDepartment = useMutation({
     mutationFn: async (departmentId: string) => {
-      await deleteDepartmentById(departmentId)
+      await deleteDepartmentById(departmentId, token ?? undefined)
     },
     onSuccess: () => {
       showToast('Department deleted successfully', 'success')

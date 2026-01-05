@@ -3,8 +3,8 @@
 import { cookies } from "next/headers"
 
 import { AssetsPageClient } from "./AssetsPageClient"
-import type { Asset, Employee } from "@/types/hrm"
-import { fetchAssets, fetchEmployees } from "@/lib/hrmData"
+import { fetchAssets, type Asset } from "@/features/assets"
+import { fetchEmployees, type Employee } from "@/features/employees"
 
 export default async function AssetPage() {
   const cookieStore = await cookies()

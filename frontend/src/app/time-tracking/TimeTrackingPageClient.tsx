@@ -10,7 +10,8 @@ import {
     CalendarIcon,
     UserIcon,
 } from "@heroicons/react/24/outline"
-import { timeTrackingService, type Project, type TimeEntry } from "@/services/timeTrackingService"
+import { useAuth } from "@/features/auth"
+import { getTimesheet, createProject, type Project, type TimeEntry } from "@/features/time-tracking"
 import { useToast } from "@/components/ui/ToastProvider"
 import { Modal } from "@/components/ui/Modal"
 import { Input, TextArea } from "@/components/ui/FormComponents"
@@ -31,6 +32,7 @@ const statusColors: Record<string, string> = {
 export function TimeTrackingPageClient({ initialProjects, employees }: TimeTrackingPageClientProps) {
     const router = useRouter()
     const { showToast } = useToast()
+    const { token } = useAuth()
 
     const [projects, setProjects] = useState<Project[]>(initialProjects)
     const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
@@ -56,7 +58,7 @@ export function TimeTrackingPageClient({ initialProjects, employees }: TimeTrack
 
         setIsLoadingTimesheet(true)
         try {
-            const entries = await timeTrackingService.getTimesheet(employeeId)
+            const entries = await getTimesheet(employeeId, undefined, undefined, token ?? undefined)
             setTimeEntries(entries)
         } catch {
             showToast("Failed to load timesheet", "error")
@@ -79,20 +81,18 @@ export function TimeTrackingPageClient({ initialProjects, employees }: TimeTrack
 
         setIsSubmitting(true)
         try {
-            const result = await timeTrackingService.createProject({
+            const result = await createProject({
                 name: projectForm.name,
                 description: projectForm.description || undefined,
                 client: projectForm.client || undefined,
                 startDate: new Date(projectForm.startDate).toISOString(),
                 endDate: projectForm.endDate ? new Date(projectForm.endDate).toISOString() : undefined,
-            })
+            }, token ?? undefined)
 
-            if (result?.data) {
-                setProjects((prev) => [...prev, result.data])
-                showToast("Project created successfully", "success")
-                setShowCreateProjectModal(false)
-                setProjectForm({ name: "", description: "", client: "", startDate: "", endDate: "" })
-            }
+            setProjects((prev) => [...prev, result])
+            showToast("Project created successfully", "success")
+            setShowCreateProjectModal(false)
+            setProjectForm({ name: "", description: "", client: "", startDate: "", endDate: "" })
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Failed to create project"
             showToast(message, "error")

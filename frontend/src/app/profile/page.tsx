@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
+import { fetchProfile, updateProfile, uploadAvatar } from '@/features/auth'
 import AvatarUpload from '@/components/ui/AvatarUpload'
-import api from '@/app/api/api'
 import { UserCircleIcon, BriefcaseIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { DatePicker } from '@/components/ui/FormComponents'
 import { useForm, Controller } from 'react-hook-form'
@@ -30,7 +30,7 @@ type ProfileFormData = yup.InferType<typeof profileSchema>
 
 export default function ProfilePage() {
     const router = useRouter()
-    const { user, updateUser, token } = useAuthStore()
+    const { user, updateUser, token } = useAuth()
     const { showToast } = useToast()
     const [activeTab, setActiveTab] = useState('personal')
     const [isEditing, setIsEditing] = useState(false)
@@ -73,53 +73,19 @@ export default function ProfilePage() {
     }, [user, reset])
 
     const handleAvatarUpload = async (file: File) => {
-        const formData = new FormData()
-        formData.append('avatar', file)
-
         try {
             if (!token) {
                 showToast('You are not logged in.', 'error')
                 return
             }
 
-            const envApiUrl = process.env.NEXT_PUBLIC_API_URL
-            const resolvedBaseUrl =
-                envApiUrl && /^https?:\/\//i.test(envApiUrl)
-                    ? envApiUrl
-                    : String((api as any)?.defaults?.baseURL || 'http://localhost:5000/api')
-            const baseUrl = resolvedBaseUrl.replace(/\/$/, '')
-            const endpoint = `${baseUrl}/auth/avatar`
-
-            const uploadResponse = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-                body: formData,
-            })
-
-            if (!uploadResponse.ok) {
-                const payload = await uploadResponse.json().catch(() => null)
-                const message =
-                    payload?.error?.message ||
-                    payload?.message ||
-                    'Failed to upload photo'
-                throw new Error(message)
-            }
-
-            const uploadPayload = await uploadResponse.json().catch(() => null)
-            const uploadedAvatarUrl =
-                uploadPayload?.data?.avatarUrl ||
-                uploadPayload?.avatarUrl ||
-                null
+            const { avatarUrl: uploadedAvatarUrl } = await uploadAvatar(file, token)
 
             if (uploadedAvatarUrl) {
                 updateUser({ avatarUrl: uploadedAvatarUrl })
             }
 
-            // Refresh profile (but preserve the latest avatarUrl if backend returns stale user data)
-            const profileResponse = await api.get('/auth/profile')
-            const profileUser = profileResponse?.data?.data?.user ?? null
+            const profileUser = await fetchProfile(token)
             if (profileUser) {
                 updateUser({
                     ...profileUser,
@@ -151,10 +117,8 @@ export default function ProfilePage() {
                 }
             }
 
-            const response = await api.put('/auth/profile', payload)
-            const result = response?.data?.data || {}
+            const result = await updateProfile(payload, token)
 
-            // Backend returns { user: { firstName, lastName }, employee: { ... } }
             const updatedBasic = result.user || {}
             const updatedEmployee = result.employee || {}
 
@@ -169,8 +133,6 @@ export default function ProfilePage() {
 
             updateUser(nextUser)
 
-            // The useEffect above will fire when updateUser replaces the user object in the store,
-            // but we call reset here manually as well to be immediate and handle date formatting.
             const finalEmployee = nextUser.employee || {}
             reset({
                 firstName: nextUser.firstName || '',

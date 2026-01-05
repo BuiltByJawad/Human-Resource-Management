@@ -12,7 +12,13 @@ import {
     EyeSlashIcon,
     TrashIcon,
 } from "@heroicons/react/24/outline"
-import { companyDocumentService, type CompanyDocument } from "@/services/companyDocumentService"
+import { useAuth } from "@/features/auth"
+import {
+    uploadCompanyDocument,
+    toggleCompanyDocumentVisibility,
+    deleteCompanyDocument,
+    type CompanyDocument,
+} from "@/features/documents"
 import { useToast } from "@/components/ui/ToastProvider"
 import { Modal } from "@/components/ui/Modal"
 import { Input, TextArea } from "@/components/ui/FormComponents"
@@ -34,6 +40,7 @@ const categories = ["HR Policy", "IT Policy", "Handbook", "Form", "Other"]
 export function DocumentsPageClient({ initialDocuments }: DocumentsPageClientProps) {
     const router = useRouter()
     const { showToast } = useToast()
+    const { token } = useAuth()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const [documents, setDocuments] = useState<CompanyDocument[]>(initialDocuments)
@@ -70,19 +77,21 @@ export function DocumentsPageClient({ initialDocuments }: DocumentsPageClientPro
 
         setIsSubmitting(true)
         try {
-            const result = await companyDocumentService.uploadDocument(selectedFile, {
-                title: uploadForm.title,
-                description: uploadForm.description || undefined,
-                category: uploadForm.category,
-            })
+            const result = await uploadCompanyDocument(
+                {
+                    file: selectedFile,
+                    title: uploadForm.title,
+                    description: uploadForm.description || undefined,
+                    category: uploadForm.category,
+                },
+                token ?? undefined,
+            )
 
-            if (result?.data) {
-                setDocuments((prev) => [...prev, result.data])
-                showToast("Document uploaded successfully", "success")
-                setShowUploadModal(false)
-                setUploadForm({ title: "", description: "", category: "HR Policy" })
-                setSelectedFile(null)
-            }
+            setDocuments((prev) => [...prev, result])
+            showToast("Document uploaded successfully", "success")
+            setShowUploadModal(false)
+            setUploadForm({ title: "", description: "", category: "HR Policy" })
+            setSelectedFile(null)
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Failed to upload document"
             showToast(message, "error")
@@ -93,7 +102,7 @@ export function DocumentsPageClient({ initialDocuments }: DocumentsPageClientPro
 
     const handleToggleVisibility = async (doc: CompanyDocument) => {
         try {
-            await companyDocumentService.toggleVisibility(doc.id, !doc.isVisible)
+            await toggleCompanyDocumentVisibility(doc.id, !doc.isVisible, token ?? undefined)
             setDocuments((prev) =>
                 prev.map((d) => (d.id === doc.id ? { ...d, isVisible: !d.isVisible } : d))
             )
@@ -107,7 +116,7 @@ export function DocumentsPageClient({ initialDocuments }: DocumentsPageClientPro
         if (!confirm("Are you sure you want to delete this document?")) return
 
         try {
-            await companyDocumentService.deleteDocument(docId)
+            await deleteCompanyDocument(docId, token ?? undefined)
             setDocuments((prev) => prev.filter((d) => d.id !== docId))
             showToast("Document deleted", "success")
         } catch {

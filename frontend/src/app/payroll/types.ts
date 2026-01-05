@@ -1,3 +1,1 @@
-import type { PayrollRecord as PayrollRecordBase } from "@/types/hrm"
-
-export type PayrollRecord = PayrollRecordBase
+export type { PayrollRecord } from "@/features/payroll"

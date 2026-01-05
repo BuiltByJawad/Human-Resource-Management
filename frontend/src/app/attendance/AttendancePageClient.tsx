@@ -5,19 +5,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
-import { AttendanceCard, AttendanceHistory, type AttendanceRecord } from '@/components/hrm/AttendanceComponents'
-import { useAuthStore } from '@/store/useAuthStore'
+import { AttendanceCard, AttendanceHistory } from '@/components/hrm/AttendanceComponents'
+import type { AttendanceRecord } from '@/features/attendance'
+import { useAuth } from '@/features/auth'
 import { useToast } from '@/components/ui/ToastProvider'
 import { handleCrudError } from '@/lib/apiError'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { clockIn, clockOut, fetchAttendanceRecords } from '@/lib/hrmData'
+import { clockIn, clockOut, fetchAttendanceRecords } from '@/features/attendance'
 
 interface AttendancePageClientProps {
   initialAttendance?: AttendanceRecord[]
 }
 
 export function AttendancePageClient({ initialAttendance = [] }: AttendancePageClientProps) {
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 

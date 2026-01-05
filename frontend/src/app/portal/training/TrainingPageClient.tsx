@@ -3,12 +3,13 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { trainingService, type EmployeeTraining } from '@/services/trainingService'
+import { getMyCourses, type EmployeeTraining } from '@/features/training'
 import { CourseCard } from '@/components/modules/training/CourseCard'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { handleCrudError } from '@/lib/apiError'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useAuth } from '@/features/auth'
 
 interface TrainingPageClientProps {
   initialCourses?: EmployeeTraining[]
@@ -16,10 +17,11 @@ interface TrainingPageClientProps {
 
 export function TrainingPageClient({ initialCourses = [] }: TrainingPageClientProps) {
   const { showToast } = useToast()
+  const { token } = useAuth()
 
   const coursesQuery = useQuery<EmployeeTraining[], Error>({
-    queryKey: ['training', 'my-courses'],
-    queryFn: trainingService.getMyCourses,
+    queryKey: ['training', 'my-courses', token],
+    queryFn: () => getMyCourses(token ?? undefined),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     initialData: initialCourses

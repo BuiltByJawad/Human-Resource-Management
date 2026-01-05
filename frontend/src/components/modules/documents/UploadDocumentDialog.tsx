@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/FormComponents';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { documentService } from '@/services/documentService';
+import { uploadDocument } from '@/features/documents';
+import { useAuth } from '@/features/auth';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
 interface UploadDocumentDialogProps {
@@ -42,6 +43,7 @@ const FieldLabel = ({ htmlFor, children, required }: { htmlFor?: string; childre
 export const UploadDocumentDialog: React.FC<UploadDocumentDialogProps> = ({ onSuccess }) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const { token } = useAuth();
 
     const {
         register,
@@ -74,13 +76,13 @@ export const UploadDocumentDialog: React.FC<UploadDocumentDialogProps> = ({ onSu
     const onSubmit = async (values: UploadDocumentFormValues) => {
         setLoading(true);
         try {
-            await documentService.uploadDocument({
+            await uploadDocument({
                 title: values.title.trim(),
                 category: values.category.trim(),
                 fileUrl: values.fileUrl.trim(),
                 description: values.description?.trim() || undefined,
                 type: inferDocumentType(values.fileUrl)
-            });
+            }, token ?? undefined);
             setOpen(false);
             reset();
             if (onSuccess) onSuccess();

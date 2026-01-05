@@ -6,14 +6,13 @@ import { PlusIcon, FunnelIcon, ClipboardDocumentListIcon } from '@heroicons/reac
 
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
-import { LeaveRequestCard, LeaveRequestForm, type LeaveRequest, type LeaveRequestFormData } from '@/components/hrm/LeaveComponents'
+import { LeaveRequestCard, LeaveRequestForm, type LeaveRequest, type LeaveRequestFormData, fetchLeaveRequests, createLeaveRequest, approveLeave, rejectLeave } from '@/features/leave'
 import { Modal } from '@/components/ui/Modal'
 import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
-import { useAuthStore } from '@/store/useAuthStore'
-import { PERMISSIONS } from '@/constants/permissions'
+import { useAuth } from '@/features/auth'
+import { PERMISSIONS } from '@/shared/constants/permissions'
 import { handleCrudError } from '@/lib/apiError'
-import { fetchLeaveRequests, createLeaveRequest, approveLeave, rejectLeave } from '@/lib/hrmData'
 import { Skeleton } from '@/components/ui/Skeleton'
 
 interface LeavePageClientProps {
@@ -21,7 +20,7 @@ interface LeavePageClientProps {
 }
 
 export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
-  const { token, hasAnyPermission } = useAuthStore()
+  const { token, hasAnyPermission } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 

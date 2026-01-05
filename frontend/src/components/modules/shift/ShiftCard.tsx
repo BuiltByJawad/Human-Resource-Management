@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import { Shift } from '@/services/shiftService';
 import { format } from 'date-fns';
+import { Shift } from '@/features/shifts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';

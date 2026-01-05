@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 
@@ -8,7 +8,8 @@ import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
 import { DatePicker } from '@/components/ui/FormComponents'
-import { ExpenseClaim, getMyExpenses, submitExpenseClaim } from '@/services/expenseService'
+import { ExpenseClaim, getMyExpenses, submitExpenseClaim } from '@/features/expenses'
+import { useAuth } from '@/features/auth'
 import { handleCrudError } from '@/lib/apiError'
 
 const categories = ['Travel', 'Meals', 'Equipment', 'Training', 'Other']
@@ -21,6 +22,7 @@ interface ExpensesPageClientProps {
 export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageClientProps) {
   const { showToast } = useToast()
   const queryClient = useQueryClient()
+  const { token } = useAuth()
   const [form, setForm] = useState({
     amount: 0,
     currency: 'USD',
@@ -37,8 +39,8 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
     error,
     refetch
   } = useQuery<ExpenseClaim[], Error>({
-    queryKey: ['expenses', employeeId],
-    queryFn: () => getMyExpenses(employeeId as string),
+    queryKey: ['expenses', employeeId, token],
+    queryFn: () => getMyExpenses(employeeId as string, token ?? undefined),
     enabled: !!employeeId,
     retry: false,
     initialData: employeeId ? initialClaims : []
@@ -46,7 +48,7 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
 
   const hasEmployee = !!employeeId
 
-  useMemo(() => {
+  useEffect(() => {
     if (isError && error) {
       handleCrudError({
         error,
@@ -72,7 +74,7 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
         date: form.date,
         description: form.description,
         receiptUrl: form.receiptUrl || undefined
-      })
+      }, token ?? undefined)
       showToast('Expense submitted', 'success')
       setForm({
         amount: 0,

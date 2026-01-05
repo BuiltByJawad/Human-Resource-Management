@@ -6,11 +6,9 @@ import { PencilSquareIcon, TrashIcon, PlayIcon } from '@heroicons/react/24/outli
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import type { ComplianceLog as ComplianceLogBase, ComplianceRule as ComplianceRuleBase } from '@/types/hrm'
+import type { ComplianceLog, ComplianceRule } from '@/features/compliance'
 
-export type ComplianceRule = ComplianceRuleBase
-
-export type ComplianceLog = ComplianceLogBase
+export type { ComplianceRule, ComplianceLog } from '@/features/compliance'
 
 interface RuleFormProps {
     isOpen: boolean

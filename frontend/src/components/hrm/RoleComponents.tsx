@@ -7,11 +7,7 @@ import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import type { Permission as PermissionBase, Role as RoleBase } from '@/types/hrm'
-
-export type Permission = PermissionBase
-
-export type Role = RoleBase
+import type { Permission, Role } from '@/features/roles'
 
 interface RoleFormProps {
     isOpen: boolean

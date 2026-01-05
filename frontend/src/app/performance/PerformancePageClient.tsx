@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { PlusIcon, ChartBarIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon } from "@heroicons/react/24/outline"
 
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
-import { PERMISSIONS } from "@/constants/permissions"
+import { PERMISSIONS } from '@/shared/constants/permissions'
 import {
   ReviewCycleCard,
   ReviewForm,
@@ -21,7 +21,7 @@ import {
   createPerformanceCycle,
   submitPerformanceReview,
   summarizePerformanceReviews,
-} from "@/lib/hrmData"
+} from "@/features/performance"
 import { handleCrudError } from "@/lib/apiError"
 import DashboardShell from "@/components/ui/DashboardShell"
 import type {
@@ -31,7 +31,7 @@ import type {
   PerformanceSummaryResponse,
   ReviewCycle,
   SubmitPerformanceReviewPayload,
-} from "@/types/hrm"
+} from "@/features/performance"
 
 type TabKey = "active" | "past" | "team"
 
@@ -56,7 +56,7 @@ export function PerformancePageClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const { user, token, hasPermission } = useAuthStore()
+  const { user, token, hasPermission } = useAuth()
   const { showToast } = useToast()
 
   const [mounted, setMounted] = useState(false)

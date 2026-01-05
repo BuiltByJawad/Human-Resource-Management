@@ -1,7 +1,9 @@
 import { cookies } from 'next/headers'
 
 import { EmployeesPageClient } from './EmployeesPageClient'
-import { fetchDepartments, fetchRolesWithToken, fetchEmployees } from '@/lib/hrmData'
+import { fetchDepartments } from '@/features/departments'
+import { fetchRoles } from '@/features/roles'
+import { fetchEmployees } from '@/features/employees'
 
 export default async function EmployeesPage() {
   const cookieStore = await cookies()
@@ -9,7 +11,7 @@ export default async function EmployeesPage() {
 
   const [departments, roles, employees] = await Promise.all([
     fetchDepartments(token ?? undefined),
-    fetchRolesWithToken(token ?? undefined),
+    fetchRoles(token ?? undefined),
     fetchEmployees({ page: 1, limit: 9 }, token ?? undefined),
   ])
 

@@ -6,24 +6,29 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
-import { EmployeeForm, type Employee } from '@/components/hrm/EmployeeComponents'
-import EmployeeDetailsModal from '@/components/hrm/EmployeeDetailsModal'
-import { Modal } from '@/components/ui/Modal'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { useToast } from '@/components/ui/ToastProvider'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useDebounce } from '@/hooks/useDebounce'
-import { EmployeesToolbar, EmployeesListSection } from '@/components/hrm/EmployeesPageComponents'
-import type { Department, EmployeesPage, EmployeesPagination, Role } from '@/types/hrm'
+import { useAuth } from '@/features/auth'
 import {
-  fetchDepartments,
-  fetchRolesWithToken,
+  EmployeeForm,
+  type Employee,
+  EmployeesToolbar,
+  EmployeesListSection,
+  EmployeeDetailsModal,
   fetchEmployees,
   createEmployee,
   updateEmployee,
   deleteEmployeeById,
   sendEmployeeInvite,
-} from '@/lib/hrmData'
+  type EmployeesPage,
+  type EmployeesPagination,
+} from '@/features/employees'
+import { Modal } from '@/components/ui/Modal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/ui/ToastProvider'
+import { useDebounce } from '@/shared/hooks/useDebounce'
+import type { Department } from '@/features/departments'
+import type { Role } from '@/features/roles'
+import { fetchDepartments } from '@/features/departments'
+import { fetchRoles } from '@/features/roles'
 
 interface EmployeesPageClientProps {
   initialDepartments?: Department[]
@@ -37,7 +42,7 @@ function EmployeesContent({
   initialEmployees
 }: EmployeesPageClientProps) {
   const searchParams = useSearchParams()
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -85,18 +90,18 @@ function EmployeesContent({
   })
 
   const departmentsQuery = useQuery<Department[]>({
-		queryKey: ['departments', token],
-		queryFn: () => fetchDepartments(token ?? undefined),
-		enabled: !!token,
-		initialData: initialDepartments,
-	})
+    queryKey: ['departments', token],
+    queryFn: () => fetchDepartments(token ?? undefined),
+    enabled: !!token,
+    initialData: initialDepartments,
+  })
 
-	const rolesQuery = useQuery<Role[]>({
-		queryKey: ['roles', token],
-		queryFn: () => fetchRolesWithToken(token ?? undefined),
-		enabled: !!token,
-		initialData: initialRoles,
-	})
+  const rolesQuery = useQuery<Role[]>({
+    queryKey: ['roles', token],
+    queryFn: () => fetchRoles(token ?? undefined),
+    enabled: !!token,
+    initialData: initialRoles,
+  })
 
   const isDefaultFilters =
     pagination.page === defaultPagination.page &&

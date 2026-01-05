@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 
 export function AuthTransitionOverlay() {
   const pathname = usePathname()
-  const { isAuthTransition, endAuthTransition } = useAuthStore()
+  const { isAuthTransition, endAuthTransition } = useAuth()
 
   const MIN_AUTH_TRANSITION_MS = 350
 

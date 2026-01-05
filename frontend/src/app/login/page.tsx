@@ -1,7 +1,12 @@
-import LoginClient from './LoginClient'
-import { FALLBACK_BRANDING, buildHighlights, deriveHeroTitle, LoginBranding } from './branding'
 import { headers } from 'next/headers'
 import { extractTenantSlug } from '@/lib/tenant'
+import {
+  FALLBACK_BRANDING,
+  LoginForm,
+  buildHighlights,
+  deriveHeroTitle,
+  type LoginBranding,
+} from '@/features/auth'
 
 function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
   if (typeof url !== 'string') return null
@@ -68,5 +73,5 @@ async function fetchBranding(): Promise<LoginBranding> {
 
 export default async function LoginPage() {
   const branding = await fetchBranding()
-  return <LoginClient branding={branding} />
+  return <LoginForm branding={branding} />
 }

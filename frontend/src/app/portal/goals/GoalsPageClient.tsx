@@ -4,7 +4,8 @@ import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FlagIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline'
 
-import { goalsService, type PerformanceGoal } from '@/services/goalsService'
+import { useAuth } from '@/features/auth'
+import { getMyGoals, type PerformanceGoal } from '@/features/goals'
 import { CreateGoalDialog } from '@/components/modules/goals/CreateGoalDialog'
 import { KeyResultList } from '@/components/modules/goals/KeyResultList'
 import Sidebar from '@/components/ui/Sidebar'
@@ -30,6 +31,7 @@ function calculateProgress(goal: PerformanceGoal) {
 
 export function GoalsPageClient({ initialGoals = [] }: GoalsPageClientProps) {
   const { showToast } = useToast()
+  const { token } = useAuth()
 
   const {
     data: goals = [],
@@ -38,8 +40,8 @@ export function GoalsPageClient({ initialGoals = [] }: GoalsPageClientProps) {
     error,
     refetch
   } = useQuery<PerformanceGoal[], Error>({
-    queryKey: ['goals', 'my'],
-    queryFn: goalsService.getMyGoals,
+    queryKey: ['goals', 'my', token],
+    queryFn: () => getMyGoals(token ?? undefined),
     retry: false,
     initialData: initialGoals
   })

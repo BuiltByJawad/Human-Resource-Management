@@ -12,10 +12,11 @@ import {
     ClockIcon,
     MapPinIcon,
 } from "@heroicons/react/24/outline"
-import { shiftService, type Shift } from "@/services/shiftService"
 import { useToast } from "@/components/ui/ToastProvider"
 import { Modal } from "@/components/ui/Modal"
 import { Input } from "@/components/ui/FormComponents"
+import { useAuth } from "@/features/auth"
+import { getShifts, scheduleShift, type Shift } from "@/features/shifts"
 
 interface ShiftsPageClientProps {
     initialShifts: Shift[]
@@ -37,6 +38,7 @@ const statusColors: Record<string, string> = {
 export function ShiftsPageClient({ initialShifts, employees }: ShiftsPageClientProps) {
     const router = useRouter()
     const { showToast } = useToast()
+    const { token } = useAuth()
 
     const [shifts, setShifts] = useState<Shift[]>(initialShifts)
     const [showCreateModal, setShowCreateModal] = useState(false)
@@ -99,15 +101,16 @@ export function ShiftsPageClient({ initialShifts, employees }: ShiftsPageClientP
         endOfWeek.setHours(23, 59, 59, 999)
 
         try {
-            const data = await shiftService.getShifts(
+            const data = await getShifts(
                 currentWeekStart.toISOString(),
-                endOfWeek.toISOString()
+                endOfWeek.toISOString(),
+                token ?? undefined
             )
             setShifts(data)
         } catch {
             showToast("Failed to refresh shifts", "error")
         }
-    }, [currentWeekStart, showToast])
+    }, [currentWeekStart, showToast, token])
 
     const handleCreateShift = useCallback(async () => {
         if (!shiftForm.employeeId || !shiftForm.startTime || !shiftForm.endTime) {
@@ -117,13 +120,16 @@ export function ShiftsPageClient({ initialShifts, employees }: ShiftsPageClientP
 
         setIsSubmitting(true)
         try {
-            await shiftService.scheduleShift({
-                employeeId: shiftForm.employeeId,
-                startTime: new Date(shiftForm.startTime).toISOString(),
-                endTime: new Date(shiftForm.endTime).toISOString(),
-                type: shiftForm.type,
-                location: shiftForm.location || undefined,
-            })
+            await scheduleShift(
+                {
+                    employeeId: shiftForm.employeeId,
+                    startTime: new Date(shiftForm.startTime).toISOString(),
+                    endTime: new Date(shiftForm.endTime).toISOString(),
+                    type: shiftForm.type,
+                    location: shiftForm.location || undefined,
+                },
+                token ?? undefined
+            )
 
             showToast("Shift scheduled successfully", "success")
             setShowCreateModal(false)

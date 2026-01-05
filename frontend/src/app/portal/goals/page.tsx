@@ -1,75 +1,20 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import type { PerformanceGoal } from '@/services/goalsService';
-import { GoalsPageClient } from './GoalsPageClient';
-
-function buildApiBase() {
-    return (
-        process.env.BACKEND_URL ||
-        (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '') : null) ||
-        'http://localhost:5000'
-    );
-}
-
-async function fetchCurrentUser() {
-    try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get('accessToken')?.value;
-        if (!token) {
-            return { user: null, token: null };
-        }
-
-        const response = await fetch(`${buildApiBase()}/api/auth/me`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            },
-            cache: 'no-store'
-        });
-
-        if (!response.ok) {
-            return { user: null, token: null };
-        }
-
-        const payload = await response.json().catch(() => null);
-        const data = payload?.data ?? payload;
-        return { user: data?.user ?? data ?? null, token };
-    } catch {
-        return { user: null, token: null };
-    }
-}
-
-async function fetchInitialGoals(token: string | null): Promise<PerformanceGoal[]> {
-    try {
-        if (!token) return [];
-        const base = buildApiBase();
-        const response = await fetch(`${base}/api/goals/my-goals`, {
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            cache: 'no-store'
-        });
-
-        if (!response.ok) {
-            return [];
-        }
-
-        const payload = await response.json().catch(() => null);
-        const data = payload?.data ?? payload;
-        return Array.isArray(data) ? data : [];
-    } catch {
-        return [];
-    }
-}
+import type { PerformanceGoal } from '@/features/goals'
+import { GoalsPageClient } from './GoalsPageClient'
+import { fetchCurrentUser } from '@/features/auth/services/auth.api'
+import { getMyGoals } from '@/features/goals'
 
 export default async function GoalsPage() {
-    const { user, token } = await fetchCurrentUser();
-    const employeeId = user?.employee?.id ?? null;
-    if (!employeeId) {
-        redirect('/dashboard');
-    }
+  const cookieStore = await cookies()
+  const token = cookieStore.get('accessToken')?.value ?? null
+  const user = await fetchCurrentUser(token ?? undefined)
+  const employeeId = user?.employee?.id ?? null
+  if (!employeeId) {
+    redirect('/dashboard')
+  }
 
-    const initialGoals = await fetchInitialGoals(token);
-    return <GoalsPageClient initialGoals={initialGoals} />;
+  const initialGoals: PerformanceGoal[] = token ? await getMyGoals(token ?? undefined) : []
+  return <GoalsPageClient initialGoals={initialGoals} />
 }

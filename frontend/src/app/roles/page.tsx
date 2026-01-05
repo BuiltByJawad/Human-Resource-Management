@@ -3,14 +3,14 @@
 import { cookies } from "next/headers"
 
 import { RolesPageClient } from "./RolesPageClient"
-import { fetchRolesWithToken, fetchRolePermissions } from "@/lib/hrmData"
+import { fetchRoles, fetchRolePermissions } from "@/features/roles"
 
 export default async function RolesPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get("accessToken")?.value ?? null
 
   const [initialRoles, initialPermissionsPayload] = await Promise.all([
-    fetchRolesWithToken(token ?? undefined),
+    fetchRoles(token ?? undefined),
     fetchRolePermissions(token ?? undefined),
   ])
 

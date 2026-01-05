@@ -2,10 +2,19 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { NotificationBell } from '@/components/ui/NotificationBell'
+import { useAuth } from '@/features/auth'
 
 export default function Header() {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const router = useRouter()
+  const { logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/login')
+  }
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -43,12 +52,13 @@ export default function Header() {
                     Settings
                   </Link>
                   <hr className="my-1" />
-                  <Link
-                    href="/api/auth/logout"
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Sign out
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>

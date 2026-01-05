@@ -6,17 +6,17 @@ import { format } from "date-fns"
 
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import { DatePicker } from "@/components/ui/FormComponents"
 import {
-  OffboardingProcess,
-  OffboardingTask,
+  type OffboardingProcess,
+  type OffboardingTask,
   getOffboardingProcesses,
   initiateOffboarding,
   updateOffboardingTask,
-} from "@/services/offboardingService"
-import api from "@/lib/axios"
+} from "@/features/offboarding"
+import { fetchEmployeesForManagers } from "@/features/employees"
 
 export interface EmployeeOption {
   id: string
@@ -37,7 +37,7 @@ export function OffboardingAdminPageClient({
   initialEmployees,
   initialCanManage,
 }: OffboardingAdminPageClientProps) {
-  const { user, token } = useAuthStore()
+  const { user, token } = useAuth()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
@@ -49,7 +49,7 @@ export function OffboardingAdminPageClient({
 
   const processesQuery = useQuery<OffboardingProcess[]>({
     queryKey: ["offboarding", "processes"],
-    queryFn: () => getOffboardingProcesses(),
+    queryFn: () => getOffboardingProcesses(token ?? undefined),
     initialData: initialProcesses,
     enabled: !!token,
     staleTime: 5 * 60 * 1000,
@@ -59,12 +59,8 @@ export function OffboardingAdminPageClient({
   const employeesQuery = useQuery<EmployeeOption[]>({
     queryKey: ["offboarding", "employees"],
     queryFn: async () => {
-      const response = await api.get("/employees", {
-        params: { limit: 200 },
-      })
-      const payload = response.data?.data ?? response.data ?? []
-      const employees = Array.isArray(payload?.employees) ? payload.employees : Array.isArray(payload) ? payload : []
-      return employees.map((emp: any) => ({
+      const employees = await fetchEmployeesForManagers(token ?? undefined)
+      return (employees ?? []).map((emp: any) => ({
         id: emp.id,
         name: `${emp.firstName ?? ""} ${emp.lastName ?? ""}`.trim() || emp.email,
         email: emp.email,
@@ -224,7 +220,7 @@ export function OffboardingAdminPageClient({
                         </div>
                       </div>
                       <div className="mt-4 space-y-3">
-                        {tasks.map((task) => (
+                        {tasks.map((task: OffboardingTask) => (
                           <div
                             key={task.id}
                             className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border rounded-lg p-3"

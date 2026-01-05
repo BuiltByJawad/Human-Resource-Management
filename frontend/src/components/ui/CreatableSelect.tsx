@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
-import { useClickOutside } from '@/hooks/useClickOutside'
+import { useClickOutside } from '@/shared/hooks/useClickOutside'
 
 interface Option {
     value: string

@@ -7,7 +7,8 @@ import { format } from 'date-fns'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
-import { getEmployeeBenefits } from '@/services/benefitsService'
+import { getEmployeeBenefits, type BenefitEnrollment } from '@/features/benefits'
+import { useAuth } from '@/features/auth'
 import { handleCrudError } from '@/lib/apiError'
 import { Skeleton } from '@/components/ui/Skeleton'
 
@@ -43,6 +44,7 @@ const EMPTY_STATE: BenefitsResponse = {
 
 export function BenefitsPageClient({ employeeId, initialBenefits }: BenefitsPageClientProps) {
   const { showToast } = useToast()
+  const { token } = useAuth()
 
   const {
     data: benefitsData = EMPTY_STATE,
@@ -51,8 +53,20 @@ export function BenefitsPageClient({ employeeId, initialBenefits }: BenefitsPage
     error
   } = useQuery<BenefitsResponse, Error>({
     queryKey: ['benefits', employeeId],
-    queryFn: () => getEmployeeBenefits(employeeId as string),
-    enabled: !!employeeId,
+    queryFn: async () => {
+      const enrollments = await getEmployeeBenefits(employeeId as string, token ?? undefined)
+      const benefits = (enrollments ?? []).map((enrollment: BenefitEnrollment) => ({
+        id: enrollment.id,
+        benefitPlanId: enrollment.benefitPlanId,
+        coverageStartDate: enrollment.coverageStartDate,
+        status: enrollment.status,
+        planName: enrollment.benefitPlan?.name ?? '',
+        planType: enrollment.benefitPlan?.type ?? '',
+        cost: enrollment.benefitPlan?.costToEmployee ?? 0,
+      }))
+      return { benefits, summary: null }
+    },
+    enabled: !!employeeId && !!token,
     retry: false,
     initialData: employeeId ? initialBenefits : EMPTY_STATE
   })

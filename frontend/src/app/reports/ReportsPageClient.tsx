@@ -8,16 +8,16 @@ import { ArrowLeftIcon, ExclamationCircleIcon } from "@heroicons/react/24/outlin
 
 import { DataTable, type Column } from "@/components/ui/DataTable"
 import { ReportFilters, DashboardStats, SummaryCard, ExportButton } from "@/components/reports/ReportsComponents"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
-import api from "@/lib/axios"
 import {
   fetchReportsDashboard,
   fetchReportByType,
   fetchDepartments as fetchDeptOptions,
+  exportEmployeeReportCSV,
   type ReportsFilterParams,
-} from "@/lib/hrmData"
+} from "@/features/reports"
 
 type TabType = "overview" | "employees" | "attendance" | "leave" | "payroll"
 
@@ -142,7 +142,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 export function ReportsPageClient({ initialDashboardData, initialDepartments }: ReportsPageClientProps) {
   const router = useRouter()
-  const { token } = useAuthStore()
+  const { token } = useAuth()
   const { showToast } = useToast()
 
   const [activeTab, setActiveTab] = useState<TabType>("overview")
@@ -237,18 +237,9 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
 
   const handleExportCSV = async () => {
     try {
-      const params = new URLSearchParams()
-      if (startDate) params.append("startDate", startDate.toISOString())
-      if (endDate) params.append("endDate", endDate.toISOString())
-      if (departmentId) params.append("departmentId", departmentId)
-      params.append("format", "csv")
+      const blob = await exportEmployeeReportCSV(filters, token ?? undefined)
 
-      const response = await api.get("/reports/employees", {
-        params,
-        responseType: "blob",
-      })
-
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
       link.setAttribute("download", "employees.csv")

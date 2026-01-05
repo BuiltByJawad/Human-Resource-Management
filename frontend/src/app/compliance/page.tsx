@@ -3,7 +3,7 @@
 import { cookies } from "next/headers"
 
 import { CompliancePageClient } from "./CompliancePageClient"
-import { fetchComplianceLogs, fetchComplianceRules } from "@/lib/hrmData"
+import { fetchComplianceLogs, fetchComplianceRules } from "@/features/compliance"
 
 export default async function CompliancePage() {
   const cookieStore = await cookies()

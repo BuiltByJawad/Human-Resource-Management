@@ -29,9 +29,9 @@ import {
   CreditCardIcon,
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline'
-import { useAuthStore } from '@/store/useAuthStore'
+import { useAuth } from '@/features/auth'
 import { useOrgStore } from '@/store/useOrgStore'
-import { PERMISSIONS, type Permission } from '@/constants/permissions'
+import { PERMISSIONS, type Permission } from '@/shared/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 
 type NavIcon = typeof HomeIcon
@@ -147,7 +147,7 @@ function useSidebarState() {
 export default function Sidebar() {
   const { toggle, isMounted } = useSidebarState()
   const router = useRouter()
-  const storeUser = useAuthStore((state) => state.user)
+  const storeUser = useAuth((state) => state.user)
   const branding = useBranding()
   const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl, loaded: orgLoaded } = useOrgStore()
   const initialAuth = useInitialAuth()
@@ -263,7 +263,7 @@ export default function Sidebar() {
         flex items-center px-6 border-b border-white/5 relative transition-all duration-300
         h-20 [.sidebar-collapsed_&]:h-32 [.sidebar-collapsed_&]:flex-col [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:gap-4 [.sidebar-collapsed_&]:px-0
       `}>
-        <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full`}>
+        <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full min-w-0`}>
           {showOrgSkeleton ? (
             <>
               <div className="h-9 w-9 rounded-xl bg-slate-800 animate-pulse flex-shrink-0" />
@@ -298,13 +298,13 @@ export default function Sidebar() {
               </div>
               <div
                 className={`
-                  transition-all duration-300 origin-left
+                  transition-all duration-300 origin-left min-w-0
                   opacity-100 max-w-[200px] translate-x-0
                   [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
                 `}
               >
-                <p className="text-base font-bold tracking-tight text-white">{siteName}</p>
-                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{tagline}</p>
+                <p className="text-base font-bold tracking-tight text-white truncate">{siteName}</p>
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider truncate">{tagline}</p>
               </div>
             </>
           )}

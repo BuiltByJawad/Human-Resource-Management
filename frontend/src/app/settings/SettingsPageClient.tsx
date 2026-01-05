@@ -7,14 +7,22 @@ import * as yup from "yup"
 import { ArrowLeftIcon } from "@heroicons/react/24/outline"
 import { useRouter } from "next/navigation"
 
-import api from "@/lib/axios"
 import { Input } from "@/components/ui/FormComponents"
 import { Modal } from "@/components/ui/Modal"
 import AvatarUpload from "@/components/ui/AvatarUpload"
 import { useToast } from "@/components/ui/ToastProvider"
-import { useAuthStore } from "@/store/useAuthStore"
+import { useAuth } from "@/features/auth"
+import {
+  updateOrgSettings,
+  uploadLogo,
+  uploadFavicon,
+  deleteFavicon,
+  changePassword,
+  type OrgSettings,
+  type UpdateOrgSettingsPayload,
+} from "@/features/settings"
 import { useOrgStore } from "@/store/useOrgStore"
-import { PERMISSIONS } from "@/constants/permissions"
+import { PERMISSIONS } from "@/shared/constants/permissions"
 import DashboardShell from "@/components/ui/DashboardShell"
 
 const passwordSchema = yup.object().shape({
@@ -44,17 +52,8 @@ const passwordSchema = yup.object().shape({
 
 type PasswordFormData = yup.InferType<typeof passwordSchema>
 
-export type OrgSettingsPayload = {
-  siteName?: string | null
-  tagline?: string | null
-  companyName?: string | null
-  companyAddress?: string | null
-  logoUrl?: string | null
-  faviconUrl?: string | null
-}
-
 interface SettingsPageClientProps {
-  initialOrgSettings: OrgSettingsPayload
+  initialOrgSettings: OrgSettings
 }
 
 const DEFAULT_ORG_SETTINGS = {
@@ -67,7 +66,7 @@ const DEFAULT_ORG_SETTINGS = {
 export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientProps) {
   const router = useRouter()
   const { showToast } = useToast()
-  const { hasPermission } = useAuthStore()
+  const { hasPermission, token } = useAuth()
   const { updateOrg, logoUrl, faviconUrl, setLoaded } = useOrgStore()
 
   const normalizedInitialOrg = useMemo(
@@ -156,17 +155,14 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
 
     setIsSavingSettings(true)
     try {
-      const res = await api.put("/org/settings", orgSettings)
-      if (res.data.success) {
-        const data = res.data.data
-        updateOrg({
-          siteName: data.siteName,
-          tagline: data.tagline,
-          companyName: data.companyName,
-          companyAddress: data.companyAddress,
-        })
-        showToast("Organization settings saved", "success")
-      }
+      const data = await updateOrgSettings(orgSettings as UpdateOrgSettingsPayload, token ?? undefined)
+      updateOrg({
+        siteName: data.siteName ?? undefined,
+        tagline: data.tagline ?? undefined,
+        companyName: data.companyName ?? undefined,
+        companyAddress: data.companyAddress ?? undefined,
+      })
+      showToast("Organization settings saved", "success")
     } catch (error: any) {
       const message =
         error?.response?.data?.error?.message ||
@@ -177,18 +173,12 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
     } finally {
       setIsSavingSettings(false)
     }
-  }, [orgSettings, showToast, updateOrg])
+  }, [orgSettings, showToast, updateOrg, token])
 
   const handleLogoUpload = useCallback(
     async (file: File) => {
-      const formData = new FormData()
-      formData.append("logo", file)
-
       try {
-        const res = await api.post("/org/branding/logo", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        })
-        const url = res.data?.data?.logoUrl || res.data?.logoUrl
+        const { logoUrl: url } = await uploadLogo(file, token ?? undefined)
         if (url) {
           updateOrg({ logoUrl: url })
           showToast("Logo updated", "success")
@@ -200,19 +190,13 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         showToast(message, "error")
       }
     },
-    [showToast, updateOrg],
+    [showToast, updateOrg, token],
   )
 
   const handleFaviconUpload = useCallback(
     async (file: File) => {
-      const formData = new FormData()
-      formData.append("favicon", file)
-
       try {
-        const res = await api.post("/org/branding/favicon", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        })
-        const url = res.data?.data?.faviconUrl || res.data?.faviconUrl
+        const { faviconUrl: url } = await uploadFavicon(file, token ?? undefined)
         if (url) {
           updateOrg({ faviconUrl: url })
           showToast("Favicon updated", "success")
@@ -224,8 +208,19 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         showToast(message, "error")
       }
     },
-    [showToast, updateOrg],
+    [showToast, updateOrg, token],
   )
+
+  const handleFaviconRemove = useCallback(async () => {
+    try {
+      await deleteFavicon(token ?? undefined)
+      updateOrg({ faviconUrl: null })
+      showToast("Favicon removed", "success")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to remove favicon"
+      showToast(message, "error")
+    }
+  }, [showToast, updateOrg, token])
 
   const adminSections = useMemo(
     () => [
@@ -315,6 +310,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
                 <AvatarUpload
                   currentAvatarUrl={faviconUrl || undefined}
                   onUpload={handleFaviconUpload}
+                  onRemove={handleFaviconRemove}
                   className="flex-col !items-start"
                 />
               </div>
@@ -381,6 +377,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
       faviconUrl,
       router,
       handleFaviconUpload,
+      handleFaviconRemove,
       handleLogoUpload,
       handleSaveOrgSettings,
     ],
@@ -389,10 +386,13 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
   const onSubmit = async (data: PasswordFormData) => {
     setIsChangingPassword(true)
     try {
-      await api.post("/auth/password/change", {
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      })
+      await changePassword(
+        {
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+        },
+        token ?? undefined,
+      )
       showToast("Password changed successfully", "success")
       setShowPasswordModal(false)
       reset()

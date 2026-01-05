@@ -3,9 +3,7 @@
 import { Button, Card } from '../ui/FormComponents'
 import { Badge } from '../ui/CommonComponents'
 import { ClockIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from '@heroicons/react/24/outline'
-import type { AttendanceRecord as AttendanceRecordBase } from '@/types/hrm'
-
-export type AttendanceRecord = AttendanceRecordBase
+import type { AttendanceRecord } from '@/features/attendance'
 
 interface AttendanceCardProps {
     status: 'checked_in' | 'checked_out'

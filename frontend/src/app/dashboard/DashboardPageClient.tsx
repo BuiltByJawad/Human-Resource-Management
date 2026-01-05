@@ -10,41 +10,16 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import { useRouter } from 'next/navigation'
 
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { StatsCard } from '@/components/ui/DataTable'
 import { Card } from '@/components/ui/FormComponents'
-import api from '@/app/api/api'
-import { useAuthStore } from '@/store/useAuthStore'
-import { PERMISSIONS } from '@/constants/permissions'
-import type { LeaveRequest } from '@/types/hrm'
-import { analyticsService, type DashboardMetrics } from '@/services/analyticsService'
-import { useRouter } from 'next/navigation'
-
-export interface DashboardStats {
-  totalEmployees: number
-  activeEmployees: number
-  totalDepartments: number
-  pendingLeaveRequests: number
-  totalPayroll: number
-  attendanceRate: number
-}
-
-export interface RecentActivity {
-  id: string
-  type: 'leave' | 'attendance' | 'payroll' | 'employee'
-  description: string
-  timestamp: string
-  employee: string
-}
-
-export interface UpcomingEvent {
-  id: string
-  title: string
-  date: string
-  type: 'meeting' | 'review' | 'deadline' | string
-}
+import { useAuth } from '@/features/auth'
+import { PERMISSIONS } from '@/shared/constants/permissions'
+import { getDashboardMetrics, getUpcomingEvents, type DashboardMetrics, type UpcomingEvent } from '@/features/analytics'
+import { getDashboardStats, getRecentActivities, type DashboardStats, type RecentActivity } from '@/features/dashboard'
 
 interface DashboardPageClientProps {
   initialStats: DashboardStats | null
@@ -74,9 +49,7 @@ export function DashboardPageClient({
   initialUpcomingEvents,
 }: DashboardPageClientProps) {
   const router = useRouter()
-  const token = useAuthStore((state) => state.token)
-  const user = useAuthStore((state) => state.user)
-  const hasPermission = useAuthStore((state) => state.hasPermission)
+  const { token, user, hasPermission } = useAuth()
 
   // When the page is refreshed, the auth store may be empty until rehydration
   // and/or refreshSession completes. During that window we show skeletons
@@ -95,19 +68,9 @@ export function DashboardPageClient({
   const isAuthHydrating = !token && (initialHasSession || authGraceActive)
   const isUserHydrating = !user && (initialHasSession || authGraceActive)
   const { data: stats = FALLBACK_STATS, isLoading } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', token],
     queryFn: async () => {
-      const response = await api.get('/dashboard/stats')
-      const payload = response.data?.data ?? response.data
-      const data = payload?.stats ?? payload ?? {}
-      return {
-        totalEmployees: Number(data.totalEmployees) || 0,
-        activeEmployees: Number(data.activeEmployees) || 0,
-        totalDepartments: Number(data.totalDepartments) || 0,
-        pendingLeaveRequests: Number(data.pendingLeaveRequests) || 0,
-        totalPayroll: Number(data.totalPayroll) || 0,
-        attendanceRate: Number(data.attendanceRate) || 0
-      }
+      return getDashboardStats(token ?? undefined)
     },
     enabled: !!token,
     initialData: initialStats ?? FALLBACK_STATS,
@@ -123,16 +86,19 @@ export function DashboardPageClient({
   const canViewPeopleAnalytics = !!user && hasPermission(PERMISSIONS.VIEW_ANALYTICS)
 
   const peopleMetricsQuery = useQuery<DashboardMetrics | null>({
-    queryKey: ['analytics-dashboard'],
+    queryKey: ['analytics-dashboard', token],
     queryFn: async () => {
       const endDate = new Date()
       const startDate = new Date(endDate)
       startDate.setDate(endDate.getDate() - 30)
 
-      const metrics = await analyticsService.getDashboardMetrics({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      })
+      const metrics = await getDashboardMetrics(
+        {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
+        token ?? undefined,
+      )
 
       return metrics ?? null
     },
@@ -146,36 +112,7 @@ export function DashboardPageClient({
   const recentActivitiesQuery = useQuery<RecentActivity[]>({
     queryKey: ['dashboard', 'recent-activities'],
     queryFn: async () => {
-      const res = await api.get('/leave', { params: { limit: 8, page: 1 } })
-      const raw = res.data?.data
-      const leaveRequests = (Array.isArray(raw) ? raw : raw?.leaveRequests ?? []) as (LeaveRequest & {
-        createdAt?: string | null
-        employee?: { firstName?: string | null; lastName?: string | null } | null
-      })[]
-
-      return leaveRequests.map((leave) => {
-        const createdAt = leave.createdAt ? new Date(leave.createdAt) : null
-        const timestamp = createdAt
-          ? createdAt.toLocaleString(undefined, {
-              hour: '2-digit',
-              minute: '2-digit',
-              day: '2-digit',
-              month: 'short',
-            })
-          : ''
-
-        const employeeName = `${leave.employee?.firstName ?? 'Employee'} ${
-          leave.employee?.lastName ?? ''
-        }`.trim() || 'Employee'
-
-        return {
-          id: leave.id ?? crypto.randomUUID(),
-          type: 'leave' as const,
-          description: leave.reason ? `requested leave: ${leave.reason}` : 'requested leave',
-          timestamp,
-          employee: employeeName,
-        }
-      })
+      return getRecentActivities(token ?? undefined)
     },
     enabled: !!token,
     ...(initialRecentActivities !== null ? { initialData: initialRecentActivities } : {}),
@@ -188,9 +125,9 @@ export function DashboardPageClient({
   })
 
   const upcomingEventsQuery = useQuery<UpcomingEvent[]>({
-    queryKey: ['analytics-upcoming-events'],
+    queryKey: ['analytics-upcoming-events', token],
     queryFn: async () => {
-      const events = await analyticsService.getUpcomingEvents()
+      const events = await getUpcomingEvents(token ?? undefined)
       return events.map((event) => ({
         ...event,
         // Ensure date is a human-readable string; backend returns ISO timestamps.

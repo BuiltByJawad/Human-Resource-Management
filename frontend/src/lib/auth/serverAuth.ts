@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 
-import { fetchCurrentUser } from '@/lib/hrmData'
-import type { CurrentUser } from '@/types/hrm'
+import { fetchCurrentUser } from '@/features/auth/services/auth.api'
+import type { CurrentUser } from '@/features/auth/types/auth.types'
 
 export interface ServerAuthContext {
   user: CurrentUser | null

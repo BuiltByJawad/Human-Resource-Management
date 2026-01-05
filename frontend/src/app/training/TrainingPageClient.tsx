@@ -11,7 +11,8 @@ import {
     CheckCircleIcon,
     ClockIcon,
 } from "@heroicons/react/24/outline"
-import { trainingService, type TrainingCourse, type EmployeeTraining } from "@/services/trainingService"
+import { useAuth } from "@/features/auth"
+import { createCourse, assignCourse, type TrainingCourse, type EmployeeTraining } from "@/features/training"
 import { useToast } from "@/components/ui/ToastProvider"
 import { Modal } from "@/components/ui/Modal"
 import { Input, TextArea } from "@/components/ui/FormComponents"
@@ -36,6 +37,7 @@ const statusIcons: Record<string, React.ElementType> = {
 export function TrainingPageClient({ initialCourses, employees }: TrainingPageClientProps) {
     const router = useRouter()
     const { showToast } = useToast()
+    const { token } = useAuth()
 
     const [courses, setCourses] = useState<TrainingCourse[]>(initialCourses)
     const [showCreateModal, setShowCreateModal] = useState(false)
@@ -64,19 +66,17 @@ export function TrainingPageClient({ initialCourses, employees }: TrainingPageCl
 
         setIsSubmitting(true)
         try {
-            const newCourse = await trainingService.createCourse({
+            const newCourse = await createCourse({
                 title: courseForm.title,
                 description: courseForm.description || undefined,
                 contentUrl: courseForm.contentUrl || undefined,
                 duration: courseForm.duration ? parseInt(courseForm.duration, 10) : undefined,
-            })
+            }, token ?? undefined)
 
-            if (newCourse?.data) {
-                setCourses((prev) => [...prev, newCourse.data])
-                showToast("Course created successfully", "success")
-                setShowCreateModal(false)
-                setCourseForm({ title: "", description: "", contentUrl: "", duration: "" })
-            }
+            setCourses((prev) => [...prev, newCourse])
+            showToast("Course created successfully", "success")
+            setShowCreateModal(false)
+            setCourseForm({ title: "", description: "", contentUrl: "", duration: "" })
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Failed to create course"
             showToast(message, "error")
@@ -93,7 +93,7 @@ export function TrainingPageClient({ initialCourses, employees }: TrainingPageCl
 
         setIsSubmitting(true)
         try {
-            await trainingService.assignCourse(assignForm.employeeId, selectedCourse.id)
+            await assignCourse(assignForm.employeeId, selectedCourse.id, token ?? undefined)
             showToast("Course assigned successfully", "success")
             setShowAssignModal(false)
             setAssignForm({ employeeId: "" })

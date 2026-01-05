@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
-import { documentService, type CompanyDocument } from '@/services/documentService'
+import { getDocuments, type CompanyDocument } from '@/features/documents'
 import { DocumentCard } from '@/components/modules/documents/DocumentCard'
 import { UploadDocumentDialog } from '@/components/modules/documents/UploadDocumentDialog'
 import Sidebar from '@/components/ui/Sidebar'
@@ -12,6 +12,7 @@ import Header from '@/components/ui/Header'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/ToastProvider'
 import { handleCrudError } from '@/lib/apiError'
+import { useAuth } from '@/features/auth'
 
 const categories = ['All', 'HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other']
 
@@ -25,6 +26,7 @@ export function DocumentsPageClient({
   initialCategory = 'All'
 }: DocumentsPageClientProps) {
   const { showToast } = useToast()
+  const { token } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
   const isAdmin = true
@@ -37,8 +39,8 @@ export function DocumentsPageClient({
     error,
     refetch,
   } = useQuery<CompanyDocument[], Error>({
-    queryKey: ['documents'],
-    queryFn: () => documentService.getDocuments(),
+    queryKey: ['documents', selectedCategory, token],
+    queryFn: () => getDocuments(selectedCategory, token ?? undefined),
     retry: false,
     initialData: initialDocuments,
     placeholderData: (previousData) => previousData ?? initialDocuments,

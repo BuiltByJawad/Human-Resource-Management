@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
-import { KeyResult, goalsService } from '@/services/goalsService';
+import { updateKeyResultProgress, type KeyResult } from '@/features/goals';
+import { useAuth } from '@/features/auth';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ interface KeyResultListProps {
 }
 
 export const KeyResultList: React.FC<KeyResultListProps> = ({ keyResults, onUpdate }) => {
+    const { token } = useAuth();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState<number>(0);
 
@@ -23,7 +25,7 @@ export const KeyResultList: React.FC<KeyResultListProps> = ({ keyResults, onUpda
 
     const saveProgress = async (id: string) => {
         try {
-            await goalsService.updateKeyResultProgress(id, editValue);
+            await updateKeyResultProgress(id, editValue, token ?? undefined);
             setEditingId(null);
             if (onUpdate) onUpdate();
         } catch (error) {

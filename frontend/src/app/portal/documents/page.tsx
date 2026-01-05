@@ -1,75 +1,20 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import type { CompanyDocument } from '@/services/documentService'
+import type { CompanyDocument } from '@/features/documents'
 import { DocumentsPageClient } from './DocumentsPageClient'
-
-function buildApiBase() {
-  return (
-    process.env.BACKEND_URL ||
-    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '') : null) ||
-    'http://localhost:5000'
-  )
-}
-
-async function fetchCurrentUser() {
-  try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('accessToken')?.value
-    if (!token) {
-      return { user: null, token: null }
-    }
-
-    const response = await fetch(`${buildApiBase()}/api/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      cache: 'no-store',
-    })
-
-    if (!response.ok) {
-      return { user: null, token: null }
-    }
-
-    const payload = await response.json().catch(() => null)
-    const data = payload?.data ?? payload
-    return { user: data?.user ?? data ?? null, token }
-  } catch {
-    return { user: null, token: null }
-  }
-}
-
-async function fetchInitialDocuments(token: string | null): Promise<CompanyDocument[]> {
-  try {
-    if (!token) return []
-    const base = buildApiBase()
-    const response = await fetch(`${base}/api/documents`, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      cache: 'no-store'
-    })
-
-    if (!response.ok) {
-      return []
-    }
-
-    const payload = await response.json().catch(() => null)
-    const data = payload?.data ?? payload
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
-  }
-}
+import { fetchCurrentUser } from '@/features/auth/services/auth.api'
+import { getDocuments } from '@/features/documents'
 
 export default async function DocumentsPage() {
-  const { user, token } = await fetchCurrentUser()
+  const cookieStore = await cookies()
+  const token = cookieStore.get('accessToken')?.value ?? null
+  const user = await fetchCurrentUser(token ?? undefined)
   const employeeId = user?.employee?.id ?? null
   if (!employeeId) {
     redirect('/dashboard')
   }
 
-  const initialDocuments = await fetchInitialDocuments(token)
+  const initialDocuments = token ? await getDocuments(undefined, token ?? undefined) : []
   return <DocumentsPageClient initialDocuments={initialDocuments} initialCategory="All" />
 }

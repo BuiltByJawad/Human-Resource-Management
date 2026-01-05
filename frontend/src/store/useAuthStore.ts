@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { Permission } from '@/constants/permissions'
+import { loginRequest, refreshSessionRequest, logoutRequest } from '@/features/auth/services/auth.api'
+import type { AuthUserPayload, CurrentUser } from '@/features/auth/types/auth.types'
+import type { Permission } from '@/shared/constants/permissions'
 import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
-import type { CurrentUser } from '@/types/hrm'
 
 type AuthPersistMode = 'local' | 'session'
 
@@ -129,7 +130,41 @@ export interface User {
     permissions: Permission[]
 }
 
-interface AuthState {
+const toPermissions = (input: unknown, fallback: Permission[] = []): Permission[] => {
+    if (!Array.isArray(input)) return fallback
+    return input.filter((perm): perm is Permission => typeof perm === 'string') as Permission[]
+}
+
+const buildUserFromPayload = (payload: AuthUserPayload | CurrentUser | null | undefined, fallbackPermissions: Permission[] = []): User | null => {
+    if (!payload) {
+        return null
+    }
+
+    const permissions: Permission[] = toPermissions((payload as AuthUserPayload | CurrentUser).permissions, fallbackPermissions)
+    const asAuthPayload = payload as AuthUserPayload
+
+    return {
+        id: payload.id ?? '',
+        email: payload.email ?? '',
+        firstName: payload.firstName ?? null,
+        lastName: payload.lastName ?? null,
+        role: payload.role ?? 'User',
+        avatarUrl: payload.avatarUrl ?? null,
+        organizationId: 'organizationId' in asAuthPayload ? asAuthPayload.organizationId ?? null : null,
+        department: 'department' in asAuthPayload ? asAuthPayload.department : undefined,
+        phoneNumber: 'phoneNumber' in asAuthPayload ? asAuthPayload.phoneNumber : undefined,
+        address: 'address' in asAuthPayload ? asAuthPayload.address : undefined,
+        dateOfBirth: 'dateOfBirth' in asAuthPayload ? asAuthPayload.dateOfBirth : undefined,
+        gender: 'gender' in asAuthPayload ? asAuthPayload.gender : undefined,
+        maritalStatus: 'maritalStatus' in asAuthPayload ? asAuthPayload.maritalStatus : undefined,
+        emergencyContact: 'emergencyContact' in asAuthPayload ? asAuthPayload.emergencyContact : undefined,
+        employee: 'employee' in asAuthPayload ? asAuthPayload.employee : (payload as CurrentUser).employee ?? undefined,
+        status: 'status' in asAuthPayload ? asAuthPayload.status : undefined,
+        permissions,
+    }
+}
+
+export interface AuthState {
     user: User | null
     token: string | null
     refreshToken: string | null
@@ -184,7 +219,7 @@ function getInitialAuthState(): Pick<
 
 export const useAuthStore = create<AuthState>()(
     persist(
-        (set, get) => {
+        (set, get): AuthState => {
             const initial = getInitialAuthState()
             return {
                 user: initial.user,
@@ -208,30 +243,16 @@ export const useAuthStore = create<AuthState>()(
                     }
                     set({ isAuthTransition: true })
                     try {
-                        const tenantSlug = getClientTenantSlug()
-                        const response = await fetch('/api/auth/login', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
-                            },
-                            credentials: 'include',
-                            body: JSON.stringify({ email, password, rememberMe }),
-                        })
-                        const json = await response.json()
-                        if (!response.ok) {
-                            throw new Error(json?.error || json?.message || 'Login failed')
-                        }
-                        const payload = json?.data ?? json
-                        const { user, accessToken, refreshToken, permissions } = payload
-                        const normalizedUser: User = {
-                            ...user,
-                            permissions: permissions ?? [],
-                        }
+                        const response = await loginRequest({ email, password, rememberMe })
+                        const permissions = toPermissions(response?.permissions, [])
+                        const accessToken = response?.accessToken ?? null
+                        const refreshToken = response?.refreshToken ?? null
+                        const normalizedUser = buildUserFromPayload(response?.user, permissions) ?? null
+
                         set({
                             user: normalizedUser,
                             token: accessToken,
-                            refreshToken: refreshToken ?? null,
+                            refreshToken,
                             isAuthenticated: true,
                             isLoggingOut: false,
                             rememberMe,
@@ -250,13 +271,24 @@ export const useAuthStore = create<AuthState>()(
                 },
                 logout: async () => {
                     set({ isAuthTransition: true, isLoggingOut: true })
+                    // Clear store immediately so UI re-renders logged-out state without showing dashboard
+                    set({
+                        user: null,
+                        token: null,
+                        refreshToken: null,
+                        isAuthenticated: false,
+                        rememberMe: false,
+                        isLoggingOut: true,
+                        isAuthTransition: true,
+                        lastRefreshedAt: null,
+                    })
                     if (typeof window !== 'undefined') {
+                        // Best-effort clear of auth cookies for SPA navigation
                         try {
-                            await fetch('/api/auth/logout', { credentials: 'include' })
+                            document.cookie = 'accessToken=; Max-Age=0; path=/'
+                            document.cookie = 'refreshToken=; Max-Age=0; path=/'
                         } catch {
                         }
-                    }
-                    if (typeof window !== 'undefined') {
                         try {
                             window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
                         } catch (error) {
@@ -273,16 +305,15 @@ export const useAuthStore = create<AuthState>()(
                         } catch {
                         }
                     }
-                    set({
-                        user: null,
-                        token: null,
-                        refreshToken: null,
-                        isAuthenticated: false,
-                        rememberMe: false,
-                        isLoggingOut: true,
-                        isAuthTransition: true,
-                        lastRefreshedAt: null,
-                    })
+                    try {
+                        await logoutRequest()
+                    } catch (error) {
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.warn('Logout request failed', error)
+                        }
+                    }
+                    // End transition after cleanup
+                    set({ isLoggingOut: false, isAuthTransition: false })
                 },
                 endAuthTransition: () => set({ isAuthTransition: false, isLoggingOut: false }),
                 clearAuth: () => {
@@ -307,26 +338,15 @@ export const useAuthStore = create<AuthState>()(
                     const { refreshToken, token, user, rememberMe } = get()
                     try {
                         const requestBody = refreshToken ? { refreshToken, rememberMe } : { rememberMe }
-                        const tenantSlug = getClientTenantSlug()
-                        const response = await fetch('/api/auth/refresh', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
-                            },
-                            credentials: 'include',
-                            body: JSON.stringify(requestBody),
-                        })
-                        const json = await response.json()
-                        if (!response.ok) {
-                            throw new Error(json?.error || json?.message || 'Token refresh failed')
+                        const { ok, data } = await refreshSessionRequest(requestBody)
+                        if (!ok) {
+                            throw new Error('Token refresh failed')
                         }
-                        const payload = json?.data ?? json
-                        const newAccessToken = payload?.accessToken || payload?.token || token
+                        const payload = data ?? {}
+                        const permissions = toPermissions(payload?.permissions ?? user?.permissions, [])
+                        const newAccessToken = payload?.accessToken || token
                         const newRefreshToken = payload?.refreshToken || refreshToken
-                        const nextUser = payload?.user
-                            ? { ...(payload.user || {}), permissions: payload.permissions ?? payload.user?.permissions ?? user?.permissions ?? [] }
-                            : user
+                        const nextUser = buildUserFromPayload(payload?.user, permissions) ?? user
 
                         set({
                             token: newAccessToken,

@@ -26,7 +26,8 @@ const robotoMono = Roboto_Mono({
 });
 
 const DEFAULT_TITLE = "HRM Platform";
-const DEFAULT_FAVICON = "/favicon.ico";
+const DEFAULT_FAVICON =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" rx="12" ry="12" fill="%232256e6"/%3E%3Ctext x="50%25" y="55%25" text-anchor="middle" font-size="34" fill="white" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif"%3EH%3C/text%3E%3C/svg%3E';
 
 interface BrandingData {
   siteName: string;
@@ -99,6 +100,7 @@ async function fetchBranding(): Promise<BrandingData> {
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await fetchBranding();
   const title = branding.siteName || DEFAULT_TITLE;
+  const faviconHref = branding.faviconUrl ?? DEFAULT_FAVICON;
 
   return {
     title,
@@ -113,6 +115,10 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title,
       description: "A modern Human Resource Management platform.",
+    },
+    icons: {
+      icon: faviconHref,
+      shortcut: faviconHref,
     },
   };
 }

@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { trainingService, EmployeeTraining } from '@/services/trainingService';
+import { getMyCourses, updateProgress, type EmployeeTraining } from '@/features/training';
+import { useAuth } from '@/features/auth';
 import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
 import { Button } from '@/components/ui/button';
@@ -19,12 +20,13 @@ export default function CoursePlayerPage() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { showToast } = useToast();
+    const { token } = useAuth();
     const trainingId = params.id as string;
 
     const coursesQuery = useQuery<EmployeeTraining[]>({
         queryKey: ['training', 'my-courses'],
-        queryFn: trainingService.getMyCourses,
-        enabled: !!trainingId,
+        queryFn: () => getMyCourses(token ?? undefined),
+        enabled: !!trainingId && !!token,
         staleTime: 5 * 60 * 1000,
         initialData: [],
     });
@@ -45,7 +47,7 @@ export default function CoursePlayerPage() {
     );
 
     const progressMutation = useMutation({
-        mutationFn: (newProgress: number) => trainingService.updateProgress(trainingId, newProgress),
+        mutationFn: (newProgress: number) => updateProgress(trainingId, newProgress, token ?? undefined),
         onError: (err) =>
             handleCrudError({
                 error: err,
