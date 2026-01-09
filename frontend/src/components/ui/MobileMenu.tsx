@@ -177,7 +177,7 @@ export default function MobileMenu({ isOpen, onClose, user }: MobileMenuProps) {
                 {/* User Profile in Mobile Menu */}
                 <div className="p-4 border-t border-white/5 mt-auto">
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-black/20">
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-sm shadow-inner border-2 border-white/10">
+                        <div className="h-9 w-9 rounded-full bg-indigo-500 flex items-center justify-center font-semibold text-sm shadow-inner border-2 border-white/10">
                             {initials}
                         </div>
                         <div>

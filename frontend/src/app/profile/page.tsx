@@ -199,6 +199,9 @@ export default function ProfilePage() {
 
     if (!user) return null
 
+    const avatarDisplayName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'User'
+    const defaultAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarDisplayName)}&background=6366f1&color=ffffff`
+
     return (
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div className="mb-6">
@@ -218,7 +221,7 @@ export default function ProfilePage() {
                         <div className="p-6 text-center border-b border-gray-200">
                             <div className="flex justify-center">
                                 <AvatarUpload
-                                    currentAvatarUrl={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}`}
+                                    currentAvatarUrl={user.avatarUrl || defaultAvatarUrl}
                                     onUpload={handleAvatarUpload}
                                     disabled={!isEditing}
                                     className="flex-col !gap-4"

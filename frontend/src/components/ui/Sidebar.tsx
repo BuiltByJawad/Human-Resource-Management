@@ -260,10 +260,11 @@ export default function Sidebar() {
     >
       {/* Header */}
       <div className={`
-        flex items-center px-6 border-b border-white/5 relative transition-all duration-300
-        h-20 [.sidebar-collapsed_&]:h-32 [.sidebar-collapsed_&]:flex-col [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:gap-4 [.sidebar-collapsed_&]:px-0
+        relative flex items-center px-6 pr-12 border-b border-white/5 transition-all duration-300 min-w-0 gap-4
+        h-20
+        [.sidebar-collapsed_&]:h-32 [.sidebar-collapsed_&]:flex-col [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:gap-3 [.sidebar-collapsed_&]:px-0
       `}>
-        <div className={`flex items-center gap-4 transition-all duration-300 [.sidebar-collapsed_&]:justify-center [.sidebar-collapsed_&]:w-full`}>
+        <div className={`flex items-center gap-4 transition-all duration-300 flex-1 min-w-0 [.sidebar-collapsed_&]:flex-none`}>
           {showOrgSkeleton ? (
             <>
               <div className="h-9 w-9 rounded-xl bg-slate-800 animate-pulse flex-shrink-0" />
@@ -299,12 +300,12 @@ export default function Sidebar() {
               <div
                 className={`
                   transition-all duration-300 origin-left
-                  opacity-100 max-w-[200px] translate-x-0
+                  opacity-100 translate-x-0 min-w-0 max-w-[160px] overflow-hidden flex-1
                   [.sidebar-collapsed_&]:opacity-0 [.sidebar-collapsed_&]:max-w-0 [.sidebar-collapsed_&]:overflow-hidden [.sidebar-collapsed_&]:-translate-x-4 [.sidebar-collapsed_&]:hidden
                 `}
               >
-                <p className="text-base font-bold tracking-tight text-white">{siteName}</p>
-                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{tagline}</p>
+                <p className="text-base font-bold tracking-tight text-white truncate" title={siteName}>{siteName}</p>
+                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider truncate" title={tagline}>{tagline}</p>
               </div>
             </>
           )}
@@ -314,9 +315,9 @@ export default function Sidebar() {
         <button
           onClick={toggle}
           className={`
-            p-1.5 rounded-lg text-slate-400 hover:bg-white/10 hover:text-white transition-all duration-200
-            absolute right-4
-            [.sidebar-collapsed_&]:static [.sidebar-collapsed_&]:right-auto
+            h-10 w-10 flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:bg-white/10 hover:text-white transition-all duration-200
+            absolute right-4 top-1/2 -translate-y-1/2
+            [.sidebar-collapsed_&]:static [.sidebar-collapsed_&]:-translate-y-0 [.sidebar-collapsed_&]:right-auto [.sidebar-collapsed_&]:mt-1
           `}
           aria-label="Toggle sidebar"
         >
@@ -370,7 +371,7 @@ export default function Sidebar() {
             gap-3 [.sidebar-collapsed_&]:justify-center
           `}
         >
-          <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-semibold text-sm shadow-inner flex-shrink-0 border-2 border-white/10 overflow-hidden relative">
+          <div className="h-9 w-9 rounded-full bg-indigo-500 flex items-center justify-center font-semibold text-sm shadow-inner flex-shrink-0 border-2 border-white/10 overflow-hidden relative">
             {hasUser ? (
               avatarUrl ? (
                 <Image
@@ -388,7 +389,7 @@ export default function Sidebar() {
               <span className="h-6 w-6 rounded-full bg-slate-500/60 animate-pulse block" />
             )}
           </div>
-          <div className="[.sidebar-collapsed_&]:hidden overflow-hidden">
+          <div className="[.sidebar-collapsed_&]:hidden overflow-hidden min-w-0 max-w-[200px]">
             {hasUser ? (
               <>
                 <p className="text-sm font-medium text-white truncate">{userDisplayName}</p>

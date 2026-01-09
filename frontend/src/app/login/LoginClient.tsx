@@ -44,11 +44,20 @@ interface LoginClientProps {
 
 export default function LoginClient({ branding }: LoginClientProps) {
   const router = useRouter()
-  const { login } = useAuthStore()
+  const { login, isAuthTransition, endAuthTransition, isAuthenticated } = useAuthStore()
   const { updateOrg } = useOrgStore()
   const { showToast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const isSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    if (!isAuthTransition) return
+    // Only end the transition here when we're unauthenticated (logout -> login).
+    // For successful login (isAuthenticated = true), Header will end the transition
+    // after the protected layout mounts, so the loader stays visible during login.
+    if (isAuthenticated) return
+    endAuthTransition()
+  }, [isAuthTransition, isAuthenticated, endAuthTransition])
 
   useEffect(() => {
     router.prefetch('/dashboard')
@@ -175,7 +184,7 @@ export default function LoginClient({ branding }: LoginClientProps) {
           <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
             <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
               <Input
-                label="Work email"
+                label="Work Email"
                 type="email"
                 placeholder="you@example.com"
                 required

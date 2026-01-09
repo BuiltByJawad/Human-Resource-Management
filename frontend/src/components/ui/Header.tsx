@@ -168,7 +168,7 @@ export default function Header() {
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const [notificationsError, setNotificationsError] = useState<string | null>(null)
 
-  const { user, logout, hasPermission } = useAuthStore()
+  const { user, logout, hasPermission, isAuthenticated, isAuthTransition, endAuthTransition } = useAuthStore()
   const initialAuth = useInitialAuth()
   // Prefer server-fetched user on first paint to avoid showing stale
   // persisted auth data, then fall back to the client store user.
@@ -199,6 +199,12 @@ export default function Header() {
     headerMountedOnce = true
     setIsMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!isAuthTransition) return
+    if (!isAuthenticated) return
+    endAuthTransition()
+  }, [isAuthTransition, isAuthenticated, endAuthTransition])
 
   const handleLogout = async () => {
     await logout()
@@ -349,12 +355,18 @@ export default function Header() {
               <Bars3Icon className="h-6 w-6" />
             </button>
 
-            <div className="flex items-center flex-1 gap-3">
+            <div className="flex items-center flex-1 gap-3 min-w-0">
               {/* Branding Section - Instantly available via server-side fetch & StoreHydrator */}
               {siteName || tagline ? (
-                <div className="hidden sm:flex flex-col">
-                  {tagline && <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{tagline}</p>}
-                  {siteName && <h1 className="text-lg font-semibold text-slate-900">{siteName}</h1>}
+                <div className="hidden sm:flex flex-col min-w-0 max-w-[220px]">
+                  {tagline && (
+                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400 truncate">{tagline}</p>
+                  )}
+                  {siteName && (
+                    <h1 className="text-lg font-semibold text-slate-900 truncate" title={siteName}>
+                      {siteName} Workspace
+                    </h1>
+                  )}
                 </div>
               ) : (
                 <div className="hidden sm:flex flex-col">
@@ -468,7 +480,7 @@ export default function Header() {
                           <Image src={avatarUrl} alt="Profile" fill className="object-cover" sizes="32px" />
                         </div>
                       ) : (
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold text-xs">
+                        <div className="h-8 w-8 rounded-full bg-indigo-500 text-white flex items-center justify-center font-semibold text-xs">
                           {initials}
                         </div>
                       )}
