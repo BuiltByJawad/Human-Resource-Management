@@ -5,19 +5,22 @@ import { validateRequest } from '@/shared/middleware/validation'
 import { loginSchema, registerSchema, changePasswordSchema, updateProfileSchema, inviteUserSchema, completeInviteSchema, passwordResetRequestSchema, resetPasswordSchema, refreshTokenSchema } from '@/validators'
 import { authRateLimiter } from '@/shared/middleware/security'
 import { upload } from '@/shared/middleware/uploadMiddleware'
+import { logout } from '@/modules/auth/auth.controller'
 
 const router = Router()
 
 router.post('/register', authRateLimiter, validateRequest(registerSchema), register)
 router.post('/login', authRateLimiter, validateRequest(loginSchema), login)
-router.post('/refresh-token', validateRequest(refreshTokenSchema), refreshToken)
+router.post('/refresh-token', authRateLimiter, validateRequest(refreshTokenSchema), refreshToken)
 router.get('/profile', protect, getProfile)
+router.post('/logout', protect, logout)
 router.put('/avatar', protect, upload.single('avatar'), uploadAvatar)
 router.put('/change-password', protect, validateRequest(changePasswordSchema), changePassword)
 router.put('/profile', protect, validateRequest(updateProfileSchema), updateProfile)
+
 router.post('/invite', protect, checkPermission('roles', 'assign'), validateRequest(inviteUserSchema), inviteUser)
-router.post('/complete-invite', validateRequest(completeInviteSchema), completeInvite)
-router.post('/password-reset/request', validateRequest(passwordResetRequestSchema), requestPasswordReset)
-router.post('/password-reset/complete', validateRequest(resetPasswordSchema), resetPassword)
+router.post('/complete-invite', authRateLimiter, validateRequest(completeInviteSchema), completeInvite)
+router.post('/password-reset/request', authRateLimiter, validateRequest(passwordResetRequestSchema), requestPasswordReset)
+router.post('/password-reset/complete', authRateLimiter, validateRequest(resetPasswordSchema), resetPassword)
 
 export default router

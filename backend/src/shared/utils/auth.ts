@@ -1,8 +1,15 @@
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
+import config from '../config/config'
 
 export const PASSWORD_MIN_LENGTH = 8
+
+export interface GeneratedTokens {
+  accessToken: string
+  refreshToken: string
+  refreshTokenJti: string
+}
 
 export const validatePasswordStrength = (password: string): string | null => {
   if (!password || password.length < PASSWORD_MIN_LENGTH) {
@@ -35,20 +42,31 @@ export const comparePassword = async (
   return bcrypt.compare(password, hashedPassword)
 }
 
-export const generateTokens = (userId: string, email: string, role: string, organizationId?: string | null) => {
+export const generateTokens = (userId: string, email: string, role: string, organizationId?: string | null): GeneratedTokens => {
+  const accessExpirationMinutes =
+    typeof config.jwt.accessExpirationMinutes === 'number' && Number.isFinite(config.jwt.accessExpirationMinutes)
+      ? config.jwt.accessExpirationMinutes
+      : 15
+  const refreshExpirationDays =
+    typeof config.jwt.refreshExpirationDays === 'number' && Number.isFinite(config.jwt.refreshExpirationDays)
+      ? config.jwt.refreshExpirationDays
+      : 7
+
+  const refreshTokenJti = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex')
+
   const accessToken = jwt.sign(
     { userId, email, role, organizationId: organizationId || undefined },
     process.env.JWT_SECRET!,
-    { expiresIn: '15m' }
+    { expiresIn: `${accessExpirationMinutes}m` }
   )
   
   const refreshToken = jwt.sign(
-    { userId, organizationId: organizationId || undefined },
+    { userId, organizationId: organizationId || undefined, jti: refreshTokenJti },
     process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: '7d' }
+    { expiresIn: `${refreshExpirationDays}d` }
   )
   
-  return { accessToken, refreshToken }
+  return { accessToken, refreshToken, refreshTokenJti }
 }
 
 export const verifyToken = (token: string, secret: string) => {

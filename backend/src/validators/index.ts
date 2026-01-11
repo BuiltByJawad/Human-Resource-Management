@@ -79,10 +79,11 @@ export const employeeUpdateSchema = Joi.object({
 })
 
 export const leaveRequestSchema = Joi.object({
-  leaveType: Joi.string().valid('annual', 'sick', 'personal', 'maternity', 'paternity').required(),
+  leaveType: Joi.string().valid('annual', 'sick', 'personal', 'maternity', 'paternity', 'unpaid').required(),
   startDate: Joi.date().required(),
   endDate: Joi.date().greater(Joi.ref('startDate')).required(),
   reason: Joi.string().max(500).optional(),
+  emergencyContact: Joi.string().max(300).optional(),
 })
 
 export const attendanceSchema = Joi.object({

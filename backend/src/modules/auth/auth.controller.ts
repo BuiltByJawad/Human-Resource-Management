@@ -6,6 +6,41 @@ import { TenantRequest } from '../../shared/middleware/tenant';
 import { BadRequestError, UnauthorizedError } from '../../shared/utils/errors';
 import { HTTP_STATUS, SUCCESS_MESSAGES } from '../../shared/constants';
 
+const assertTrustedOriginForCookieAuth = (req: Request) => {
+    // Only enforce in production to avoid breaking local dev environments.
+    if (process.env.NODE_ENV !== 'production') return;
+
+    const origin = req.get('origin');
+    if (!origin) return;
+
+    const frontendUrl = process.env.FRONTEND_URL;
+    if (!frontendUrl) return;
+
+    try {
+        const expected = new URL(frontendUrl);
+        const actual = new URL(origin);
+        if (expected.origin !== actual.origin) {
+            throw new BadRequestError('Invalid request origin');
+        }
+    } catch {
+        throw new BadRequestError('Invalid request origin');
+    }
+};
+
+const getRefreshCookieOptions = () => {
+    const isProd = process.env.NODE_ENV === 'production';
+    const refreshDays = Number(process.env.JWT_REFRESH_EXPIRATION_DAYS || 30);
+    const maxAgeMs = Number.isFinite(refreshDays) ? Math.max(1, refreshDays) * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    // If frontend and backend are on different sites in production, SameSite=None is required.
+    return {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+        path: '/api/auth',
+        maxAge: maxAgeMs,
+    };
+};
+
 /**
  * Register a new user
  */
@@ -17,9 +52,15 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         ...(req.body as any),
         organizationId,
     } as any);
+
+    res.cookie('refreshToken', result.refreshToken, getRefreshCookieOptions());
+
     res.status(HTTP_STATUS.CREATED).json({
         success: true,
-        data: result,
+        data: {
+            ...result,
+            refreshToken: undefined,
+        },
     });
 });
 
@@ -80,9 +121,15 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         ...(req.body as any),
         organizationId,
     } as any);
+
+    res.cookie('refreshToken', result.refreshToken, getRefreshCookieOptions());
+
     res.json({
         success: true,
-        data: result,
+        data: {
+            ...result,
+            refreshToken: undefined,
+        },
     });
 });
 
@@ -90,10 +137,34 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
  * Refresh token
  */
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
-    const result = await authService.refreshAccessToken(req.body as any);
+    const body: Record<string, unknown> =
+        typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {};
+    const refreshToken =
+        typeof body.refreshToken === 'string' && body.refreshToken.length > 0
+            ? body.refreshToken
+            : typeof (req as any).cookies?.refreshToken === 'string'
+                ? (req as any).cookies.refreshToken
+                : '';
+
+    const usingCookie = !(typeof body.refreshToken === 'string' && body.refreshToken.length > 0);
+    if (usingCookie) {
+        assertTrustedOriginForCookieAuth(req);
+    }
+
+    if (!refreshToken) {
+        throw new BadRequestError('refreshToken is required');
+    }
+
+    const result = await authService.refreshAccessToken({ refreshToken } as any);
+
+    res.cookie('refreshToken', result.refreshToken, getRefreshCookieOptions());
+
     res.json({
         success: true,
-        data: result,
+        data: {
+            ...result,
+            refreshToken: undefined,
+        },
     });
 });
 
@@ -105,15 +176,45 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
         throw new UnauthorizedError('User not authenticated');
     }
 
-    // Fetch fresh user data
-    const user = await authService.refreshAccessToken({ refreshToken: '' }).catch(() => null);
-
     res.json({
         success: true,
         data: {
             user: req.user,
             permissions: req.user.permissions,
         },
+    });
+});
+
+export const logout = asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+    }
+
+    const body: Record<string, unknown> =
+        typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {};
+    const refreshToken =
+        typeof body.refreshToken === 'string' && body.refreshToken.length > 0
+            ? body.refreshToken
+            : typeof (req as any).cookies?.refreshToken === 'string'
+                ? (req as any).cookies.refreshToken
+                : '';
+
+    const usingCookie = !(typeof body.refreshToken === 'string' && body.refreshToken.length > 0);
+    if (usingCookie) {
+        assertTrustedOriginForCookieAuth(req as unknown as Request);
+    }
+
+    if (!refreshToken) {
+        throw new BadRequestError('refreshToken is required');
+    }
+
+    await authService.logout(req.user.id, refreshToken);
+
+    res.clearCookie('refreshToken', getRefreshCookieOptions());
+
+    res.json({
+        success: true,
+        message: SUCCESS_MESSAGES.LOGOUT_SUCCESS,
     });
 });
 

@@ -344,8 +344,9 @@ export async function fetchRolesWithToken(token?: string): Promise<Role[]> {
     return []
   } catch (error: any) {
     const status = error?.response?.status
-    if (status === 401) return []
-    if (status === 404) return []
+    // For unauthorized or forbidden roles access, treat as "no roles" instead of
+    // throwing, so pages that optionally query roles can still render.
+    if (status === 401 || status === 403 || status === 404) return []
     throw error
   }
 }

@@ -4,12 +4,14 @@ import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
 import { ForbiddenError, BadRequestError } from '../../shared/utils/errors';
 import { requireRequestOrganizationId } from '../../shared/utils/tenant';
+import { createAuditLog } from '../../shared/utils/audit';
+import { AuthRequest } from '../../shared/middleware/auth';
 
 /**
  * Get all payroll records
  */
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const result = await payrollService.getAll(req.query, organizationId);
 
     res.json({
@@ -23,7 +25,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
  * Get payroll record by ID
  */
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const record = await payrollService.getById(req.params.id, organizationId);
 
     res.json({
@@ -36,8 +38,25 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
  * Generate payroll for a period
  */
 export const generate = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
+    const authReq = req as unknown as AuthRequest;
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const result = await payrollService.generatePayroll(req.body, organizationId);
+
+    const actorUserId = authReq.user?.id;
+    const body: Record<string, unknown> =
+        typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {};
+    const payPeriod = typeof body.payPeriod === 'string' ? body.payPeriod : undefined;
+    if (actorUserId) {
+        await createAuditLog({
+            userId: actorUserId,
+            action: 'payroll.generate',
+            newValues: {
+                payPeriod,
+                generatedCount: Array.isArray(result.payrolls) ? result.payrolls.length : 0,
+            },
+            req,
+        });
+    }
 
     res.status(HTTP_STATUS.CREATED).json({
         success: true,
@@ -50,8 +69,26 @@ export const generate = asyncHandler(async (req: Request, res: Response) => {
  * Update payroll status
  */
 export const updateStatus = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
+    const authReq = req as unknown as AuthRequest;
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const record = await payrollService.updateStatus(req.params.id, req.body, organizationId);
+
+    const actorUserId = authReq.user?.id;
+    const body: Record<string, unknown> =
+        typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {};
+    const status = typeof body.status === 'string' ? body.status : undefined;
+    if (actorUserId) {
+        await createAuditLog({
+            userId: actorUserId,
+            action: 'payroll.update_status',
+            resourceId: record.id,
+            newValues: {
+                payrollRecordId: record.id,
+                status,
+            },
+            req,
+        });
+    }
 
     res.json({
         success: true,
@@ -63,9 +100,9 @@ export const updateStatus = asyncHandler(async (req: Request, res: Response) => 
 /**
  * Get employee payslips
  */
-export const getEmployeePayslips = asyncHandler(async (req: any, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const permissions: string[] = Array.isArray(req?.user?.permissions) ? req.user.permissions : [];
+export const getEmployeePayslips = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
+    const permissions: string[] = Array.isArray(req.user?.permissions) ? req.user.permissions : [];
     const canViewAll = permissions.includes('payroll.view');
 
     const requestedEmployeeId = req.params.employeeId;
@@ -92,7 +129,7 @@ export const getEmployeePayslips = asyncHandler(async (req: any, res: Response) 
  * Get payroll summary for a period
  */
 export const getPeriodSummary = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const summary = await payrollService.getPeriodSummary(req.params.payPeriod, organizationId);
 
     res.json({

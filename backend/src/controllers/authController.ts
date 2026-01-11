@@ -3,16 +3,102 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { addHours } from 'date-fns'
 import { asyncHandler } from '@/shared/middleware/errorHandler'
-import { prisma } from '@/shared/config/database'
+import { prisma, redis, logger } from '@/shared/config/database'
 import { comparePassword, generateTokens, hashPassword, validatePasswordStrength } from '@/shared/utils/auth'
 import { UnauthorizedError, BadRequestError, NotFoundError } from '@/shared/utils/errors'
 import { AuthRequest } from '@/shared/middleware/auth'
 import { sendEmail } from '@/shared/utils/email'
 import { createAuditLog } from '@/shared/utils/audit'
 import { authService } from '@/modules/auth/auth.service'
+import config from '@/shared/config/config'
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex')
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
+
+const normalizeEmail = (value: unknown): string => {
+  if (typeof value !== 'string') return ''
+  return value.trim().toLowerCase()
+}
+
+const getClientIp = (req: Request): string => {
+  // trust proxy is enabled in app.ts; req.ip will respect X-Forwarded-For
+  return typeof req.ip === 'string' && req.ip.length > 0 ? req.ip : 'unknown'
+}
+
+const ensureRedisConnected = async (): Promise<boolean> => {
+  try {
+    if (redis.isOpen) return true
+    await redis.connect()
+    return true
+  } catch (error) {
+    logger.warn('Redis unavailable for login lockout, continuing without lockout', { error })
+    return false
+  }
+}
+
+const getLockoutConfig = () => {
+  const isProd = process.env.NODE_ENV === 'production'
+  return {
+    maxAttempts: isProd ? 5 : 10,
+    windowSeconds: isProd ? 15 * 60 : 5 * 60,
+    blockSeconds: isProd ? 15 * 60 : 5 * 60,
+  }
+}
+
+const lockoutKeys = (ip: string, email: string) => {
+  const safeEmail = email || 'unknown'
+  const safeIp = ip || 'unknown'
+  return {
+    failKey: `auth:login:fail:${safeIp}:${safeEmail}`,
+    blockKey: `auth:login:block:${safeIp}:${safeEmail}`,
+  }
+}
+
+const isBlocked = async (blockKey: string): Promise<boolean> => {
+  try {
+    const ttl = await redis.ttl(blockKey)
+    return typeof ttl === 'number' && ttl > 0
+  } catch {
+    return false
+  }
+}
+
+const recordLoginFailure = async (failKey: string, blockKey: string) => {
+  const { maxAttempts, windowSeconds, blockSeconds } = getLockoutConfig()
+  try {
+    const attempts = await redis.incr(failKey)
+    if (attempts === 1) {
+      await redis.expire(failKey, windowSeconds)
+    }
+    if (attempts >= maxAttempts) {
+      await redis.set(blockKey, '1', { EX: blockSeconds })
+    }
+  } catch {
+    // never block auth flow if redis ops fail
+  }
+}
+
+const clearLoginFailures = async (failKey: string, blockKey: string) => {
+  try {
+    await redis.del(failKey)
+    await redis.del(blockKey)
+  } catch {
+    // ignore
+  }
+}
+
+const storeRefreshJti = async (userId: string, jti: string) => {
+  const refreshDays =
+    typeof config.jwt.refreshExpirationDays === 'number' && Number.isFinite(config.jwt.refreshExpirationDays)
+      ? config.jwt.refreshExpirationDays
+      : 7
+  const ttlSeconds = Math.max(1, Math.floor(refreshDays * 24 * 60 * 60))
+  try {
+    await redis.set(`auth:refresh:jti:${userId}:${jti}`, '1', { EX: ttlSeconds })
+  } catch {
+    // ignore
+  }
+}
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const { email, password, firstName, lastName } = req.body
@@ -47,7 +133,13 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     }
   })
 
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name, user.organizationId)
+  const tokens = generateTokens(user.id, user.email, user.role.name, user.organizationId)
+  const { accessToken, refreshToken } = tokens
+
+  const redisOk = await ensureRedisConnected()
+  if (redisOk && typeof tokens.refreshTokenJti === 'string') {
+    await storeRefreshJti(user.id, tokens.refreshTokenJti)
+  }
 
   // Audit: user self-registered
   await createAuditLog({
@@ -385,7 +477,21 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
 })
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body
+  const body: Record<string, unknown> =
+    typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {}
+  const email = normalizeEmail(body.email)
+  const password = typeof body.password === 'string' ? body.password : ''
+
+  if (!email || password.length === 0) {
+    throw new BadRequestError('Email and password are required')
+  }
+
+  const ip = getClientIp(req)
+  const { failKey, blockKey } = lockoutKeys(ip, email)
+  const redisOk = await ensureRedisConnected()
+  if (redisOk && (await isBlocked(blockKey))) {
+    throw new UnauthorizedError('Too many login attempts, please try again later')
+  }
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -404,11 +510,17 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   })
 
   if (!user || user.status !== 'active') {
+    if (redisOk) {
+      await recordLoginFailure(failKey, blockKey)
+    }
     throw new UnauthorizedError('Invalid credentials or inactive account')
   }
 
   const isPasswordValid = await comparePassword(password, user.password)
   if (!isPasswordValid) {
+    if (redisOk) {
+      await recordLoginFailure(failKey, blockKey)
+    }
     // Audit: failed login attempt
     await createAuditLog({
       userId: user.id,
@@ -418,7 +530,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     throw new UnauthorizedError('Invalid credentials')
   }
 
-  const { accessToken, refreshToken } = generateTokens(user.id, user.email, user.role.name, user.organizationId)
+  if (redisOk) {
+    await clearLoginFailures(failKey, blockKey)
+  }
+
+  const tokens = generateTokens(user.id, user.email, user.role.name, user.organizationId)
+  const { accessToken, refreshToken } = tokens
+
+  if (redisOk) {
+    await storeRefreshJti(user.id, tokens.refreshTokenJti)
+  }
 
   await prisma.user.update({
     where: { id: user.id },

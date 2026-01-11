@@ -27,10 +27,33 @@ import {
     AuthResponse,
 } from './dto';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../../shared/config/database';
+import { prisma, redis, logger } from '../../shared/config/database';
+import config from '../../shared/config/config';
 
 const generateToken = (length = 32) => crypto.randomBytes(length).toString('hex');
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+
+const ensureRedisConnected = async (): Promise<boolean> => {
+    try {
+        if (redis.isOpen) return true;
+        await redis.connect();
+        return true;
+    } catch (error) {
+        logger.warn('Redis unavailable for refresh token rotation, continuing without rotation', { error });
+        return false;
+    }
+};
+
+const refreshJtiKey = (userId: string, jti: string) => `auth:refresh:jti:${userId}:${jti}`;
+
+const storeRefreshJti = async (userId: string, jti: string) => {
+    const refreshDays =
+        typeof config.jwt.refreshExpirationDays === 'number' && Number.isFinite(config.jwt.refreshExpirationDays)
+            ? config.jwt.refreshExpirationDays
+            : 7;
+    const ttlSeconds = Math.max(1, Math.floor(refreshDays * 24 * 60 * 60));
+    await redis.set(refreshJtiKey(userId, jti), '1', { EX: ttlSeconds });
+};
 
 export class AuthService {
     /**
@@ -68,13 +91,19 @@ export class AuthService {
             status: 'active',
         });
 
+        const redisOk = await ensureRedisConnected();
+
         // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(
+        const tokens = generateTokens(
             user.id,
             user.email,
             user.role.name,
             (user as any)?.organizationId
         );
+
+        if (redisOk) {
+            await storeRefreshJti(user.id, tokens.refreshTokenJti);
+        }
 
         // Audit log
         await createAuditLog({
@@ -84,8 +113,8 @@ export class AuthService {
         });
 
         return {
-            accessToken,
-            refreshToken,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: {
                 id: user.id,
                 email: user.email,
@@ -399,13 +428,19 @@ export class AuthService {
             throw new UnauthorizedError('Invalid credentials');
         }
 
+        const redisOk = await ensureRedisConnected();
+
         // Generate tokens
-        const { accessToken, refreshToken } = generateTokens(
+        const tokens = generateTokens(
             user.id,
             user.email,
             user.role.name,
             (user as any)?.organizationId
         );
+
+        if (redisOk) {
+            await storeRefreshJti(user.id, tokens.refreshTokenJti);
+        }
 
         // Update last login
         await authRepository.updateUser(user.id, {
@@ -425,8 +460,8 @@ export class AuthService {
         });
 
         return {
-            accessToken,
-            refreshToken,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: {
                 id: user.id,
                 email: user.email,
@@ -458,6 +493,22 @@ export class AuthService {
             throw new UnauthorizedError('Invalid refresh token payload');
         }
 
+        const tokenUserId: string | undefined = typeof payload?.userId === 'string' ? payload.userId : undefined;
+        const tokenJti: string | undefined = typeof payload?.jti === 'string' ? payload.jti : undefined;
+        const tokenOrgId: string | undefined = typeof payload?.organizationId === 'string' ? payload.organizationId : undefined;
+
+        const redisOk = await ensureRedisConnected();
+        if (redisOk) {
+            if (!tokenUserId || !tokenJti) {
+                throw new UnauthorizedError('Invalid or expired refresh token');
+            }
+            const exists = await redis.exists(refreshJtiKey(tokenUserId, tokenJti));
+            if (!exists) {
+                throw new UnauthorizedError('Invalid or expired refresh token');
+            }
+            await redis.del(refreshJtiKey(tokenUserId, tokenJti));
+        }
+
         // Get user (prefer userId from token, fallback to email)
         const user = payload?.userId
             ? await authRepository.findUserById(payload.userId)
@@ -467,8 +518,24 @@ export class AuthService {
             throw new UnauthorizedError('User not found or inactive');
         }
 
+        const userOrgId = (user as any)?.organizationId as string | null | undefined;
+        if (userOrgId) {
+            if (!tokenOrgId) {
+                throw new UnauthorizedError('Invalid refresh token (missing organization)');
+            }
+            if (tokenOrgId !== userOrgId) {
+                throw new UnauthorizedError('Invalid refresh token (organization mismatch)');
+            }
+        } else if (tokenOrgId) {
+            throw new UnauthorizedError('Invalid refresh token (user not assigned to organization)');
+        }
+
         // Generate new tokens
         const tokens = generateTokens(user.id, user.email, user.role!.name, (user as any)?.organizationId);
+
+        if (redisOk) {
+            await storeRefreshJti(user.id, tokens.refreshTokenJti);
+        }
 
         // Get permissions
         const userWithPerms = await authRepository.findUserByEmail(user.email);
@@ -490,6 +557,33 @@ export class AuthService {
             },
             permissions,
         };
+    }
+
+    async logout(userId: string, refreshToken: string): Promise<void> {
+        let payload: any;
+        try {
+            payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!);
+        } catch {
+            throw new UnauthorizedError('Invalid or expired refresh token');
+        }
+
+        const tokenUserId: string | undefined = typeof payload?.userId === 'string' ? payload.userId : undefined;
+        const tokenJti: string | undefined = typeof payload?.jti === 'string' ? payload.jti : undefined;
+
+        if (!tokenUserId || tokenUserId !== userId) {
+            throw new UnauthorizedError('Invalid refresh token');
+        }
+
+        const redisOk = await ensureRedisConnected();
+        if (redisOk && tokenJti) {
+            await redis.del(refreshJtiKey(userId, tokenJti));
+        }
+
+        await createAuditLog({
+            userId,
+            action: 'auth.logout',
+            resourceId: userId,
+        });
     }
 
     /**

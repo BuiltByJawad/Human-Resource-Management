@@ -2,7 +2,7 @@ import { Router } from 'express';
 import analyticsRoutes from './analytics.routes';
 import assetRoutes from './assetRoutes';
 import attendanceRoutes from './attendanceRoutes';
-import authRoutes from './authRoutes';
+import authRoutes from '../modules/auth/auth.routes';
 import benefitsRoutes from '../modules/benefits/benefits.routes';
 import complianceRoutes from './complianceRoutes';
 import dashboardRoutes from './dashboardRoutes';

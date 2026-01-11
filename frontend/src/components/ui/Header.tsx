@@ -208,7 +208,11 @@ export default function Header() {
 
   const handleLogout = async () => {
     await logout()
-    router.replace('/login')
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    } else {
+      router.replace('/login')
+    }
   }
 
   const notificationsQuery = useQuery<NotificationItem[]>({

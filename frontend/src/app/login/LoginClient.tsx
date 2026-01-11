@@ -106,7 +106,12 @@ export default function LoginClient({ branding }: LoginClientProps) {
 
       const role = useAuthStore.getState().user?.role
       const isAdminRole = typeof role === 'string' && role.toLowerCase().includes('admin')
-      router.replace(isAdminRole ? '/dashboard' : '/employees')
+      const destination = isAdminRole ? '/dashboard' : '/employees'
+      if (typeof window !== 'undefined') {
+        window.location.href = destination
+      } else {
+        router.replace(destination)
+      }
       return
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to login'

@@ -153,16 +153,17 @@ export function DashboardPageClient({
         employee?: { firstName?: string | null; lastName?: string | null } | null
       })[]
 
+      const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: 'short',
+        timeZone: 'UTC',
+      })
+
       return leaveRequests.map((leave) => {
         const createdAt = leave.createdAt ? new Date(leave.createdAt) : null
-        const timestamp = createdAt
-          ? createdAt.toLocaleString(undefined, {
-              hour: '2-digit',
-              minute: '2-digit',
-              day: '2-digit',
-              month: 'short',
-            })
-          : ''
+        const timestamp = createdAt ? dateFormatter.format(createdAt) : ''
 
         const employeeName = `${leave.employee?.firstName ?? 'Employee'} ${
           leave.employee?.lastName ?? ''
@@ -191,15 +192,18 @@ export function DashboardPageClient({
     queryKey: ['analytics-upcoming-events'],
     queryFn: async () => {
       const events = await analyticsService.getUpcomingEvents()
+      const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC',
+      })
+
       return events.map((event) => ({
         ...event,
         // Ensure date is a human-readable string; backend returns ISO timestamps.
-        date: new Date(event.date).toLocaleString(undefined, {
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        date: dateFormatter.format(new Date(event.date)),
       })) as UpcomingEvent[]
     },
     enabled: !!token && canViewPeopleAnalytics,

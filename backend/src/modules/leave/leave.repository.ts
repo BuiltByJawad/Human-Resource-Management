@@ -83,17 +83,18 @@ export class LeaveRepository {
     }
 
     async update(id: string, data: Prisma.LeaveRequestUpdateInput, organizationId: string) {
-        const updated = await prisma.leaveRequest.updateMany({
+        const existing = await prisma.leaveRequest.findFirst({
             where: { id, employee: { organizationId } },
-            data,
+            select: { id: true },
         });
 
-        if (!updated.count) {
+        if (!existing) {
             return null;
         }
 
-        return prisma.leaveRequest.findFirst({
-            where: { id, employee: { organizationId } },
+        return prisma.leaveRequest.update({
+            where: { id },
+            data,
             include: {
                 employee: {
                     select: {

@@ -4,8 +4,149 @@ import { CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveQueryDto, ApproveLea
 import { PAGINATION } from '../../shared/constants';
 import { prisma } from '../../shared/config/database';
 import { notificationService } from '../notification/notification.service';
+import { LeaveType } from '@prisma/client';
+import {
+    calculateBusinessDays,
+    calculateLeaveBalances,
+    getLeavePolicySettingsFromJson,
+    LeavePolicySettings,
+    LeaveUsageSummary,
+} from './utils/leavePolicyCalculator';
 
 export class LeaveService {
+    private async getLeavePolicySettings(organizationId: string): Promise<LeavePolicySettings> {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { settings: true },
+        });
+        return getLeavePolicySettingsFromJson(org?.settings);
+    }
+
+    private async assertNoOverlappingLeave(params: {
+        employeeId: string;
+        organizationId: string;
+        startDate: Date;
+        endDate: Date;
+        excludeLeaveRequestId?: string;
+    }): Promise<void> {
+        const { employeeId, organizationId, startDate, endDate, excludeLeaveRequestId } = params;
+
+        const overlap = await prisma.leaveRequest.findFirst({
+            where: {
+                employeeId,
+                status: { in: ['pending', 'approved'] },
+                ...(excludeLeaveRequestId ? { id: { not: excludeLeaveRequestId } } : {}),
+                employee: { organizationId },
+                AND: [
+                    { startDate: { lte: endDate } },
+                    { endDate: { gte: startDate } },
+                ],
+            },
+            select: { id: true },
+        });
+
+        if (overlap) {
+            throw new BadRequestError('Leave request overlaps with an existing request');
+        }
+    }
+
+    private async isApproverAllowed(params: {
+        employeeId: string;
+        approverEmployeeId: string;
+        organizationId: string;
+    }): Promise<boolean> {
+        const { employeeId, approverEmployeeId, organizationId } = params;
+
+        const employee = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { managerId: true },
+        });
+
+        // Manager-first rule (if configured manager exists)
+        if (employee?.managerId) {
+            if (employee.managerId === approverEmployeeId) return true;
+        }
+
+        // Fallback: any employee whose linked user has leave approval permission
+        const approver = await prisma.employee.findFirst({
+            where: { id: approverEmployeeId, organizationId },
+            select: {
+                id: true,
+                user: {
+                    select: {
+                        status: true,
+                        role: {
+                            select: {
+                                permissions: {
+                                    select: {
+                                        permission: {
+                                            select: { resource: true, action: true },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!approver?.user || approver.user.status !== 'active') return false;
+
+        const permissions = approver.user.role.permissions.map((rp) => `${rp.permission.resource}.${rp.permission.action}`);
+        return permissions.includes('leave_requests.approve');
+    }
+
+    private async getLeaveUsage(employeeId: string, organizationId: string, asOf: Date): Promise<LeaveUsageSummary> {
+        const year = asOf.getFullYear();
+        const startOfYear = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
+        const endOfYear = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
+
+        const prevYear = year - 1;
+        const prevStart = new Date(Date.UTC(prevYear, 0, 1, 0, 0, 0));
+        const prevEnd = new Date(Date.UTC(prevYear, 11, 31, 23, 59, 59));
+
+        const [current, previous] = await Promise.all([
+            prisma.leaveRequest.groupBy({
+                by: ['leaveType'],
+                where: {
+                    employeeId,
+                    status: 'approved',
+                    startDate: { gte: startOfYear, lte: endOfYear },
+                    employee: { organizationId },
+                },
+                _sum: { daysRequested: true },
+            }),
+            prisma.leaveRequest.groupBy({
+                by: ['leaveType'],
+                where: {
+                    employeeId,
+                    status: 'approved',
+                    startDate: { gte: prevStart, lte: prevEnd },
+                    employee: { organizationId },
+                },
+                _sum: { daysRequested: true },
+            }),
+        ]);
+
+        const usedDaysByType: Partial<Record<LeaveType, number>> = {};
+        current.forEach((row) => {
+            const total = row._sum.daysRequested;
+            usedDaysByType[row.leaveType] = typeof total === 'number' ? total : 0;
+        });
+
+        const usedDaysByTypePreviousYear: Partial<Record<LeaveType, number>> = {};
+        previous.forEach((row) => {
+            const total = row._sum.daysRequested;
+            usedDaysByTypePreviousYear[row.leaveType] = typeof total === 'number' ? total : 0;
+        });
+
+        return {
+            usedDaysByType,
+            usedDaysByTypePreviousYear,
+        };
+    }
+
     private async resolveApproverUserIds(employeeId: string, organizationId: string): Promise<string[]> {
         const employee = await prisma.employee.findFirst({
             where: { id: employeeId, organizationId },
@@ -138,8 +279,39 @@ export class LeaveService {
             throw new BadRequestError('Start date must be before end date');
         }
 
+        const settings = await this.getLeavePolicySettings(organizationId);
+        const holidays = settings.calendar?.holidays ? new Set(settings.calendar.holidays) : undefined;
+
         // Calculate days requested
-        const daysRequested = this.calculateBusinessDays(startDate, endDate);
+        const daysRequested = calculateBusinessDays(startDate, endDate, holidays);
+
+        await this.assertNoOverlappingLeave({
+            employeeId,
+            organizationId,
+            startDate,
+            endDate,
+        });
+
+        const leaveType = (data.leaveType as LeaveType | string) as LeaveType;
+        if (leaveType !== LeaveType.unpaid) {
+            const employeeForProration = await prisma.employee.findFirst({
+                where: { id: employeeId, organizationId },
+                select: { hireDate: true },
+            });
+            const [usage] = await Promise.all([
+                this.getLeaveUsage(employeeId, organizationId, startDate),
+            ]);
+            const balances = calculateLeaveBalances({
+                asOf: startDate,
+                settings,
+                usage,
+                hireDate: employeeForProration?.hireDate ?? null,
+            });
+            const balance = balances[leaveType];
+            if (balance && balance.remaining < daysRequested) {
+                throw new BadRequestError('Insufficient leave balance');
+            }
+        }
 
         // Check leave balance (simplified - would need proper leave balance tracking)
         // const balance = await this.getLeaveBalance(employeeId, data.leaveType);
@@ -212,7 +384,36 @@ export class LeaveService {
             if (data.startDate) updateData.startDate = startDate;
             if (data.endDate) updateData.endDate = endDate;
 
-            updateData.daysRequested = this.calculateBusinessDays(startDate, endDate);
+            const settings = await this.getLeavePolicySettings(organizationId);
+            const holidays = settings.calendar?.holidays ? new Set(settings.calendar.holidays) : undefined;
+            updateData.daysRequested = calculateBusinessDays(startDate, endDate, holidays);
+
+            await this.assertNoOverlappingLeave({
+                employeeId: leaveRequest.employeeId,
+                organizationId,
+                startDate,
+                endDate,
+                excludeLeaveRequestId: leaveRequest.id,
+            });
+
+            const nextLeaveType = ((data.leaveType ?? leaveRequest.leaveType) as unknown) as LeaveType;
+            if (nextLeaveType !== LeaveType.unpaid) {
+                const employeeForProration = await prisma.employee.findFirst({
+                    where: { id: leaveRequest.employeeId, organizationId },
+                    select: { hireDate: true },
+                });
+                const usage = await this.getLeaveUsage(leaveRequest.employeeId, organizationId, startDate);
+                const balances = calculateLeaveBalances({
+                    asOf: startDate,
+                    settings,
+                    usage,
+                    hireDate: employeeForProration?.hireDate ?? null,
+                });
+                const balance = balances[nextLeaveType];
+                if (balance && balance.remaining < updateData.daysRequested) {
+                    throw new BadRequestError('Insufficient leave balance');
+                }
+            }
         }
 
         const updated = await leaveRepository.update(id, updateData, organizationId);
@@ -230,6 +431,15 @@ export class LeaveService {
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Leave request has already been processed');
+        }
+
+        const isAllowed = await this.isApproverAllowed({
+            employeeId: leaveRequest.employeeId,
+            approverEmployeeId: approverId,
+            organizationId,
+        });
+        if (!isAllowed) {
+            throw new BadRequestError('You are not allowed to approve this leave request');
         }
 
         const updated = await leaveRepository.update(id, {
@@ -267,6 +477,15 @@ export class LeaveService {
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Leave request has already been processed');
+        }
+
+        const isAllowed = await this.isApproverAllowed({
+            employeeId: leaveRequest.employeeId,
+            approverEmployeeId: approverId,
+            organizationId,
+        });
+        if (!isAllowed) {
+            throw new BadRequestError('You are not allowed to reject this leave request');
         }
 
         const updated = await leaveRepository.update(id, {
@@ -329,43 +548,33 @@ export class LeaveService {
     }
 
     /**
-     * Calculate business days between two dates
-     */
-    private calculateBusinessDays(startDate: Date, endDate: Date): number {
-        let count = 0;
-        const current = new Date(startDate);
-
-        while (current <= endDate) {
-            const dayOfWeek = current.getDay();
-            // Skip weekends (0 = Sunday, 6 = Saturday)
-            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-                count++;
-            }
-            current.setDate(current.getDate() + 1);
-        }
-
-        return count;
-    }
-
-    /**
      * Get leave balance for employee (simplified)
      */
     async getLeaveBalance(employeeId: string, organizationId: string, leaveType?: string) {
         const employee = await prisma.employee.findFirst({
             where: { id: employeeId, organizationId },
-            select: { id: true },
+            select: { id: true, hireDate: true },
         });
         if (!employee) {
             throw new NotFoundError('Employee not found');
         }
 
-        // This would connect to a leave balance table
-        // For now, return mock data
-        return {
-            annual: { total: 20, used: 5, remaining: 15 },
-            sick: { total: 10, used: 2, remaining: 8 },
-            casual: { total: 5, used: 1, remaining: 4 },
-        };
+        const asOf = new Date();
+        const settings = await this.getLeavePolicySettings(organizationId);
+        const usage = await this.getLeaveUsage(employeeId, organizationId, asOf);
+        const balances = calculateLeaveBalances({
+            asOf,
+            settings,
+            usage,
+            hireDate: employee.hireDate,
+        });
+
+        if (leaveType) {
+            const key = leaveType as keyof typeof balances;
+            return { [leaveType]: balances[key] };
+        }
+
+        return balances;
     }
 }
 

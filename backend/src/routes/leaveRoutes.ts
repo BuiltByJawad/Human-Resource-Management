@@ -7,6 +7,7 @@ import { leaveRequestSchema } from '@/validators'
 import { validateRequest, validateParams, validateQuery } from '@/shared/middleware/validation'
 import { NotFoundError } from '@/shared/utils/errors'
 import Joi from 'joi'
+import { leaveService } from '@/modules/leave/leave.service'
 
 const router = Router()
 
@@ -29,9 +30,15 @@ router.get(
     const { page, limit, status, employeeId } = req.query as any
     const skip = (page - 1) * limit
 
+    const authReq = req as AuthRequest
+    const organizationId = authReq.user?.organizationId ?? null
+
     const where: any = {}
     if (status) where.status = status
     if (employeeId) where.employeeId = employeeId
+    if (organizationId) {
+      where.employee = { organizationId }
+    }
 
     const [leaveRequests, total] = await Promise.all([
       prisma.leaveRequest.findMany({
@@ -67,6 +74,9 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
 
+    const authReq = req as AuthRequest
+    const organizationId = authReq.user?.organizationId ?? null
+
     const leaveRequest = await prisma.leaveRequest.findUnique({
       where: { id },
       include: {
@@ -74,6 +84,16 @@ router.get(
         approver: { select: { id: true, firstName: true, lastName: true } },
       },
     })
+
+    if (leaveRequest && organizationId && leaveRequest.employee?.id) {
+      const employee = await prisma.employee.findFirst({
+        where: { id: leaveRequest.employee.id, organizationId },
+        select: { id: true },
+      })
+      if (!employee) {
+        throw new NotFoundError('Leave request')
+      }
+    }
 
     if (!leaveRequest) {
       throw new NotFoundError('Leave request')
@@ -91,25 +111,14 @@ router.post(
   authenticate,
   validateRequest(leaveRequestSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const leaveData = req.body
-    const employeeId = req.user!.id
+    const organizationId = req.user?.organizationId
+    const employeeId = req.user?.employeeId
 
-    const startDate = new Date(leaveData.startDate)
-    const endDate = new Date(leaveData.endDate)
-    const daysRequested = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    if (!organizationId || !employeeId) {
+      throw new NotFoundError('Employee')
+    }
 
-    const leaveRequest = await prisma.leaveRequest.create({
-      data: {
-        ...leaveData,
-        employeeId,
-        daysRequested,
-        startDate,
-        endDate,
-      },
-      include: {
-        employee: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    })
+    const leaveRequest = await leaveService.create(employeeId, req.body, organizationId)
 
     res.status(201).json({
       success: true,
@@ -126,34 +135,14 @@ router.put(
   validateParams(paramsSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { id } = req.params
-    const approverId = req.user!.id
+    const organizationId = req.user?.organizationId
+    const approverId = req.user?.employeeId
 
-    const leaveRequest = await prisma.leaveRequest.findUnique({
-      where: { id },
-    })
-
-    if (!leaveRequest) {
-      throw new NotFoundError('Leave request')
+    if (!organizationId || !approverId) {
+      throw new NotFoundError('Employee')
     }
 
-    if (leaveRequest.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        error: 'Leave request has already been processed',
-      })
-    }
-
-    const updatedLeaveRequest = await prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        status: 'approved',
-        approverId,
-      },
-      include: {
-        employee: { select: { id: true, firstName: true, lastName: true, email: true } },
-        approver: { select: { id: true, firstName: true, lastName: true } },
-      },
-    })
+    const updatedLeaveRequest = await leaveService.approve(id, approverId, undefined, organizationId)
 
     res.json({
       success: true,
@@ -170,34 +159,14 @@ router.put(
   validateParams(paramsSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { id } = req.params
-    const approverId = req.user!.id
+    const organizationId = req.user?.organizationId
+    const approverId = req.user?.employeeId
 
-    const leaveRequest = await prisma.leaveRequest.findUnique({
-      where: { id },
-    })
-
-    if (!leaveRequest) {
-      throw new NotFoundError('Leave request')
+    if (!organizationId || !approverId) {
+      throw new NotFoundError('Employee')
     }
 
-    if (leaveRequest.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        error: 'Leave request has already been processed',
-      })
-    }
-
-    const updatedLeaveRequest = await prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        status: 'rejected',
-        approverId,
-      },
-      include: {
-        employee: { select: { id: true, firstName: true, lastName: true, email: true } },
-        approver: { select: { id: true, firstName: true, lastName: true } },
-      },
-    })
+    const updatedLeaveRequest = await leaveService.reject(id, approverId, req.body, organizationId)
 
     res.json({
       success: true,

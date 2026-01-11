@@ -3,15 +3,16 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import { errorHandler } from '@/shared/middleware/errorHandler';
 import { logger, stream } from '@/shared/config/logger';
+import { rateLimiter } from '@/shared/middleware/security';
 import routes from './routes';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from '@/shared/config/swagger';
+import { cookieMiddleware } from '@/shared/middleware/cookies';
 
 export const prisma = new PrismaClient();
 
@@ -33,7 +34,13 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.set('io', io);
 
   // Security Middleware
-  // app.use(helmet({ ... })); // Temporarily disabled to debug 500 error
+  app.use(
+    helmet({
+      // Avoid breaking Swagger UI and other embedded resources.
+      contentSecurityPolicy: false,
+    })
+  );
+  app.use(rateLimiter);
 
   app.use(compression());
 
@@ -47,7 +54,7 @@ export const createApp = (): { app: Application; httpServer: any } => {
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Tenant-Slug'],
   };
 
   app.use(cors(corsOptions));
@@ -59,12 +66,18 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+  // Cookies (for httpOnly refresh tokens)
+  app.use(cookieMiddleware);
+
   // Request logging
   app.use(morgan('combined', { stream }));
 
 
   // Prometheus metrics endpoint
   app.get('/metrics', async (req: Request, res: Response) => {
+    if (process.env.NODE_ENV === 'production' && process.env.EXPOSE_METRICS !== 'true') {
+      return res.status(404).json({ status: 'error', message: 'Not Found' });
+    }
     try {
       const { register } = await import('@/shared/utils/metrics');
       res.set('Content-Type', register.contentType);
@@ -75,10 +88,16 @@ export const createApp = (): { app: Application; httpServer: any } => {
   });
 
   // API Documentation
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'HRM API Documentation',
-  }));
+  if (process.env.NODE_ENV !== 'production' || process.env.EXPOSE_API_DOCS === 'true') {
+    app.use(
+      '/api-docs',
+      swaggerUi.serve,
+      swaggerUi.setup(swaggerSpec, {
+        customCss: '.swagger-ui .topbar { display: none }',
+        customSiteTitle: 'HRM API Documentation',
+      })
+    );
+  }
 
   // Mount API routes
   app.use('/api', routes);
@@ -128,20 +147,15 @@ export const createApp = (): { app: Application; httpServer: any } => {
           timestamp: new Date().toISOString(),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Readiness check failed';
       res.status(503).json({
         ready: false,
-        reason: error.message,
+        reason: message,
         timestamp: new Date().toISOString(),
       });
     }
   });
-
-
-
-  // Mount API Routes
-  app.use('/api', routes); // Use the imported router
-
   // 404 handler
   app.use((req: Request, res: Response) => {
     res.status(404).json({

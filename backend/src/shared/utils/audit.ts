@@ -1,13 +1,14 @@
 import { Request } from 'express'
 import { prisma } from '../config/database'
 import { logger } from '../config/logger'
+import { Prisma } from '@prisma/client'
 
 interface AuditLogInput {
   userId: string
   action: string
   resourceId?: string
-  oldValues?: unknown
-  newValues?: unknown
+  oldValues?: Prisma.InputJsonValue
+  newValues?: Prisma.InputJsonValue
   req?: Request
 }
 
@@ -28,8 +29,8 @@ export const createAuditLog = async ({
         userId,
         action,
         resourceId: resourceId ?? null,
-        oldValues: oldValues as any,
-        newValues: newValues as any,
+        oldValues: oldValues === undefined ? undefined : oldValues,
+        newValues: newValues === undefined ? undefined : newValues,
         ipAddress: ipAddress ?? null,
         userAgent: userAgent ?? null,
       },

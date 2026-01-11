@@ -2,9 +2,12 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '@/shared/middleware/errorHandler'
 import { BadRequestError } from '@/shared/utils/errors'
 import { AuthRequest } from '@/shared/middleware/auth'
+import { createAuditLog } from '@/shared/utils/audit'
 import { prisma } from '@/shared/config/database'
 import cloudinary from '@/shared/config/cloudinary'
 import { TenantRequest } from '@/shared/middleware/tenant'
+import { Prisma } from '@prisma/client'
+import Joi from 'joi'
 
 // Helper to get full URL for uploads (supports Cloudinary + local disk)
 const getFileUrl = (req: Request, file: any) => {
@@ -75,6 +78,121 @@ const ensureSettings = async (organizationId?: string | null) => {
 
   return settings
 }
+
+const ensureOrganization = async (organizationId?: string | null) => {
+  if (!organizationId) {
+    throw new BadRequestError('Organization not found')
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, settings: true },
+  })
+
+  if (!org) {
+    throw new BadRequestError('Organization not found')
+  }
+
+  return org
+}
+
+const hasLeavePolicyManagePermission = (req: AuthRequest): boolean => {
+  const roleName = req.user?.role
+  if (roleName === 'Super Admin') return true
+
+  const perms = Array.isArray(req.user?.permissions) ? req.user?.permissions : []
+  return perms.includes('leave_policies.manage')
+}
+
+const leavePolicySchema = Joi.object({
+  policies: Joi.object()
+    .pattern(
+      Joi.string().valid('annual', 'sick', 'personal', 'maternity', 'paternity', 'unpaid'),
+      Joi.object({
+        annualEntitlementDays: Joi.number().min(0).max(365).required(),
+        carryForwardMaxDays: Joi.number().min(0).max(365).optional(),
+        accrual: Joi.object({
+          enabled: Joi.boolean().required(),
+          frequency: Joi.string().valid('monthly').required(),
+        }).optional(),
+      })
+    )
+    .required(),
+  calendar: Joi.object({
+    holidays: Joi.array().items(Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/)).max(366).optional(),
+  }).optional(),
+}).required()
+
+const toSettingsObject = (value: unknown): Record<string, unknown> => {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
+// Get leave policy settings (stored under CompanySettings.settings.leave)
+export const getLeavePolicy = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!hasLeavePolicyManagePermission(req)) {
+    throw new BadRequestError('Missing permission: leave_policies.manage')
+  }
+
+  const org = await ensureOrganization(req.user?.organizationId ?? null)
+  const root = toSettingsObject(org.settings)
+  const leave = toSettingsObject(root.leave)
+
+  res.json({
+    success: true,
+    data: leave,
+  })
+})
+
+// Update leave policy settings (stored under CompanySettings.settings.leave)
+export const updateLeavePolicy = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!hasLeavePolicyManagePermission(req)) {
+    throw new BadRequestError('Missing permission: leave_policies.manage')
+  }
+
+  const { error, value } = leavePolicySchema.validate(req.body, { abortEarly: false, stripUnknown: true })
+  if (error) {
+    throw new BadRequestError(error.message)
+  }
+
+  const org = await ensureOrganization(req.user?.organizationId ?? null)
+  const root = toSettingsObject(org.settings)
+  const previousLeave = toSettingsObject(root.leave)
+
+  const nextSettings: Record<string, unknown> = {
+    ...root,
+    leave: value,
+  }
+
+  const updated = await prisma.organization.update({
+    where: { id: org.id },
+    data: {
+      settings: nextSettings as unknown as Prisma.InputJsonValue,
+    },
+    select: { settings: true },
+  })
+
+  const updatedRoot = toSettingsObject(updated.settings)
+
+  const actorUserId = req.user?.id
+  if (actorUserId) {
+    await createAuditLog({
+      userId: actorUserId,
+      action: 'leave_policies.update',
+      resourceId: org.id,
+      oldValues: ({ leave: previousLeave } as unknown) as Prisma.InputJsonValue,
+      newValues: ({ leave: toSettingsObject(updatedRoot.leave) } as unknown) as Prisma.InputJsonValue,
+      req,
+    })
+  }
+
+  res.json({
+    success: true,
+    data: toSettingsObject(updatedRoot.leave),
+  })
+})
 
 // Upload organization logo
 export const uploadBrandLogo = asyncHandler(async (req: AuthRequest, res: Response) => {
