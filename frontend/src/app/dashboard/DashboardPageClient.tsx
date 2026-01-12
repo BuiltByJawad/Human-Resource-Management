@@ -161,7 +161,7 @@ export function DashboardPageClient({
         timeZone: 'UTC',
       })
 
-      return leaveRequests.map((leave) => {
+      return leaveRequests.map((leave, index) => {
         const createdAt = leave.createdAt ? new Date(leave.createdAt) : null
         const timestamp = createdAt ? dateFormatter.format(createdAt) : ''
 
@@ -170,7 +170,7 @@ export function DashboardPageClient({
         }`.trim() || 'Employee'
 
         return {
-          id: leave.id ?? crypto.randomUUID(),
+          id: leave.id ?? `leave-${leave.createdAt ?? 'unknown'}-${index}`,
           type: 'leave' as const,
           description: leave.reason ? `requested leave: ${leave.reason}` : 'requested leave',
           timestamp,
@@ -230,6 +230,23 @@ export function DashboardPageClient({
     !hasKnownUpcomingEvents &&
     (isUserHydrating || upcomingEventsQuery.isLoading) &&
     upcomingEvents.length === 0
+
+  const recentActivityTimestampFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC',
+  })
+
+  const getActivityTimestamp = (value: string): string => {
+    if (!value) return ''
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) {
+      return recentActivityTimestampFormatter.format(parsed)
+    }
+    return value
+  }
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -350,7 +367,7 @@ export function DashboardPageClient({
                           <p className="text-sm text-gray-900">
                             <span className="font-medium">{activity.employee}</span> {activity.description}
                           </p>
-                          <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                          <p className="text-xs text-gray-500">{getActivityTimestamp(activity.timestamp)}</p>
                         </div>
                       </div>
                     ))

@@ -306,7 +306,7 @@ export const useAuthStore = create<AuthState>()(
                 refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
                     const { refreshToken, token, user, rememberMe } = get()
                     try {
-                        const requestBody = { rememberMe }
+                        const requestBody = refreshToken ? { rememberMe, refreshToken } : { rememberMe }
                         const tenantSlug = getClientTenantSlug()
                         const response = await fetch('/api/auth/refresh', {
                             method: 'POST',

@@ -71,7 +71,7 @@ export const generate = asyncHandler(async (req: Request, res: Response) => {
 export const updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
     const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const record = await payrollService.updateStatus(req.params.id, req.body, organizationId);
+    const record = await payrollService.updateStatus(req.params.id, req.body, organizationId, authReq.user?.id);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =

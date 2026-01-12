@@ -4,12 +4,15 @@ export interface GeneratePayrollDto {
 }
 
 export interface UpdatePayrollStatusDto {
-    status: 'draft' | 'approved' | 'paid';
+    status: 'draft' | 'processed' | 'paid';
+    paidAt?: string;
+    paymentMethod?: string;
+    paymentReference?: string;
 }
 
 export interface PayrollQueryDto {
     payPeriod?: string;
-    status?: 'draft' | 'approved' | 'paid';
+    status?: 'draft' | 'processed' | 'paid';
     employeeId?: string;
     page?: number;
     limit?: number;

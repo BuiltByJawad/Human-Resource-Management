@@ -135,6 +135,7 @@ model User {
   // Backlink to Employee (Employee.userId)
   employee Employee?
   notifications Notification[]
+  payrollPaidRecords PayrollRecord[] @relation("PayrollPaidBy")
   scheduledReportsCreated ScheduledReport[]
   scheduledReportRecipients ScheduledReportRecipient[]
 
@@ -394,11 +395,16 @@ model PayrollRecord {
   deductionsBreakdown Json?
   attendanceSummary   Json?
   processedAt         DateTime?
+  paidAt              DateTime?
+  paymentMethod       String?
+  paymentReference    String?
+  paidByUserId        String?
   status              PayrollStatus @default(processed)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
   employee Employee @relation(fields: [employeeId], references: [id])
+  paidBy   User?    @relation("PayrollPaidBy", fields: [paidByUserId], references: [id])
 
   @@unique([employeeId, payPeriod], name: "employeeId_payPeriod")
 }

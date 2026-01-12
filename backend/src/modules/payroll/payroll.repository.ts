@@ -199,17 +199,40 @@ export class PayrollRepository {
         });
     }
 
-    async updateStatus(id: string, status: string) {
+    async updateStatus(
+        id: string,
+        data: {
+            status: string;
+            paidAt?: Date;
+            paymentMethod?: string;
+            paymentReference?: string;
+            paidByUserId?: string;
+        },
+    ) {
         return prisma.payrollRecord.update({
             where: { id },
             data: {
-                status: status as any,
-                processedAt: status === 'paid' ? new Date() : undefined,
+                status: data.status as any,
+                processedAt: data.status === 'processed' ? new Date() : undefined,
+                paidAt: data.status === 'paid' ? data.paidAt : undefined,
+                paymentMethod: data.status === 'paid' ? data.paymentMethod : undefined,
+                paymentReference: data.status === 'paid' ? data.paymentReference : undefined,
+                paidByUserId: data.status === 'paid' ? data.paidByUserId : undefined,
             },
         });
     }
 
-    async updateStatusScoped(id: string, status: string, organizationId: string) {
+    async updateStatusScoped(
+        id: string,
+        data: {
+            status: string;
+            paidAt?: Date;
+            paymentMethod?: string;
+            paymentReference?: string;
+            paidByUserId?: string;
+        },
+        organizationId: string,
+    ) {
         const result = await prisma.payrollRecord.updateMany({
             where: {
                 id,
@@ -218,8 +241,12 @@ export class PayrollRepository {
                 },
             },
             data: {
-                status: status as any,
-                processedAt: status === 'paid' ? new Date() : undefined,
+                status: data.status as any,
+                processedAt: data.status === 'processed' ? new Date() : undefined,
+                paidAt: data.status === 'paid' ? data.paidAt : null,
+                paymentMethod: data.status === 'paid' ? data.paymentMethod : null,
+                paymentReference: data.status === 'paid' ? data.paymentReference : null,
+                paidByUserId: data.status === 'paid' ? data.paidByUserId : null,
             },
         });
 

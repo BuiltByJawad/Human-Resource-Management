@@ -720,11 +720,14 @@ export async function generatePayroll(
 export async function updatePayrollStatus(
 	payrollId: string,
 	status: PayrollRecord['status'],
-	token?: string,
+	tokenOrMeta?: string | { paidAt?: string; paymentMethod?: string; paymentReference?: string },
+	tokenMaybe?: string,
 ): Promise<void> {
-	await api.patch(
+	const token = typeof tokenOrMeta === 'string' ? tokenOrMeta : tokenMaybe
+	const meta = typeof tokenOrMeta === 'object' && tokenOrMeta !== null ? tokenOrMeta : undefined
+	await api.put(
 		`/payroll/${payrollId}/status`,
-		{ status },
+		{ status, ...(meta ?? {}) },
 		withAuthConfig(token),
 	)
 }
@@ -852,9 +855,16 @@ export async function fetchPerformanceReviews(
 	token?: string,
 ): Promise<PerformanceReview[]> {
 	if (!userId) return []
-	const response = await api.get(`/performance/reviews/${userId}`, withAuthConfig(token))
-	const payload = response.data?.data ?? response.data
-	return Array.isArray(payload) ? (payload as PerformanceReview[]) : []
+	const response = await api.get('/performance/reviews', {
+		params: { employeeId: userId },
+		...withAuthConfig(token),
+	})
+	const payload = response.data
+	const root = payload?.data ?? payload
+	if (Array.isArray(root)) return root as PerformanceReview[]
+	if (Array.isArray(root?.reviews)) return root.reviews as PerformanceReview[]
+	if (Array.isArray(payload?.reviews)) return payload.reviews as PerformanceReview[]
+	return []
 }
 
 export async function createPerformanceCycle(

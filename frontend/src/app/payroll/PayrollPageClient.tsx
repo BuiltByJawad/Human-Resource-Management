@@ -15,6 +15,7 @@ import { PayslipModal } from "@/components/hrm/PayslipModal"
 import GeneratePayrollModal from "@/components/hrm/GeneratePayrollModal"
 import ExportPayrollModal from "@/components/hrm/ExportPayrollModal"
 import PayrollConfigModal from "@/components/hrm/PayrollConfigModal"
+import MarkPayrollPaidModal, { type MarkPayrollPaidPayload } from "@/components/hrm/MarkPayrollPaidModal"
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
 import { useAuthStore } from "@/store/useAuthStore"
@@ -53,6 +54,7 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [overrideTarget, setOverrideTarget] = useState<{ employeeId: string; payPeriod: string } | null>(null)
+  const [markPaidTarget, setMarkPaidTarget] = useState<{ id: string } | null>(null)
   const [hasHydrated, setHasHydrated] = useState(false)
 
   useEffect(() => {
@@ -65,9 +67,13 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
     return unsub
   }, [])
 
-  const canViewPayroll = hasHydrated && hasPermission(PERMISSIONS.VIEW_PAYROLL)
-  const canConfigurePayroll = hasHydrated && hasPermission(PERMISSIONS.CONFIGURE_PAYROLL)
-  const canManagePayroll = hasHydrated && hasPermission(PERMISSIONS.MANAGE_PAYROLL)
+  const canViewPayrollAction = hasHydrated && hasPermission(PERMISSIONS.VIEW_PAYROLL)
+  const canConfigurePayrollAction = hasHydrated && hasPermission(PERMISSIONS.CONFIGURE_PAYROLL)
+  const canManagePayrollAction = hasHydrated && hasPermission(PERMISSIONS.MANAGE_PAYROLL)
+
+  const canViewPayrollUi = !hasHydrated || canViewPayrollAction
+  const canConfigurePayrollUi = !hasHydrated || canConfigurePayrollAction
+  const canManagePayrollUi = !hasHydrated || canManagePayrollAction
 
   const payrollQuery = useQuery<PayrollRecord[]>({
     queryKey: ["payroll", "list"],
@@ -146,8 +152,9 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
     const list = Array.isArray(payrollQuery.data) ? payrollQuery.data : []
     const total = list.reduce((acc, curr) => acc + Number(curr.netSalary ?? 0), 0)
     const pending = list.filter((r) => r.status === "draft").length
-    const processed = list.filter((r) => r.status === "paid").length
-    return { totalCost: total, pendingCount: pending, processedCount: processed }
+    const approved = list.filter((r) => r.status === "processed").length
+    const paid = list.filter((r) => r.status === "paid").length
+    return { totalCost: total, pendingCount: pending, approvedCount: approved, paidCount: paid }
   }, [payrollQuery.data])
 
   const generateMutation = useMutation({
@@ -165,8 +172,16 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
   })
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: PayrollRecord["status"] }) =>
-      updatePayrollStatus(id, status, token ?? undefined),
+    mutationFn: (args: {
+      id: string
+      status: PayrollRecord["status"]
+      meta?: MarkPayrollPaidPayload
+    }) => {
+      if (args.meta) {
+        return updatePayrollStatus(args.id, args.status, args.meta, token ?? undefined)
+      }
+      return updatePayrollStatus(args.id, args.status, token ?? undefined)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll", "list"] })
     },
@@ -225,12 +240,17 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
         <div className="flex space-x-2 justify-end">
           <button
             onClick={() => {
-              if (!canManagePayroll) return
+              if (!canManagePayrollAction) {
+                if (!hasHydrated) {
+                  showToast('Loading permissions...', 'info')
+                }
+                return
+              }
               setOverrideTarget({ employeeId: record.employeeId, payPeriod: record.payPeriod })
             }}
-            disabled={!canManagePayroll}
+            disabled={hasHydrated && !canManagePayrollAction}
             className={`p-1 ${
-              canManagePayroll
+              canManagePayrollUi
                 ? "text-gray-700 hover:text-gray-900"
                 : "text-gray-300 cursor-not-allowed"
             }`}
@@ -250,7 +270,17 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
           </button>
           {record.status === "draft" && (
             <button
-              onClick={() => statusMutation.mutate({ id: record.id, status: "paid" })}
+              onClick={() => statusMutation.mutate({ id: record.id, status: "processed" })}
+              disabled={statusMutation.isPending}
+              className="text-blue-600 hover:text-blue-900 p-1 disabled:opacity-50"
+              title="Approve Payroll"
+            >
+              <CheckCircleIcon className="h-5 w-5" />
+            </button>
+          )}
+          {record.status === "processed" && (
+            <button
+              onClick={() => setMarkPaidTarget({ id: record.id })}
               disabled={statusMutation.isPending}
               className="text-green-600 hover:text-green-900 p-1 disabled:opacity-50"
               title="Mark as Paid"
@@ -275,71 +305,115 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
                 <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Payroll Management</h1>
                 <p className="text-sm text-gray-500 mt-1">Manage salaries, payslips, and payments.</p>
               </div>
+
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setIsExportModalOpen(true)}
-                  disabled={!canViewPayroll}
+                  onClick={() => {
+                    if (!canViewPayrollAction) {
+                      if (!hasHydrated) {
+                        showToast('Loading permissions...', 'info');
+                      }
+                      return;
+                    }
+                    setIsExportModalOpen(true);
+                  }}
+                  disabled={hasHydrated && !canViewPayrollAction}
                   className={`px-4 py-2 rounded-lg flex items-center shadow-lg transition-all active:scale-95 ${
-                    canViewPayroll
-                      ? "bg-gray-900 text-white hover:bg-gray-800 shadow-gray-900/20 hover:scale-105"
-                      : "bg-gray-200 text-gray-400 shadow-gray-900/0 cursor-not-allowed"
+                    canViewPayrollUi
+                      ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-gray-900/20 hover:scale-105'
+                      : 'bg-gray-200 text-gray-400 shadow-gray-900/0 cursor-not-allowed'
                   }`}
                 >
                   Export Period CSV
                 </button>
+
                 <button
-                  onClick={() => setIsConfigModalOpen(true)}
-                  disabled={!canConfigurePayroll}
-                  className={`px-4 py-2 rounded-lg flex items-center shadow-lg transition-all active:scale-95 ring-1 ring-inset ${
-                    canConfigurePayroll
-                      ? "bg-white text-gray-900 hover:bg-gray-50 shadow-gray-900/10 hover:scale-105 ring-gray-200"
-                      : "bg-gray-100 text-gray-400 shadow-gray-900/0 cursor-not-allowed ring-gray-100"
+                  onClick={() => {
+                    if (!canConfigurePayrollAction) {
+                      if (!hasHydrated) {
+                        showToast('Loading permissions...', 'info');
+                      }
+                      return;
+                    }
+                    setIsConfigModalOpen(true);
+                  }}
+                  disabled={hasHydrated && !canConfigurePayrollAction}
+                  className={`px-4 py-2 rounded-lg flex items-center shadow-lg transition-all active:scale-95 ${
+                    canConfigurePayrollUi
+                      ? 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:scale-105'
+                      : 'bg-gray-200 text-gray-400 shadow-gray-900/0 cursor-not-allowed'
                   }`}
                 >
                   Configure Payroll
                 </button>
+
                 <button
-                  onClick={() => setIsGenerateModalOpen(true)}
-                  disabled={generateMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-60"
+                  onClick={() => {
+                    if (!canManagePayrollAction) {
+                      if (!hasHydrated) {
+                        showToast('Loading permissions...', 'info');
+                      }
+                      return;
+                    }
+                    setIsGenerateModalOpen(true);
+                  }}
+                  disabled={hasHydrated && !canManagePayrollAction}
+                  className={`px-4 py-2 rounded-lg flex items-center shadow-lg transition-all active:scale-95 ${
+                    canManagePayrollUi
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20 hover:scale-105'
+                      : 'bg-gray-200 text-gray-400 shadow-gray-900/0 cursor-not-allowed'
+                  }`}
                 >
-                  <BanknotesIcon className="h-5 w-5 mr-2" />
-                  {generateMutation.isPending ? "Generating..." : "Generate Payroll"}
+                  Generate Payroll
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Total Cost (Period)</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">${stats.totalCost.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-gray-900">${stats.totalCost.toFixed(2)}</p>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <BanknotesIcon className="h-6 w-6" />
+                  <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+                    <BanknotesIcon className="h-6 w-6 text-blue-600" />
                   </div>
                 </div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Pending (Draft)</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">{stats.pendingCount}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.pendingCount}</p>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center">
-                    <ClockIcon className="h-6 w-6" />
+                  <div className="h-12 w-12 rounded-full bg-yellow-50 flex items-center justify-center">
+                    <ClockIcon className="h-6 w-6 text-yellow-600" />
                   </div>
                 </div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Processed (Paid)</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">{stats.processedCount}</p>
+                    <p className="text-sm font-medium text-gray-500">Approved (Processed)</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.approvedCount}</p>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
-                    <CheckCircleIcon className="h-6 w-6" />
+                  <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+                    <CheckCircleIcon className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Paid</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.paidCount}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center">
+                    <CheckCircleIcon className="h-6 w-6 text-green-600" />
                   </div>
                 </div>
               </div>
@@ -412,6 +486,16 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
             : undefined
         }
         deleteLabel="Remove Override"
+      />
+
+      <MarkPayrollPaidModal
+        isOpen={!!markPaidTarget}
+        onClose={() => setMarkPaidTarget(null)}
+        onConfirm={async (payload) => {
+          if (!markPaidTarget) return
+          await statusMutation.mutateAsync({ id: markPaidTarget.id, status: "paid", meta: payload })
+          showToast("Payroll marked as paid", "success")
+        }}
       />
     </div>
   )
