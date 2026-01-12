@@ -20,10 +20,48 @@ type PayrollConfigModalProps = {
 
 const emptyConfig: PayrollConfig = { allowances: [], deductions: [] }
 
-const createEmptyItem = (): PayrollConfigItem => ({
+type DraftPayrollConfigItem = PayrollConfigItem & { id: string }
+type DraftPayrollConfig = { allowances: DraftPayrollConfigItem[]; deductions: DraftPayrollConfigItem[] }
+
+const createStableId = (): string => {
+	try {
+		return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+			? crypto.randomUUID()
+			: `${Date.now()}-${Math.random().toString(16).slice(2)}`
+	} catch {
+		return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+	}
+}
+
+const createEmptyItem = (): DraftPayrollConfigItem => ({
+	id: createStableId(),
 	name: '',
 	type: 'percentage',
 	value: 0,
+})
+
+const normalizeConfig = (config: PayrollConfig | null | undefined): DraftPayrollConfig => {
+	const allowancesRaw = Array.isArray(config?.allowances) ? config.allowances : []
+	const deductionsRaw = Array.isArray(config?.deductions) ? config.deductions : []
+	return {
+		allowances: allowancesRaw.map((it, index) => ({
+			id: `${createStableId()}-a-${index}`,
+			name: it?.name ?? '',
+			type: it?.type === 'fixed' ? 'fixed' : 'percentage',
+			value: typeof it?.value === 'number' && Number.isFinite(it.value) ? it.value : 0,
+		})),
+		deductions: deductionsRaw.map((it, index) => ({
+			id: `${createStableId()}-d-${index}`,
+			name: it?.name ?? '',
+			type: it?.type === 'fixed' ? 'fixed' : 'percentage',
+			value: typeof it?.value === 'number' && Number.isFinite(it.value) ? it.value : 0,
+		})),
+	}
+}
+
+const toPersistedConfig = (draft: DraftPayrollConfig): PayrollConfig => ({
+	allowances: (Array.isArray(draft.allowances) ? draft.allowances : []).map(({ id: _id, ...rest }) => rest),
+	deductions: (Array.isArray(draft.deductions) ? draft.deductions : []).map(({ id: _id, ...rest }) => rest),
 })
 
 const normalizeNumber = (value: string): number => {
@@ -41,13 +79,13 @@ export default function PayrollConfigModal({
 	deleteLabel,
 }: PayrollConfigModalProps) {
 	const [tab, setTab] = useState<Tab>('allowances')
-	const [draft, setDraft] = useState<PayrollConfig>(emptyConfig)
+	const [draft, setDraft] = useState<DraftPayrollConfig>(normalizeConfig(emptyConfig))
 	const [saving, setSaving] = useState(false)
 	const [deleting, setDeleting] = useState(false)
 
 	useEffect(() => {
 		if (!isOpen) return
-		setDraft(initialConfig ?? emptyConfig)
+		setDraft(normalizeConfig(initialConfig ?? emptyConfig))
 		setTab('allowances')
 	}, [isOpen, initialConfig])
 
@@ -58,7 +96,9 @@ export default function PayrollConfigModal({
 	const updateItem = (index: number, next: PayrollConfigItem) => {
 		setDraft((prev) => {
 			const nextItems = [...(tab === 'allowances' ? prev.allowances : prev.deductions)]
-			nextItems[index] = next
+			const existing = nextItems[index]
+			if (!existing) return prev
+			nextItems[index] = { ...next, id: existing.id }
 			return tab === 'allowances'
 				? { ...prev, allowances: nextItems }
 				: { ...prev, deductions: nextItems }
@@ -84,7 +124,7 @@ export default function PayrollConfigModal({
 	}
 
 	const canSave = useMemo(() => {
-		const all = [...draft.allowances, ...draft.deductions]
+		const all = [...(Array.isArray(draft.allowances) ? draft.allowances : []), ...(Array.isArray(draft.deductions) ? draft.deductions : [])]
 		if (all.length === 0) return true
 		return all.every((it) => it.name.trim().length > 0 && it.value >= 0)
 	}, [draft.allowances, draft.deductions])
@@ -93,7 +133,7 @@ export default function PayrollConfigModal({
 		if (!canSave) return
 		setSaving(true)
 		try {
-			await onSave(draft)
+			await onSave(toPersistedConfig(draft))
 			onClose()
 		} finally {
 			setSaving(false)
@@ -199,7 +239,7 @@ export default function PayrollConfigModal({
 												</div>
 											) : (
 												items.map((item, index) => (
-													<div key={index} className="rounded-xl border border-gray-200 bg-white p-4">
+													<div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4">
 														<div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
 															<div className="sm:col-span-6">
 																<label className="block text-xs font-medium text-gray-600">Name</label>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePathname, useRouter } from 'next/navigation'
 import api from '@/lib/axios'
@@ -42,8 +42,24 @@ export function PostLoginPrefetcher() {
   const queryClient = useQueryClient()
   const didPrefetch = useRef(false)
   const didRehydrate = useRef(false)
+  const [hasHydrated, setHasHydrated] = useState(false)
+
+  // Wait for Zustand persist middleware to rehydrate from storage
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setHasHydrated(true)
+    })
+    // If already hydrated (e.g., fast restore), set immediately
+    if (useAuthStore.persist.hasHydrated()) {
+      setHasHydrated(true)
+    }
+    return unsub
+  }, [])
 
   useEffect(() => {
+    // Don't run auth logic until store has rehydrated
+    if (!hasHydrated) return
+
     if (didRehydrate.current) return
     const isAuthPage = pathname === '/login' || pathname.startsWith('/auth')
     if (isAuthPage) return
@@ -60,7 +76,7 @@ export function PostLoginPrefetcher() {
         router.replace('/login')
       }
     })()
-  }, [isAuthenticated, token, refreshSession, pathname, router])
+  }, [hasHydrated, isAuthenticated, token, refreshSession, pathname, router])
 
   useEffect(() => {
     if (!isAuthenticated || !token || didPrefetch.current) return

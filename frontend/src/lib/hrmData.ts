@@ -890,6 +890,116 @@ export interface ReportsFilterParams {
   departmentId?: string | null
 }
 
+export type ScheduledReportType = 'employees' | 'attendance' | 'leave' | 'payroll'
+export type ScheduledReportFormat = 'csv' | 'pdf'
+export type ScheduledReportFrequency = 'daily' | 'weekly' | 'monthly'
+
+export interface ScheduledReportRecipientUser {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+}
+
+export interface ScheduledReportRecipient {
+  id: string
+  userId: string
+  user?: ScheduledReportRecipientUser
+}
+
+export interface ScheduledReportRun {
+  id: string
+  status: 'queued' | 'running' | 'success' | 'failed'
+  startedAt?: string | null
+  finishedAt?: string | null
+  errorMessage?: string | null
+  deliveredCount: number
+  createdAt: string
+}
+
+export interface ScheduledReport {
+  id: string
+  organizationId: string
+  name: string
+  type: ScheduledReportType
+  format: ScheduledReportFormat
+  frequency: ScheduledReportFrequency
+  filters?: ReportsFilterParams | null
+  isEnabled: boolean
+  nextRunAt?: string | null
+  lastRunAt?: string | null
+  createdByUserId: string
+  createdAt: string
+  updatedAt: string
+  recipients?: ScheduledReportRecipient[]
+  runs?: ScheduledReportRun[]
+}
+
+export interface UpsertScheduledReportPayload {
+  name: string
+  type: ScheduledReportType
+  format: ScheduledReportFormat
+  frequency: ScheduledReportFrequency
+  filters?: ReportsFilterParams
+  recipientUserIds: string[]
+  isEnabled?: boolean
+}
+
+export async function fetchScheduledReportRecipients(token?: string): Promise<ScheduledReportRecipientUser[]> {
+  const response = await api.get('/reports/schedules/recipients', withAuthConfig(token))
+  const payload = response.data?.data ?? response.data
+  return Array.isArray(payload) ? (payload as ScheduledReportRecipientUser[]) : []
+}
+
+export async function fetchScheduledReports(token?: string): Promise<ScheduledReport[]> {
+  const response = await api.get('/reports/schedules', withAuthConfig(token))
+  const payload = response.data?.data ?? response.data
+  return Array.isArray(payload) ? (payload as ScheduledReport[]) : []
+}
+
+export async function fetchScheduledReportById(id: string, token?: string): Promise<ScheduledReport | null> {
+  if (!id) return null
+  const response = await api.get(`/reports/schedules/${id}`, withAuthConfig(token))
+  const payload = response.data?.data ?? response.data
+  return (payload ?? null) as ScheduledReport | null
+}
+
+export async function createScheduledReport(payload: UpsertScheduledReportPayload, token?: string): Promise<ScheduledReport> {
+  const response = await api.post('/reports/schedules', payload, withAuthConfig(token))
+  const data = response.data?.data ?? response.data
+  return data as ScheduledReport
+}
+
+export async function updateScheduledReport(
+  id: string,
+  payload: UpsertScheduledReportPayload,
+  token?: string
+): Promise<ScheduledReport> {
+  const response = await api.put(`/reports/schedules/${id}`, payload, withAuthConfig(token))
+  const data = response.data?.data ?? response.data
+  return data as ScheduledReport
+}
+
+export async function runScheduledReportNow(id: string, token?: string): Promise<{ deliveredCount: number }> {
+  const response = await api.post(`/reports/schedules/${id}/run-now`, {}, withAuthConfig(token))
+  const data = response.data?.data ?? response.data
+  return (data ?? { deliveredCount: 0 }) as { deliveredCount: number }
+}
+
+export async function setScheduledReportEnabled(
+  id: string,
+  isEnabled: boolean,
+  token?: string
+): Promise<ScheduledReport> {
+  const response = await api.patch(`/reports/schedules/${id}/enabled`, { isEnabled }, withAuthConfig(token))
+  const data = response.data?.data ?? response.data
+  return data as ScheduledReport
+}
+
+export async function deleteScheduledReport(id: string, token?: string): Promise<void> {
+  await api.delete(`/reports/schedules/${id}`, withAuthConfig(token))
+}
+
 export async function fetchReportsDashboard(token?: string) {
   const response = await api.get('/reports/dashboard', withAuthConfig(token))
   return response.data?.data ?? response.data
@@ -913,4 +1023,42 @@ export async function fetchReportByType(
   const payload = response.data?.data ?? response.data
   if (Array.isArray(payload)) return payload
   return payload?.items ?? payload ?? []
+}
+
+export async function downloadReportCsv(
+  type: 'employees' | 'attendance' | 'leave' | 'payroll',
+  filters: ReportsFilterParams,
+  token?: string
+): Promise<void> {
+  const params: Record<string, string> = { format: 'csv' }
+  if (filters.startDate) params.startDate = String(filters.startDate)
+  if (filters.endDate) params.endDate = String(filters.endDate)
+  if (filters.departmentId) params.departmentId = String(filters.departmentId)
+
+  const response = await api.get(`/reports/${type}`, {
+    params,
+    responseType: 'blob',
+    ...withAuthConfig(token),
+  })
+
+  downloadBlob(response.data, `${type}.csv`, 'text/csv')
+}
+
+export async function downloadReportPdf(
+  type: 'employees' | 'attendance' | 'leave' | 'payroll',
+  filters: ReportsFilterParams,
+  token?: string
+): Promise<void> {
+  const params: Record<string, string> = { format: 'pdf' }
+  if (filters.startDate) params.startDate = String(filters.startDate)
+  if (filters.endDate) params.endDate = String(filters.endDate)
+  if (filters.departmentId) params.departmentId = String(filters.departmentId)
+
+  const response = await api.get(`/reports/${type}`, {
+    params,
+    responseType: 'blob',
+    ...withAuthConfig(token),
+  })
+
+  downloadBlob(response.data, `${type}.pdf`, 'application/pdf')
 }

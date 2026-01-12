@@ -1,10 +1,17 @@
 import nodemailer, { Transporter } from 'nodemailer'
 
+export interface EmailAttachment {
+  filename: string
+  content: Buffer
+  contentType: string
+}
+
 interface SendEmailOptions {
   to: string
   subject: string
   html?: string
   text?: string
+  attachments?: EmailAttachment[]
 }
 
 let transporter: Transporter | null = null
@@ -31,7 +38,7 @@ function getTransporter(): Transporter {
   return transporter
 }
 
-export async function sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<void> {
+export async function sendEmail({ to, subject, html, text, attachments }: SendEmailOptions): Promise<void> {
   const { MAIL_FROM } = process.env
   const t = getTransporter()
 
@@ -41,5 +48,12 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions): 
     subject,
     text: text || html?.replace(/<[^>]+>/g, ' ') || undefined,
     html,
+    attachments: Array.isArray(attachments)
+      ? attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        }))
+      : undefined,
   })
 }

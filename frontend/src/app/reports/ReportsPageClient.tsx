@@ -2,24 +2,40 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { ArrowLeftIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline"
 
 import { DataTable, type Column } from "@/components/ui/DataTable"
-import { ReportFilters, DashboardStats, SummaryCard, ExportButton } from "@/components/reports/ReportsComponents"
+import { ReportFilters, DashboardStats, SummaryCard, ExportButton, ExportPdfButton } from "@/components/reports/ReportsComponents"
+import { Modal } from "@/components/ui/Modal"
+import { Button, Input, Select } from "@/components/ui/FormComponents"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
-import { handleCrudError } from "@/lib/apiError"
-import api from "@/lib/axios"
 import {
-  fetchReportsDashboard,
+  createScheduledReport,
+  deleteScheduledReport,
+  downloadReportCsv,
+  downloadReportPdf,
+  fetchDepartments,
   fetchReportByType,
-  fetchDepartments as fetchDeptOptions,
+  fetchReportsDashboard,
+  fetchScheduledReportRecipients,
+  fetchScheduledReports,
+  runScheduledReportNow,
+  setScheduledReportEnabled,
+  updateScheduledReport,
   type ReportsFilterParams,
+  type ScheduledReport,
+  type ScheduledReportFormat,
+  type ScheduledReportFrequency,
+  type ScheduledReportRecipientUser,
+  type ScheduledReportType,
+  type UpsertScheduledReportPayload,
 } from "@/lib/hrmData"
+import { handleCrudError } from "@/lib/apiError"
 
-type TabType = "overview" | "employees" | "attendance" | "leave" | "payroll"
+type TabType = "overview" | "employees" | "attendance" | "leave" | "payroll" | "schedules"
 
 type AttendanceResponse = {
   attendance: any[]
@@ -144,6 +160,7 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
   const router = useRouter()
   const { token } = useAuthStore()
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
 
   const [activeTab, setActiveTab] = useState<TabType>("overview")
   const [startDate, setStartDate] = useState<Date | null>(null)
@@ -152,17 +169,36 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
   const [departments, setDepartments] = useState(initialDepartments)
   const [error, setError] = useState<string | null>(null)
 
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledReport | null>(null)
+  const [scheduleName, setScheduleName] = useState("")
+  const [scheduleType, setScheduleType] = useState<ScheduledReportType>("employees")
+  const [scheduleFormat, setScheduleFormat] = useState<ScheduledReportFormat>("csv")
+  const [scheduleFrequency, setScheduleFrequency] = useState<ScheduledReportFrequency>("weekly")
+  const [scheduleStartDate, setScheduleStartDate] = useState<string>("")
+  const [scheduleEndDate, setScheduleEndDate] = useState<string>("")
+  const [scheduleDepartmentId, setScheduleDepartmentId] = useState<string>("")
+  const [scheduleRecipientUserIds, setScheduleRecipientUserIds] = useState<string[]>([])
+  const [scheduleIsEnabled, setScheduleIsEnabled] = useState<boolean>(true)
+
+  const [scheduleHistoryOpen, setScheduleHistoryOpen] = useState(false)
+  const [scheduleHistorySchedule, setScheduleHistorySchedule] = useState<ScheduledReport | null>(null)
+
+  const [deleteScheduleOpen, setDeleteScheduleOpen] = useState(false)
+  const [deleteScheduleTarget, setDeleteScheduleTarget] = useState<ScheduledReport | null>(null)
+
   useEffect(() => {
     if (!token) return
-    fetchDeptOptions(token)
+    fetchDepartments(token)
       .then((data) => {
-        const options = (Array.isArray(data) ? data : []).map((dept: any) => ({
+        const list = Array.isArray(data) ? data : []
+        const options = list.map((dept) => ({
           value: dept.id,
           label: dept.name,
         }))
         setDepartments(options)
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (process.env.NODE_ENV !== 'production') {
           console.error("Error fetching departments:", err)
         }
@@ -187,8 +223,25 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
 
   const reportQuery = useQuery({
     queryKey: ["reports", activeTab, filters, token],
-    queryFn: () => fetchReportByType(activeTab as Exclude<TabType, "overview">, filters, token ?? undefined),
-    enabled: activeTab !== "overview" && !!token,
+    queryFn: () =>
+      fetchReportByType(activeTab as Exclude<TabType, "overview" | "schedules">, filters, token ?? undefined),
+    enabled: activeTab !== "overview" && activeTab !== "schedules" && !!token,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const schedulesQuery = useQuery({
+    queryKey: ["reports", "schedules", token],
+    queryFn: () => fetchScheduledReports(token ?? undefined),
+    enabled: activeTab === "schedules" && !!token,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const recipientsQuery = useQuery({
+    queryKey: ["reports", "schedule-recipients", token],
+    queryFn: () => fetchScheduledReportRecipients(token ?? undefined),
+    enabled: scheduleModalOpen && !!token,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
@@ -227,6 +280,8 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
 
   const isLoading = activeTab === "overview" ? dashboardQuery.isLoading : reportQuery.isLoading
 
+  const isSchedulesLoading = schedulesQuery.isLoading
+
   const employeesData =
     activeTab === "employees"
       ? (Array.isArray(reportQuery.data) ? reportQuery.data : (reportQuery.data as any)?.items ?? [])
@@ -235,28 +290,129 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
   const leaveData = activeTab === "leave" ? ((reportQuery.data as LeaveResponse) ?? null) : null
   const payrollData = activeTab === "payroll" ? ((reportQuery.data as PayrollResponse) ?? null) : null
 
-  const handleExportCSV = async () => {
+  const handleExportPDF = async () => {
     try {
-      const params = new URLSearchParams()
-      if (startDate) params.append("startDate", startDate.toISOString())
-      if (endDate) params.append("endDate", endDate.toISOString())
-      if (departmentId) params.append("departmentId", departmentId)
-      params.append("format", "csv")
-
-      const response = await api.get("/reports/employees", {
-        params,
-        responseType: "blob",
-      })
-
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement("a")
-      link.href = url
-      link.setAttribute("download", "employees.csv")
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
+      if (activeTab === "overview" || activeTab === "schedules") return
+      await downloadReportPdf(activeTab as Exclude<TabType, "overview" | "schedules">, filters, token ?? undefined)
     } catch (err) {
       handleCrudError({ error: err, resourceLabel: "Export", showToast })
+    }
+  }
+
+  const handleExportCSV = async () => {
+    try {
+      if (activeTab === "overview" || activeTab === "schedules") return
+      await downloadReportCsv(activeTab as Exclude<TabType, "overview" | "schedules">, filters, token ?? undefined)
+    } catch (err) {
+      handleCrudError({ error: err, resourceLabel: "Export", showToast })
+    }
+  }
+
+  const createScheduleMutation = useMutation({
+    mutationFn: (payload: UpsertScheduledReportPayload) => createScheduledReport(payload, token ?? undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports", "schedules", token] })
+      showToast("Scheduled report created", "success")
+      setScheduleModalOpen(false)
+    },
+    onError: (err) => handleCrudError({ error: err, resourceLabel: "Schedule", showToast }),
+  })
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpsertScheduledReportPayload }) =>
+      updateScheduledReport(id, payload, token ?? undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports", "schedules", token] })
+      showToast("Scheduled report updated", "success")
+      setScheduleModalOpen(false)
+    },
+    onError: (err) => handleCrudError({ error: err, resourceLabel: "Schedule", showToast }),
+  })
+
+  const runNowMutation = useMutation({
+    mutationFn: (id: string) => runScheduledReportNow(id, token ?? undefined),
+    onSuccess: (data) => {
+      showToast(`Report delivered to ${data.deliveredCount} recipient(s)`, "success")
+      queryClient.invalidateQueries({ queryKey: ["reports", "schedules", token] })
+    },
+    onError: (err) => handleCrudError({ error: err, resourceLabel: "Run schedule", showToast }),
+  })
+
+  const toggleEnabledMutation = useMutation({
+    mutationFn: ({ id, isEnabled }: { id: string; isEnabled: boolean }) =>
+      setScheduledReportEnabled(id, isEnabled, token ?? undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports", "schedules", token] })
+    },
+    onError: (err) => handleCrudError({ error: err, resourceLabel: "Update schedule", showToast }),
+  })
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: (id: string) => deleteScheduledReport(id, token ?? undefined),
+    onSuccess: () => {
+      showToast("Scheduled report deleted", "success")
+      queryClient.invalidateQueries({ queryKey: ["reports", "schedules", token] })
+    },
+    onError: (err) => handleCrudError({ error: err, resourceLabel: "Delete schedule", showToast }),
+  })
+
+  const openCreateSchedule = () => {
+    setEditingSchedule(null)
+    setScheduleName("")
+    setScheduleType("employees")
+    setScheduleFormat("csv")
+    setScheduleFrequency("weekly")
+    setScheduleStartDate("")
+    setScheduleEndDate("")
+    setScheduleDepartmentId("")
+    setScheduleRecipientUserIds([])
+    setScheduleIsEnabled(true)
+    setScheduleModalOpen(true)
+  }
+
+  const openEditSchedule = (s: ScheduledReport) => {
+    setEditingSchedule(s)
+    setScheduleName(s.name ?? "")
+    setScheduleType(s.type)
+    setScheduleFormat(s.format)
+    setScheduleFrequency(s.frequency)
+    setScheduleStartDate(s.filters?.startDate ? String(s.filters.startDate).slice(0, 10) : "")
+    setScheduleEndDate(s.filters?.endDate ? String(s.filters.endDate).slice(0, 10) : "")
+    setScheduleDepartmentId(s.filters?.departmentId ? String(s.filters.departmentId) : "")
+    setScheduleRecipientUserIds(Array.isArray(s.recipients) ? s.recipients.map((r) => r.userId) : [])
+    setScheduleIsEnabled(Boolean(s.isEnabled))
+    setScheduleModalOpen(true)
+  }
+
+  const submitSchedule = async () => {
+    const payload: UpsertScheduledReportPayload = {
+      name: scheduleName.trim(),
+      type: scheduleType,
+      format: scheduleFormat,
+      frequency: scheduleFrequency,
+      recipientUserIds: scheduleRecipientUserIds,
+      isEnabled: scheduleIsEnabled,
+      filters: {
+        startDate: scheduleStartDate ? new Date(scheduleStartDate).toISOString() : undefined,
+        endDate: scheduleEndDate ? new Date(scheduleEndDate).toISOString() : undefined,
+        departmentId: scheduleDepartmentId || undefined,
+      },
+    }
+
+    if (!payload.name) {
+      showToast("Schedule name is required", "error")
+      return
+    }
+
+    if (!payload.recipientUserIds.length) {
+      showToast("Select at least one recipient", "error")
+      return
+    }
+
+    if (editingSchedule?.id) {
+      await updateScheduleMutation.mutateAsync({ id: editingSchedule.id, payload })
+    } else {
+      await createScheduleMutation.mutateAsync(payload)
     }
   }
 
@@ -266,6 +422,7 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
     { id: "attendance" as TabType, name: "Attendance", description: "Clock records" },
     { id: "leave" as TabType, name: "Leave", description: "Leave requests" },
     { id: "payroll" as TabType, name: "Payroll", description: "Salary records" },
+    { id: "schedules" as TabType, name: "Schedules", description: "Scheduled exports" },
   ]
 
   const formatCurrency = (value?: number) => (value || value === 0 ? `$${Number(value).toLocaleString()}` : "N/A")
@@ -342,6 +499,103 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
     { key: "allowances", header: "Allowances", render: (value) => formatCurrency(value) },
     { key: "deductions", header: "Deductions", render: (value) => formatCurrency(value) },
     { key: "netSalary", header: "Net Salary", render: (value) => formatCurrency(value) },
+  ]
+
+  const scheduleColumns: Column<ScheduledReport>[] = [
+    { key: "name", header: "Name" },
+    { key: "type", header: "Type" },
+    { key: "format", header: "Format" },
+    { key: "frequency", header: "Frequency" },
+    {
+      key: "lastRun",
+      header: "Last Run",
+      render: (_, item) => {
+        const run = Array.isArray(item.runs) && item.runs.length ? item.runs[0] : null
+        if (!run) return "—"
+
+        const statusClass =
+          run.status === "success"
+            ? "bg-green-100 text-green-800"
+            : run.status === "failed"
+              ? "bg-red-100 text-red-800"
+              : run.status === "running"
+                ? "bg-blue-100 text-blue-800"
+                : "bg-gray-100 text-gray-800"
+
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusClass}`}>{run.status}</span>
+            <span className="text-xs text-gray-600">{run.deliveredCount} delivered</span>
+          </div>
+        )
+      },
+    },
+    {
+      key: "isEnabled",
+      header: "Enabled",
+      render: (value) => (
+        <span className={`px-2 py-1 text-xs font-medium rounded-full ${value ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}>
+          {value ? "Yes" : "No"}
+        </span>
+      ),
+    },
+    {
+      key: "nextRunAt",
+      header: "Next Run",
+      render: (value) => (value ? format(new Date(String(value)), "MMM dd, yyyy HH:mm") : "—"),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (_, item) => (
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            loading={
+              toggleEnabledMutation.isPending &&
+              toggleEnabledMutation.variables?.id === item.id &&
+              toggleEnabledMutation.variables?.isEnabled === !item.isEnabled
+            }
+            onClick={() => toggleEnabledMutation.mutate({ id: item.id, isEnabled: !item.isEnabled })}
+          >
+            {item.isEnabled ? "Disable" : "Enable"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openEditSchedule(item)}>
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setScheduleHistorySchedule(item)
+              setScheduleHistoryOpen(true)
+            }}
+          >
+            History
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={runNowMutation.isPending && runNowMutation.variables === item.id}
+            onClick={() => runNowMutation.mutate(item.id)}
+          >
+            Run now
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            loading={deleteScheduleMutation.isPending && deleteScheduleMutation.variables === item.id}
+            onClick={() => {
+              setDeleteScheduleTarget(item)
+              setDeleteScheduleOpen(true)
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    },
   ]
 
   return (
@@ -421,11 +675,243 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
               />
             )}
 
+            {activeTab === "schedules" && (
+              <div>
+                <div className="flex items-center justify-end mb-4">
+                  <Button onClick={openCreateSchedule}>Create schedule</Button>
+                </div>
+
+                {isSchedulesLoading ? (
+                  <TableSkeleton />
+                ) : !Array.isArray(schedulesQuery.data) || schedulesQuery.data.length === 0 ? (
+                  <EmptyState message="No schedules yet. Create one to automatically email reports." />
+                ) : (
+                  <DataTable data={schedulesQuery.data} columns={scheduleColumns} loading={false} />
+                )}
+
+                <Modal
+                  isOpen={scheduleModalOpen}
+                  onClose={() => setScheduleModalOpen(false)}
+                  title={editingSchedule ? "Edit scheduled report" : "Create scheduled report"}
+                  size="lg"
+                >
+                  <div className="space-y-4">
+                    <Input label="Name" value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} required />
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Select
+                        label="Type"
+                        value={scheduleType}
+                        onChange={(v) => setScheduleType(v as ScheduledReportType)}
+                        options={[
+                          { value: "employees", label: "Employees" },
+                          { value: "attendance", label: "Attendance" },
+                          { value: "leave", label: "Leave" },
+                          { value: "payroll", label: "Payroll" },
+                        ]}
+                      />
+
+                      <Select
+                        label="Format"
+                        value={scheduleFormat}
+                        onChange={(v) => setScheduleFormat(v as ScheduledReportFormat)}
+                        options={[
+                          { value: "csv", label: "CSV" },
+                          { value: "pdf", label: "PDF" },
+                        ]}
+                      />
+
+                      <Select
+                        label="Frequency"
+                        value={scheduleFrequency}
+                        onChange={(v) => setScheduleFrequency(v as ScheduledReportFrequency)}
+                        options={[
+                          { value: "daily", label: "Daily" },
+                          { value: "weekly", label: "Weekly" },
+                          { value: "monthly", label: "Monthly" },
+                        ]}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Input
+                        label="Start Date (optional)"
+                        type="date"
+                        value={scheduleStartDate}
+                        onChange={(e) => setScheduleStartDate(e.target.value)}
+                      />
+                      <Input
+                        label="End Date (optional)"
+                        type="date"
+                        value={scheduleEndDate}
+                        onChange={(e) => setScheduleEndDate(e.target.value)}
+                      />
+                      <Select
+                        label="Department (optional)"
+                        value={scheduleDepartmentId}
+                        onChange={setScheduleDepartmentId}
+                        options={[{ value: "", label: "All Departments" }, ...departments]}
+                      />
+                    </div>
+
+                    <div className="border rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-medium text-gray-900">Recipients</div>
+                        <div className="text-xs text-gray-500">{scheduleRecipientUserIds.length} selected</div>
+                      </div>
+
+                      {recipientsQuery.isLoading ? (
+                        <div className="text-sm text-gray-600">Loading recipients...</div>
+                      ) : (
+                        <div className="max-h-56 overflow-y-auto space-y-2">
+                          {(Array.isArray(recipientsQuery.data) ? recipientsQuery.data : []).map((u: ScheduledReportRecipientUser) => {
+                            const checked = scheduleRecipientUserIds.includes(u.id)
+                            return (
+                              <label key={u.id} className="flex items-center gap-2 text-sm text-gray-800">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setScheduleRecipientUserIds((prev) =>
+                                      prev.includes(u.id) ? prev.filter((id) => id !== u.id) : [...prev, u.id]
+                                    )
+                                  }}
+                                />
+                                <span className="truncate">{`${u.firstName} ${u.lastName}`.trim() || u.email}</span>
+                                <span className="text-xs text-gray-500 truncate">{u.email}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-gray-800">
+                      <input type="checkbox" checked={scheduleIsEnabled} onChange={(e) => setScheduleIsEnabled(e.target.checked)} />
+                      Enabled
+                    </label>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button variant="secondary" onClick={() => setScheduleModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        loading={createScheduleMutation.isPending || updateScheduleMutation.isPending}
+                        onClick={submitSchedule}
+                      >
+                        {editingSchedule ? "Save" : "Create"}
+                      </Button>
+                    </div>
+                  </div>
+                </Modal>
+
+      <Modal
+        isOpen={deleteScheduleOpen}
+        onClose={() => {
+          setDeleteScheduleOpen(false)
+          setDeleteScheduleTarget(null)
+        }}
+        title="Delete scheduled report"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700">
+            Are you sure you want to delete <span className="font-medium">{deleteScheduleTarget?.name}</span>? This
+            cannot be undone.
+          </p>
+
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteScheduleOpen(false)
+                setDeleteScheduleTarget(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={deleteScheduleMutation.isPending}
+              onClick={() => {
+                if (!deleteScheduleTarget) return
+                deleteScheduleMutation.mutate(deleteScheduleTarget.id, {
+                  onSuccess: () => {
+                    setDeleteScheduleOpen(false)
+                    setDeleteScheduleTarget(null)
+                  },
+                })
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={scheduleHistoryOpen}
+        onClose={() => {
+          setScheduleHistoryOpen(false)
+          setScheduleHistorySchedule(null)
+        }}
+        title={scheduleHistorySchedule ? `Run history - ${scheduleHistorySchedule.name}` : 'Run history'}
+        size="lg"
+      >
+        <div className="space-y-3">
+          {Array.isArray(scheduleHistorySchedule?.runs) && scheduleHistorySchedule?.runs.length ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delivered</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Finished</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {scheduleHistorySchedule.runs.map((r) => (
+                    <tr key={r.id}>
+                      <td className="px-4 py-2 text-sm text-gray-900">{r.status}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{r.deliveredCount}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {r.startedAt ? format(new Date(String(r.startedAt)), "MMM dd, yyyy HH:mm") : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {r.finishedAt ? format(new Date(String(r.finishedAt)), "MMM dd, yyyy HH:mm") : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{r.errorMessage || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600">No runs recorded yet.</div>
+          )}
+
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setScheduleHistoryOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+              </div>
+            )}
+
             {activeTab === "employees" && (
               <div>
                 {!isLoading && employeesData.length > 0 && (
                   <div className="flex justify-end mb-4">
-                    <ExportButton onClick={handleExportCSV} />
+                    <div className="flex items-center gap-3">
+                      <ExportButton onClick={handleExportCSV} />
+                      <ExportPdfButton onClick={handleExportPDF} />
+                    </div>
                   </div>
                 )}
                 {isLoading ? (
@@ -445,6 +931,14 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
 
             {activeTab === "attendance" && (
               <div>
+                {!isLoading && !!attendanceData?.attendance?.length && (
+                  <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-3">
+                      <ExportButton onClick={handleExportCSV} />
+                      <ExportPdfButton onClick={handleExportPDF} />
+                    </div>
+                  </div>
+                )}
                 {isLoading ? (
                   <TableSkeleton />
                 ) : !attendanceData || attendanceData.attendance?.length === 0 ? (
@@ -474,6 +968,14 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
 
             {activeTab === "leave" && (
               <div>
+                {!isLoading && !!leaveData?.leaveRequests?.length && (
+                  <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-3">
+                      <ExportButton onClick={handleExportCSV} />
+                      <ExportPdfButton onClick={handleExportPDF} />
+                    </div>
+                  </div>
+                )}
                 {isLoading ? (
                   <TableSkeleton />
                 ) : !leaveData || leaveData.leaveRequests?.length === 0 ? (
@@ -502,6 +1004,14 @@ export function ReportsPageClient({ initialDashboardData, initialDepartments }: 
 
             {activeTab === "payroll" && (
               <div>
+                {!isLoading && !!payrollData?.payrollRecords?.length && (
+                  <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-3">
+                      <ExportButton onClick={handleExportCSV} />
+                      <ExportPdfButton onClick={handleExportPDF} />
+                    </div>
+                  </div>
+                )}
                 {isLoading ? (
                   <TableSkeleton />
                 ) : !payrollData || payrollData.payrollRecords?.length === 0 ? (

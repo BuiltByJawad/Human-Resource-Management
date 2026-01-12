@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractTenantSlug } from '@/lib/tenant'
+import { getBackendBaseUrl } from '@/lib/config/env'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +30,9 @@ export async function POST(request: NextRequest) {
       hostname: request.headers.get('host'),
     })
     
-    const response = await fetch(`${process.env.BACKEND_URL}/api/auth/refresh`, {
+    const backendBaseUrl = getBackendBaseUrl()
+
+    const response = await fetch(`${backendBaseUrl}/api/auth/refresh-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +52,12 @@ export async function POST(request: NextRequest) {
     
     const payload = data?.data ?? data
     const accessToken = payload?.accessToken
-    const newRefreshToken = payload?.refreshToken
+
+    const headerObj = response.headers as unknown as { getSetCookie?: () => string[] }
+    const setCookies = typeof headerObj.getSetCookie === 'function' ? headerObj.getSetCookie() : []
+    const combined = setCookies.length ? setCookies.join(',') : response.headers.get('set-cookie')
+    const refreshMatch = typeof combined === 'string' ? combined.match(/(?:^|,\s*)refreshToken=([^;]+)/) : null
+    const newRefreshToken = refreshMatch?.[1]
 
     const nextResponse = NextResponse.json(data)
 

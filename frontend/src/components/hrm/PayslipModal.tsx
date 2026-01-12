@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useRef } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon, PrinterIcon, ArrowDownTrayIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { useOrgStore } from '@/store/useOrgStore'
@@ -17,11 +17,59 @@ export const PayslipModal = ({ isOpen, onClose, payroll }: PayslipModalProps) =>
     const { companyName, companyAddress } = useOrgStore()
     const { token } = useAuthStore()
     const { showToast } = useToast()
+    const payslipRef = useRef<HTMLDivElement | null>(null)
 
     if (!payroll) return null
 
     const handlePrint = () => {
-        window.print()
+        const node = payslipRef.current
+        if (!node) return
+
+        const iframe = document.createElement('iframe')
+        iframe.setAttribute('aria-hidden', 'true')
+        iframe.style.position = 'fixed'
+        iframe.style.right = '0'
+        iframe.style.bottom = '0'
+        iframe.style.width = '0'
+        iframe.style.height = '0'
+        iframe.style.border = '0'
+        document.body.appendChild(iframe)
+
+        const doc = iframe.contentDocument
+        const win = iframe.contentWindow
+        if (!doc || !win) {
+            document.body.removeChild(iframe)
+            return
+        }
+
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+            .map((el) => el.outerHTML)
+            .join('\n')
+
+        doc.open()
+        doc.write(`<!doctype html><html><head><meta charset="utf-8" />${styles}</head><body>${node.outerHTML}</body></html>`)
+        doc.close()
+
+        const cleanup = () => {
+            try {
+                document.body.removeChild(iframe)
+            } catch {
+                // ignore
+            }
+        }
+
+        const triggerPrint = () => {
+            try {
+                win.focus()
+                win.print()
+            } finally {
+                // give the print dialog a moment to open before cleaning up
+                window.setTimeout(cleanup, 500)
+            }
+        }
+
+        // Ensure images/fonts have a chance to load before printing
+        window.setTimeout(triggerPrint, 250)
     }
 
     const handleDownloadPdf = async () => {
@@ -104,7 +152,7 @@ export const PayslipModal = ({ isOpen, onClose, payroll }: PayslipModalProps) =>
                                     </button>
                                 </div>
 
-                                <div id="payslip-content" className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                                <div ref={payslipRef} id="payslip-content" className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                                     {/* Header */}
                                     <div className="text-center border-b pb-6 mb-6">
                                         <h2 className="text-2xl font-bold text-gray-900">{companyName}</h2>

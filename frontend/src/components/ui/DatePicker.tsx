@@ -4,6 +4,7 @@ import ReactDatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { CalendarIcon } from '@heroicons/react/24/outline'
 import { format, parseISO, isValid } from 'date-fns'
+import { createPortal } from 'react-dom'
 
 interface DatePickerProps {
     label?: string
@@ -17,6 +18,7 @@ interface DatePickerProps {
     minDate?: Date
     maxDate?: Date
     disabled?: boolean
+    mode?: 'date' | 'month'
 }
 
 export function DatePicker({
@@ -30,10 +32,16 @@ export function DatePicker({
     inputClassName = '',
     minDate,
     maxDate,
-    disabled
+    disabled,
+    mode = 'date'
 }: DatePickerProps) {
     // Handle string or Date input
-    const selectedDate = typeof value === 'string' && value ? parseISO(value) : (value as Date)
+    const selectedDate =
+        typeof value === 'string' && value
+            ? mode === 'month' && /^\d{4}-\d{2}$/.test(value)
+                ? parseISO(`${value}-01`)
+                : parseISO(value)
+            : (value as Date)
     const baseInputClasses = `
             block w-full pl-10 pr-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm
             ${error
@@ -58,11 +66,18 @@ export function DatePicker({
                     onChange={onChange}
                     className={baseInputClasses}
                     placeholderText={placeholder}
-                    dateFormat="MMM d, yyyy"
+                    dateFormat={mode === 'month' ? 'MMMM yyyy' : 'MMM d, yyyy'}
                     minDate={minDate}
                     maxDate={maxDate}
                     disabled={disabled}
                     showPopperArrow={false}
+                    showMonthDropdown={mode === 'month'}
+                    showYearDropdown={mode === 'month'}
+                    dropdownMode={mode === 'month' ? 'select' : undefined}
+                    popperPlacement="bottom-start"
+                    popperContainer={({ children }) =>
+                        typeof document === 'undefined' ? <>{children}</> : createPortal(children, document.body)
+                    }
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <CalendarIcon className={`h-5 w-5 ${error ? 'text-red-400' : 'text-gray-400'}`} aria-hidden="true" />
@@ -115,6 +130,9 @@ export function DatePicker({
         }
         .react-datepicker__triangle {
           display: none;
+        }
+        .react-datepicker-popper {
+          z-index: 9999 !important;
         }
       `}</style>
         </div>
