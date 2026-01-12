@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useToast } from './ToastProvider'
 import { PERMISSIONS } from '@/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
+import { getClientTenantSlug } from '@/lib/tenant'
 
 type NotificationCategory =
   | 'payroll'
@@ -163,12 +164,18 @@ export default function Header() {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
+  const [cachedUnreadCount, setCachedUnreadCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0
+    const raw = window.sessionStorage.getItem('ui:lastUnreadCount')
+    const parsed = raw ? Number(raw) : 0
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+  })
 
   const [searchQuery, setSearchQuery] = useState('')
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const [notificationsError, setNotificationsError] = useState<string | null>(null)
 
-  const { user, logout, hasPermission, isAuthenticated, isAuthTransition, endAuthTransition } = useAuthStore()
+  const { user, token, logout, hasPermission, isAuthenticated, isAuthTransition, endAuthTransition } = useAuthStore()
   const initialAuth = useInitialAuth()
   // Prefer server-fetched user on first paint to avoid showing stale
   // persisted auth data, then fall back to the client store user.
@@ -201,6 +208,16 @@ export default function Header() {
   }, [])
 
   useEffect(() => {
+    if (!isMounted) return
+    if (typeof window === 'undefined') return
+    const raw = window.sessionStorage.getItem('ui:lastUnreadCount')
+    const parsed = raw ? Number(raw) : 0
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      setCachedUnreadCount(parsed)
+    }
+  }, [isMounted])
+
+  useEffect(() => {
     if (!isAuthTransition) return
     if (!isAuthenticated) return
     endAuthTransition()
@@ -216,14 +233,53 @@ export default function Header() {
   }
 
   const notificationsQuery = useQuery<NotificationItem[]>({
-    queryKey: ['notifications'],
-    enabled: !!effectiveUser,
+    queryKey: ['notifications', token],
+    enabled: isAuthenticated,
     queryFn: async (): Promise<NotificationItem[]> => {
       try {
-        const res = await api.get('/notifications')
-        const raw = res.data?.data ?? []
+        const res = await fetch('/api/notifications', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-store',
+            ...(getClientTenantSlug() ? { 'X-Tenant-Slug': getClientTenantSlug() as string } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+
+        const text = await res.text()
+        const parsed = text ? (JSON.parse(text) as unknown) : null
+
+        if (!res.ok) {
+          const status = res.status
+          if (status === 403) {
+            setNotificationsError('You do not have permission to view notifications.')
+          } else {
+            setNotificationsError('Failed to load notifications.')
+          }
+          return []
+        }
+
+        const payload = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+        const root = (payload as { data?: unknown }).data ?? payload
+
+        const extractArray = (value: unknown): unknown[] => {
+          if (Array.isArray(value)) return value
+          if (!value || typeof value !== 'object') return []
+          const obj = value as Record<string, unknown>
+          if (Array.isArray(obj.notifications)) return obj.notifications
+          if (Array.isArray(obj.items)) return obj.items
+          if (obj.data && typeof obj.data === 'object') {
+            const nested = obj.data as Record<string, unknown>
+            if (Array.isArray(nested.notifications)) return nested.notifications
+            if (Array.isArray(nested.items)) return nested.items
+          }
+          return []
+        }
+
         setNotificationsError(null)
-        return (Array.isArray(raw) ? raw : []).map(mapNotificationPayload)
+        return extractArray(root).map(mapNotificationPayload)
       } catch (err: any) {
         if (err?.response?.status === 403) {
           setNotificationsError('You do not have permission to view notifications.')
@@ -234,12 +290,18 @@ export default function Header() {
       }
     },
     staleTime: 15_000,
-    refetchInterval: isNotificationsOpen ? 10_000 : false,
-    refetchIntervalInBackground: false,
-    refetchOnMount: false,
-    refetchOnWindowFocus: isNotificationsOpen,
-    refetchOnReconnect: isNotificationsOpen,
+    refetchInterval: isAuthenticated ? 30_000 : false,
+    refetchIntervalInBackground: true,
+    refetchOnMount: isAuthenticated ? 'always' : false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   })
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    queryClient.refetchQueries({ queryKey: ['notifications'] })
+  }, [isAuthenticated, token, queryClient])
 
   const notificationData: NotificationItem[] = notificationsQuery.data ?? []
   const notificationsLoading = notificationsQuery.isLoading
@@ -320,6 +382,20 @@ export default function Header() {
   const userRole = effectiveUser?.role ?? ''
 
   const hasValidUser = !!effectiveUser?.id && !!effectiveUser?.email
+
+  const shouldUseLiveUnreadCount =
+    notificationsQuery.isSuccess && !notificationsError && !notificationsQuery.isFetching
+
+  const displayUnreadCount = shouldUseLiveUnreadCount ? unreadCount : cachedUnreadCount
+  const renderUnreadCount = displayUnreadCount
+
+  useEffect(() => {
+    if (!shouldUseLiveUnreadCount) return
+    setCachedUnreadCount(unreadCount)
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('ui:lastUnreadCount', String(unreadCount))
+    }
+  }, [shouldUseLiveUnreadCount, unreadCount])
 
   return (
     <header className="glass-header sticky top-0 z-30">
@@ -417,11 +493,15 @@ export default function Header() {
                       className="relative h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 flex items-center justify-center"
                     >
                       <BellIcon className="h-5 w-5" />
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
+                      <span
+                        suppressHydrationWarning
+                        className={cn(
+                          "absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white transition-opacity",
+                          renderUnreadCount > 0 ? 'opacity-100' : 'opacity-0'
+                        )}
+                      >
+                        {renderUnreadCount > 9 ? '9+' : renderUnreadCount}
+                      </span>
                     </button>
                     {isNotificationsOpen && (
                       <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">
@@ -514,7 +594,25 @@ export default function Header() {
                 </>
               ) : (
                 <>
-                  <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse" />
+                  <div className="relative">
+                    <button
+                      type="button"
+                      disabled
+                      className="relative h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center cursor-not-allowed"
+                      title="Loading..."
+                    >
+                      <BellIcon className="h-5 w-5" />
+                      <span
+                        suppressHydrationWarning
+                        className={cn(
+                          "absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white transition-opacity",
+                          renderUnreadCount > 0 ? 'opacity-100' : 'opacity-0'
+                        )}
+                      >
+                        {renderUnreadCount > 9 ? '9+' : renderUnreadCount}
+                      </span>
+                    </button>
+                  </div>
                   <div className="flex h-12 items-center gap-3 rounded-full bg-white border border-slate-200 px-3 shadow-sm">
                     <div className="h-8 w-8 rounded-full bg-slate-100 animate-pulse" />
                     <div className="hidden md:flex flex-col gap-1">

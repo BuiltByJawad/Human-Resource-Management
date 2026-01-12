@@ -251,6 +251,10 @@ export interface PayrollRecord {
   allowancesBreakdown?: { name: string; amount: number }[]
   deductions?: number
   deductionsBreakdown?: { name: string; amount: number }[]
+  paidAt?: string | null
+  paymentMethod?: string | null
+  paymentReference?: string | null
+  paidByUserId?: string | null
   status: PayrollStatus
   employee: {
     id: string

@@ -337,10 +337,53 @@ export class PayrollService {
     /**
      * Update payroll status
      */
-    async updateStatus(id: string, data: UpdatePayrollStatusDto, organizationId: string) {
+    async updateStatus(id: string, data: UpdatePayrollStatusDto, organizationId: string, actorUserId?: string) {
         const existing = await this.getById(id, organizationId); // Verify exists
 
-        const record = await payrollRepository.updateStatusScoped(id, data.status, organizationId);
+        const nextStatus = data?.status;
+        const currentStatus = existing.status;
+
+        if (nextStatus === currentStatus) {
+            return existing;
+        }
+
+        const allowedTransitions: Record<string, Set<string>> = {
+            draft: new Set(['processed']),
+            processed: new Set(['paid']),
+            paid: new Set([]),
+        };
+
+        const allowedNext = allowedTransitions[String(currentStatus)];
+        if (!allowedNext || !allowedNext.has(String(nextStatus))) {
+            throw new BadRequestError(`Invalid payroll status transition: ${String(currentStatus)} -> ${String(nextStatus)}`);
+        }
+
+        let paidAt: Date | undefined;
+        if (data.status === 'paid') {
+            if (typeof data.paymentMethod !== 'string' || data.paymentMethod.trim().length === 0) {
+                throw new BadRequestError('paymentMethod is required when marking payroll as paid');
+            }
+            if (typeof data.paidAt !== 'string' || data.paidAt.trim().length === 0) {
+                throw new BadRequestError('paidAt is required when marking payroll as paid');
+            }
+            const parsed = new Date(data.paidAt);
+            if (Number.isNaN(parsed.getTime())) {
+                throw new BadRequestError('paidAt must be a valid ISO date string');
+            }
+            paidAt = parsed;
+        }
+
+        const record = await payrollRepository.updateStatusScoped(
+            id,
+            {
+                status: data.status,
+                paidAt,
+                paymentMethod: typeof data.paymentMethod === 'string' ? data.paymentMethod : undefined,
+                paymentReference: typeof data.paymentReference === 'string' ? data.paymentReference : undefined,
+                paidByUserId: data.status === 'paid' ? actorUserId : undefined,
+            },
+            organizationId,
+        );
         if (!record) {
             throw new NotFoundError('Payroll record not found');
         }

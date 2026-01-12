@@ -55,11 +55,20 @@ export async function POST(request: NextRequest) {
 
     const headerObj = response.headers as unknown as { getSetCookie?: () => string[] }
     const setCookies = typeof headerObj.getSetCookie === 'function' ? headerObj.getSetCookie() : []
-    const combined = setCookies.length ? setCookies.join(',') : response.headers.get('set-cookie')
-    const refreshMatch = typeof combined === 'string' ? combined.match(/(?:^|,\s*)refreshToken=([^;]+)/) : null
-    const newRefreshToken = refreshMatch?.[1]
-
     const nextResponse = NextResponse.json(data)
+
+    // Forward backend refreshToken cookie updates (including rotation) as-is.
+    // This avoids losing the new refresh token when the backend rotates it.
+    if (setCookies.length) {
+      setCookies.forEach((cookie) => {
+        nextResponse.headers.append('set-cookie', cookie)
+      })
+    } else {
+      const rawSetCookie = response.headers.get('set-cookie')
+      if (rawSetCookie) {
+        nextResponse.headers.set('set-cookie', rawSetCookie)
+      }
+    }
 
     nextResponse.cookies.set('accessToken', '', {
       httpOnly: true,
@@ -79,22 +88,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (newRefreshToken) {
-      nextResponse.cookies.set('refreshToken', '', {
-        httpOnly: true,
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        expires: new Date(0),
-      })
-      nextResponse.cookies.set('refreshToken', newRefreshToken, {
-        httpOnly: true,
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        ...(shouldRemember ? { maxAge: 60 * 60 * 24 * 7 } : {}),
-      })
-    }
+    // refreshToken cookie is managed by the backend and forwarded above.
     
     return nextResponse
   } catch (error) {

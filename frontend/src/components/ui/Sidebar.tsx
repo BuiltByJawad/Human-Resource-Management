@@ -216,7 +216,7 @@ export default function Sidebar() {
         // ignore prefetch errors (e.g., during rapid mounts/unmounts)
       }
     })
-  }, [isMounted, router, userPermissions.join(','), isSuperAdmin])
+  }, [isMounted, router])
 
   const renderNavItem = (item: (typeof navigation)[number]['items'][number]) => {
     const isActive = activeHref === item.href
