@@ -83,6 +83,30 @@ export class PayrollRepository {
         });
     }
 
+    async findByEmployeeForExport(employeeId: string, organizationId: string) {
+        return prisma.payrollRecord.findMany({
+            where: {
+                employeeId,
+                employee: {
+                    organizationId,
+                },
+            },
+            include: {
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        employeeNumber: true,
+                        department: {
+                            select: { name: true },
+                        },
+                    },
+                },
+            },
+            orderBy: { payPeriod: 'desc' },
+        });
+    }
+
     async findByPeriod(payPeriod: string, organizationId: string) {
         return prisma.payrollRecord.findMany({
             where: {

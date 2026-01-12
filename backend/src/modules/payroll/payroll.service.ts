@@ -4,8 +4,89 @@ import { GeneratePayrollDto, UpdatePayrollStatusDto, PayrollQueryDto } from './d
 import { PAGINATION } from '../../shared/constants';
 import { prisma } from '../../shared/config/database';
 import { notificationService } from '../notification/notification.service';
+import { Prisma } from '@prisma/client';
+import PDFDocument from 'pdfkit';
+
+type PayrollConfigItem = {
+    name: string;
+    type: 'fixed' | 'percentage';
+    value: number;
+};
+
+export type PayrollConfig = {
+    allowances: PayrollConfigItem[];
+    deductions: PayrollConfigItem[];
+};
+
+const DEFAULT_PAYROLL_CONFIG: PayrollConfig = {
+    allowances: [{ name: 'Standard Allowance', type: 'percentage', value: 10 }],
+    deductions: [{ name: 'Tax', type: 'percentage', value: 5 }],
+};
+
+const toSettingsObject = (value: unknown): Record<string, unknown> => {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        return value as Record<string, unknown>;
+    }
+    return {};
+};
+
+const normalizeConfigItem = (value: unknown): PayrollConfigItem | null => {
+    if (!value || typeof value !== 'object') return null;
+    const obj = value as Record<string, unknown>;
+    const name = typeof obj.name === 'string' ? obj.name : '';
+    const type = obj.type === 'fixed' || obj.type === 'percentage' ? obj.type : null;
+    const num = typeof obj.value === 'number' && Number.isFinite(obj.value) ? obj.value : null;
+    if (!name || !type || num === null || num < 0) return null;
+    return { name, type, value: num };
+};
+
+const normalizePayrollConfig = (value: unknown): PayrollConfig => {
+    if (!value || typeof value !== 'object') return DEFAULT_PAYROLL_CONFIG;
+    const obj = value as Record<string, unknown>;
+
+    const allowancesRaw = Array.isArray(obj.allowances) ? obj.allowances : [];
+    const deductionsRaw = Array.isArray(obj.deductions) ? obj.deductions : [];
+
+    const allowances = allowancesRaw.map(normalizeConfigItem).filter((x): x is PayrollConfigItem => x !== null);
+    const deductions = deductionsRaw.map(normalizeConfigItem).filter((x): x is PayrollConfigItem => x !== null);
+
+    return {
+        allowances: allowances.length ? allowances : DEFAULT_PAYROLL_CONFIG.allowances,
+        deductions: deductions.length ? deductions : DEFAULT_PAYROLL_CONFIG.deductions,
+    };
+};
 
 export class PayrollService {
+    async getPayrollConfig(organizationId: string): Promise<PayrollConfig> {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { settings: true },
+        });
+        const root = toSettingsObject(org?.settings);
+        return normalizePayrollConfig(root.payroll);
+    }
+
+    async updatePayrollConfig(config: PayrollConfig, organizationId: string): Promise<PayrollConfig> {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { settings: true },
+        });
+
+        const root = toSettingsObject(org?.settings);
+        const nextSettings: Record<string, unknown> = {
+            ...root,
+            payroll: config,
+        };
+
+        const updated = await prisma.organization.update({
+            where: { id: organizationId },
+            data: { settings: nextSettings as unknown as Prisma.InputJsonValue },
+            select: { settings: true },
+        });
+
+        const updatedRoot = toSettingsObject(updated.settings);
+        return normalizePayrollConfig(updatedRoot.payroll);
+    }
     private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
         const employee = await prisma.employee.findFirst({
             where: { id: employeeId, organizationId },
@@ -108,11 +189,13 @@ export class PayrollService {
             throw new BadRequestError('No active employees found for payroll generation');
         }
 
+        const payrollConfig = await this.getPayrollConfig(organizationId);
+
         const payrolls = [];
 
         for (const employee of employees) {
             // Calculate payroll
-            const calculation = this.calculatePayroll(employee, data.payPeriod);
+            const calculation = this.calculatePayroll(employee, data.payPeriod, payrollConfig);
 
             // Upsert payroll record
             const payroll = await payrollRepository.upsert({
@@ -147,16 +230,30 @@ export class PayrollService {
     /**
      * Calculate payroll for an employee
      */
-    private calculatePayroll(employee: any, payPeriod: string) {
+    private calculatePayroll(employee: any, payPeriod: string, payrollConfig: PayrollConfig) {
         const baseSalary = Number(employee.salary);
 
-        // Calculate allowances (10% of base salary - simplified)
-        const allowances = baseSalary * 0.1;
+        const resolveAmount = (item: PayrollConfigItem): number => {
+            if (item.type === 'fixed') return item.value;
+            return (baseSalary * item.value) / 100;
+        };
 
-        // Calculate deductions (5% tax - simplified)
-        const deductions = baseSalary * 0.05;
+        const allowancesBreakdown = payrollConfig.allowances.map((item) => ({
+            name: item.name,
+            type: item.type,
+            value: item.value,
+            amount: resolveAmount(item),
+        }));
 
-        // Net salary
+        const deductionsBreakdown = payrollConfig.deductions.map((item) => ({
+            name: item.name,
+            type: item.type,
+            value: item.value,
+            amount: resolveAmount(item),
+        }));
+
+        const allowances = allowancesBreakdown.reduce((sum, item) => sum + item.amount, 0);
+        const deductions = deductionsBreakdown.reduce((sum, item) => sum + item.amount, 0);
         const netSalary = baseSalary + allowances - deductions;
 
         // Attendance summary
@@ -171,12 +268,8 @@ export class PayrollService {
             allowances,
             deductions,
             netSalary,
-            allowancesBreakdown: [
-                { name: 'Standard Allowance', amount: allowances },
-            ],
-            deductionsBreakdown: [
-                { name: 'Tax', amount: deductions },
-            ],
+            allowancesBreakdown,
+            deductionsBreakdown,
             attendanceSummary: {
                 daysWorked,
                 totalOvertime,
@@ -218,6 +311,137 @@ export class PayrollService {
         const records = await payrollRepository.findByEmployee(employeeId, organizationId);
 
         return records;
+    }
+
+    async exportEmployeePayslipsCsv(employeeId: string, organizationId: string): Promise<{ filename: string; csv: string }> {
+        const records = await payrollRepository.findByEmployeeForExport(employeeId, organizationId);
+
+        const escapeCsv = (value: string): string => {
+            const needsQuotes = /[",\n\r]/.test(value);
+            const escaped = value.replace(/"/g, '""');
+            return needsQuotes ? `"${escaped}"` : escaped;
+        };
+
+        const toCell = (value: unknown): string => {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'number') return String(value);
+            if (typeof value === 'string') return escapeCsv(value);
+            if (value instanceof Date) return escapeCsv(value.toISOString());
+            return escapeCsv(String(value));
+        };
+
+        const headers = [
+            'Pay Period',
+            'Employee Number',
+            'Employee Name',
+            'Department',
+            'Base Salary',
+            'Allowances',
+            'Deductions',
+            'Net Salary',
+            'Status',
+            'Processed At',
+        ];
+
+        const rows = records.map((r) => {
+            const employeeName = `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.trim();
+            return [
+                toCell(r.payPeriod),
+                toCell(r.employee?.employeeNumber ?? ''),
+                toCell(employeeName),
+                toCell(r.employee?.department?.name ?? ''),
+                toCell(Number(r.baseSalary)),
+                toCell(Number(r.allowances)),
+                toCell(Number(r.deductions)),
+                toCell(Number(r.netSalary)),
+                toCell(String(r.status)),
+                toCell(r.processedAt ?? null),
+            ].join(',');
+        });
+
+        const csv = `${headers.join(',')}\n${rows.join('\n')}`;
+        return {
+            filename: `payslips-${employeeId}.csv`,
+            csv,
+        };
+    }
+
+    async exportPayslipPdf(
+        recordId: string,
+        organizationId: string
+    ): Promise<{ filename: string; pdf: Buffer; employeeId: string }> {
+        const record = await this.getById(recordId, organizationId);
+
+        const employeeName = `${record.employee?.firstName ?? ''} ${record.employee?.lastName ?? ''}`.trim();
+        const employeeNumber = record.employee?.employeeNumber ?? '';
+        const departmentName = record.employee?.department?.name ?? '';
+
+        const allowancesBreakdown = Array.isArray(record.allowancesBreakdown) ? record.allowancesBreakdown : [];
+        const deductionsBreakdown = Array.isArray(record.deductionsBreakdown) ? record.deductionsBreakdown : [];
+
+        const doc = new PDFDocument({ size: 'A4', margin: 48 });
+
+        const chunks: Buffer[] = [];
+        const pdf: Buffer = await new Promise((resolve, reject) => {
+            doc.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            doc.fontSize(18).text('Payslip', { align: 'center' });
+            doc.moveDown(1);
+
+            doc.fontSize(11);
+            doc.text(`Pay Period: ${record.payPeriod}`);
+            doc.text(`Employee: ${employeeName || 'N/A'}`);
+            doc.text(`Employee Number: ${employeeNumber || 'N/A'}`);
+            doc.text(`Department: ${departmentName || 'N/A'}`);
+            doc.text(`Status: ${String(record.status)}`);
+            doc.text(`Processed At: ${record.processedAt ? record.processedAt.toISOString() : 'N/A'}`);
+            doc.moveDown(1);
+
+            doc.fontSize(12).text('Summary', { underline: true });
+            doc.moveDown(0.5);
+
+            doc.fontSize(11);
+            doc.text(`Base Salary: ${Number(record.baseSalary).toFixed(2)}`);
+            doc.text(`Allowances: ${Number(record.allowances).toFixed(2)}`);
+            doc.text(`Deductions: ${Number(record.deductions).toFixed(2)}`);
+            doc.text(`Net Salary: ${Number(record.netSalary).toFixed(2)}`);
+            doc.moveDown(1);
+
+            const writeBreakdown = (title: string, items: unknown[]) => {
+                doc.fontSize(12).text(title, { underline: true });
+                doc.moveDown(0.5);
+                doc.fontSize(11);
+
+                if (!items.length) {
+                    doc.text('N/A');
+                    doc.moveDown(1);
+                    return;
+                }
+
+                for (const raw of items) {
+                    if (!raw || typeof raw !== 'object') continue;
+                    const obj = raw as Record<string, unknown>;
+                    const name = typeof obj.name === 'string' ? obj.name : 'Item';
+                    const amount = typeof obj.amount === 'number' ? obj.amount : Number(obj.amount);
+                    const amountText = Number.isFinite(amount) ? amount.toFixed(2) : '';
+                    doc.text(`${name}: ${amountText}`);
+                }
+                doc.moveDown(1);
+            };
+
+            writeBreakdown('Allowances Breakdown', allowancesBreakdown);
+            writeBreakdown('Deductions Breakdown', deductionsBreakdown);
+
+            doc.end();
+        });
+
+        return {
+            filename: `payslip-${employeeNumber || record.employeeId}-${record.payPeriod}.pdf`,
+            pdf,
+            employeeId: record.employeeId,
+        };
     }
 
     /**

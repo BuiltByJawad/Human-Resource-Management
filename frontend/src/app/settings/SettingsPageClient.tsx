@@ -424,6 +424,24 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
           <h1 className="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
 
           <div className="space-y-6">
+            {hasPermission(PERMISSIONS.MANAGE_LEAVE_POLICIES) ? (
+              <div className="bg-white shadow rounded-lg p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">Leave Policy</h3>
+                    <p className="text-sm text-gray-600 mt-1">Configure leave entitlements and holiday calendar.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/settings/leave-policy')}
+                    className="inline-flex items-center justify-center font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all active:scale-95 hover:scale-105 bg-transparent border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-blue-500 px-4 py-2 text-sm"
+                  >
+                    Manage
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             {adminSections
               .filter((section) => hasPermission(section.permission))
               .map((section) => (

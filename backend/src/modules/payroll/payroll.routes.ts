@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import * as payrollController from './payroll.controller';
 import { authenticate, checkPermission } from '../../shared/middleware/auth';
+import { validateRequest } from '../../shared/middleware/validation';
+import { payrollConfigSchema } from '../../validators';
 
 /**
  * @swagger
@@ -12,6 +14,13 @@ import { authenticate, checkPermission } from '../../shared/middleware/auth';
 const router = Router();
 
 router.use(authenticate);
+
+router.get('/config', checkPermission('payroll', 'configure'), payrollController.getConfig);
+router.put('/config', checkPermission('payroll', 'configure'), validateRequest(payrollConfigSchema), payrollController.updateConfig);
+
+router.get('/payslips/export/:employeeId?', payrollController.exportPayslipsCsv);
+
+router.get('/payslips/pdf/:id', payrollController.exportPayslipPdf);
 
 router.get('/payslips/:employeeId?', payrollController.getEmployeePayslips);
 

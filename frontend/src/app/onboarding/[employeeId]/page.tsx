@@ -129,7 +129,7 @@ export default function OnboardingEmployeePage() {
                 <Card className="sticky top-0 shadow-sm border-gray-200/60">
                   <CardHeader>
                     <CardTitle className="text-lg">New Step</CardTitle>
-                    <CardDescription>Add a requirement for this employee's onboarding.</CardDescription>
+                    <CardDescription>Add a requirement for this employee onboarding.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <form

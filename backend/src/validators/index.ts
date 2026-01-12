@@ -110,6 +110,7 @@ export const orgSettingsSchema = Joi.object({
   tagline: Joi.string().max(150).allow('', null),
   companyName: Joi.string().max(150).allow('', null),
   companyAddress: Joi.string().max(300).allow('', null),
+
   loginHeroTitle: Joi.string().max(120).allow('', null),
   loginHeroSubtitle: Joi.string().max(200).allow('', null),
   loginAccentColor: Joi.string()
@@ -125,4 +126,27 @@ export const orgSettingsSchema = Joi.object({
     )
     .max(4)
     .optional(),
+})
+
+export const payrollConfigSchema = Joi.object({
+  allowances: Joi.array()
+    .items(
+      Joi.object({
+        name: Joi.string().max(120).required(),
+        type: Joi.string().valid('fixed', 'percentage').required(),
+        value: Joi.number().min(0).required(),
+      })
+    )
+    .max(50)
+    .default([]),
+  deductions: Joi.array()
+    .items(
+      Joi.object({
+        name: Joi.string().max(120).required(),
+        type: Joi.string().valid('fixed', 'percentage').required(),
+        value: Joi.number().min(0).required(),
+      })
+    )
+    .max(50)
+    .default([]),
 })

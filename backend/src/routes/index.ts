@@ -16,7 +16,7 @@ import notificationRoutes from '../modules/notification/notification.routes';
 import offboardingRoutes from '../modules/offboarding/offboarding.routes';
 import onboardingRoutes from '../modules/onboarding/onboarding.routes';
 import orgRoutes from './orgRoutes';
-import payrollRoutes from './payrollRoutes';
+import payrollRoutes from '../modules/payroll/payroll.routes';
 import performanceRoutes from './performance.routes';
 import recruitmentRoutes from './recruitmentRoutes';
 import reportRoutes from './reportRoutes';
