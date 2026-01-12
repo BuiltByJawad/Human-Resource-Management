@@ -243,6 +243,7 @@ export type PayrollStatus = 'draft' | 'processed' | 'paid' | 'error'
 
 export interface PayrollRecord {
   id: string
+  employeeId: string
   payPeriod: string
   netSalary: number
   baseSalary?: number
@@ -252,6 +253,7 @@ export interface PayrollRecord {
   deductionsBreakdown?: { name: string; amount: number }[]
   status: PayrollStatus
   employee: {
+    id: string
     firstName: string
     lastName: string
     employeeNumber: string

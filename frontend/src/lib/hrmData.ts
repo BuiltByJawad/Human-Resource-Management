@@ -29,6 +29,18 @@ function withAuthConfig(token?: string) {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
 }
 
+function downloadBlob(data: BlobPart, filename: string, mimeType: string) {
+  const blob = new Blob([data], { type: mimeType })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
+
 const extractStatusCode = (error: unknown): number | undefined => {
   if (typeof error !== 'object' || error === null) {
     return undefined
@@ -715,6 +727,89 @@ export async function updatePayrollStatus(
 		{ status },
 		withAuthConfig(token),
 	)
+}
+
+export async function downloadPayslipPdf(
+	payrollRecordId: string,
+	token?: string,
+): Promise<void> {
+	const response = await api.get(`/payroll/payslips/pdf/${payrollRecordId}`, {
+		responseType: 'blob',
+		...withAuthConfig(token),
+	})
+
+	downloadBlob(response.data, `payslip-${payrollRecordId}.pdf`, 'application/pdf')
+}
+
+export async function downloadPayslipsCsv(
+	employeeId?: string,
+	token?: string,
+): Promise<void> {
+	const path = employeeId ? `/payroll/payslips/export/${employeeId}` : '/payroll/payslips/export'
+	const response = await api.get(path, {
+		responseType: 'blob',
+		...withAuthConfig(token),
+	})
+
+	const suffix = employeeId ? employeeId : 'me'
+	downloadBlob(response.data, `payslips-${suffix}.csv`, 'text/csv')
+}
+
+export async function downloadPayrollPeriodCsv(payPeriod: string, token?: string): Promise<void> {
+	if (!payPeriod) return
+	const response = await api.get(`/payroll/export/${payPeriod}`, {
+		responseType: 'blob',
+		...withAuthConfig(token),
+	})
+
+	downloadBlob(response.data, `payroll-${payPeriod}.csv`, 'text/csv')
+}
+
+export type PayrollConfigItem = {
+	name: string
+	type: 'fixed' | 'percentage'
+	value: number
+}
+
+export type PayrollConfig = {
+	allowances: PayrollConfigItem[]
+	deductions: PayrollConfigItem[]
+}
+
+export async function fetchPayrollConfig(token?: string): Promise<PayrollConfig> {
+	const response = await api.get('/payroll/config', withAuthConfig(token))
+	const payload = response.data?.data ?? response.data
+	return (payload ?? { allowances: [], deductions: [] }) as PayrollConfig
+}
+
+export async function updatePayrollConfig(config: PayrollConfig, token?: string): Promise<PayrollConfig> {
+	const response = await api.put('/payroll/config', config, withAuthConfig(token))
+	const payload = response.data?.data ?? response.data
+	return (payload ?? config) as PayrollConfig
+}
+
+export async function fetchPayrollOverride(employeeId: string, payPeriod: string, token?: string): Promise<PayrollConfig | null> {
+	if (!employeeId || !payPeriod) return null
+	const response = await api.get(`/payroll/overrides/${employeeId}/${payPeriod}`, withAuthConfig(token))
+	const payload = response.data?.data ?? response.data
+	return (payload ?? null) as PayrollConfig | null
+}
+
+export async function upsertPayrollOverride(
+	employeeId: string,
+	payPeriod: string,
+	config: PayrollConfig,
+	token?: string
+): Promise<PayrollConfig> {
+	const response = await api.put(`/payroll/overrides/${employeeId}/${payPeriod}`, config, withAuthConfig(token))
+	const payload = response.data?.data ?? response.data
+	return (payload ?? config) as PayrollConfig
+}
+
+export async function deletePayrollOverride(employeeId: string, payPeriod: string, token?: string): Promise<boolean> {
+	const response = await api.delete(`/payroll/overrides/${employeeId}/${payPeriod}`, withAuthConfig(token))
+	const payload = response.data?.data ?? response.data
+	return Boolean(payload?.removed)
 }
 
 export async function fetchRecruitmentJobs(token?: string): Promise<JobPosting[]> {

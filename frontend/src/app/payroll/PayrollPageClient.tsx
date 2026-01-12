@@ -2,17 +2,35 @@
 
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { BanknotesIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon } from "@heroicons/react/24/outline"
+import {
+  AdjustmentsHorizontalIcon,
+  BanknotesIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  DocumentTextIcon,
+} from "@heroicons/react/24/outline"
 
 import { DataTable, type Column } from "@/components/ui/DataTable"
 import { PayslipModal } from "@/components/hrm/PayslipModal"
 import GeneratePayrollModal from "@/components/hrm/GeneratePayrollModal"
+import PayrollConfigModal from "@/components/hrm/PayrollConfigModal"
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
-import { fetchPayrollRecords, generatePayroll, updatePayrollStatus } from "@/lib/hrmData"
+import {
+  deletePayrollOverride,
+  downloadPayrollPeriodCsv,
+  fetchPayrollConfig,
+  fetchPayrollOverride,
+  fetchPayrollRecords,
+  generatePayroll,
+  upsertPayrollOverride,
+  updatePayrollConfig,
+  updatePayrollStatus,
+} from "@/lib/hrmData"
+import { PERMISSIONS } from "@/constants/permissions"
 
 import { PayrollRecord } from "./types"
 
@@ -25,11 +43,14 @@ interface PayrollPageClientProps {
 
 export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientProps) {
   const { token } = useAuthStore()
+  const { hasPermission } = useAuthStore()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
+  const [overrideTarget, setOverrideTarget] = useState<{ employeeId: string; payPeriod: string } | null>(null)
 
   const payrollQuery = useQuery<PayrollRecord[]>({
     queryKey: ["payroll", "list"],
@@ -39,6 +60,69 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
     gcTime: GC_TIME,
     refetchOnWindowFocus: false,
     initialData: initialPayrolls,
+  })
+
+  const payrollConfigQuery = useQuery({
+    queryKey: ["payroll", "config"],
+    queryFn: () => fetchPayrollConfig(token ?? undefined),
+    enabled: !!token && hasPermission(PERMISSIONS.CONFIGURE_PAYROLL),
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+    refetchOnWindowFocus: false,
+  })
+
+  const payrollConfigMutation = useMutation({
+    mutationFn: (config: Parameters<typeof updatePayrollConfig>[0]) => updatePayrollConfig(config, token ?? undefined),
+    onSuccess: () => {
+      showToast("Payroll configuration saved", "success")
+      queryClient.invalidateQueries({ queryKey: ["payroll", "config"] })
+    },
+    onError: (error: unknown) =>
+      handleCrudError({
+        error,
+        resourceLabel: "Payroll configuration",
+        showToast,
+      }),
+  })
+
+  const payrollOverrideQuery = useQuery({
+    queryKey: ["payroll", "override", overrideTarget?.employeeId, overrideTarget?.payPeriod],
+    queryFn: () =>
+      overrideTarget
+        ? fetchPayrollOverride(overrideTarget.employeeId, overrideTarget.payPeriod, token ?? undefined)
+        : Promise.resolve(null),
+    enabled: !!token && !!overrideTarget && hasPermission(PERMISSIONS.MANAGE_PAYROLL),
+    staleTime: STALE_TIME,
+    gcTime: GC_TIME,
+    refetchOnWindowFocus: false,
+  })
+
+  const upsertPayrollOverrideMutation = useMutation({
+    mutationFn: (config: Parameters<typeof upsertPayrollOverride>[2]) => {
+      if (!overrideTarget) throw new Error("Override target missing")
+      return upsertPayrollOverride(overrideTarget.employeeId, overrideTarget.payPeriod, config, token ?? undefined)
+    },
+    onSuccess: () => {
+      showToast("Payroll override saved", "success")
+      queryClient.invalidateQueries({
+        queryKey: ["payroll", "override", overrideTarget?.employeeId, overrideTarget?.payPeriod],
+      })
+    },
+    onError: (error: unknown) => handleCrudError({ error, resourceLabel: "Payroll override", showToast }),
+  })
+
+  const deletePayrollOverrideMutation = useMutation({
+    mutationFn: async () => {
+      if (!overrideTarget) return false
+      return deletePayrollOverride(overrideTarget.employeeId, overrideTarget.payPeriod, token ?? undefined)
+    },
+    onSuccess: (removed) => {
+      showToast(removed ? "Payroll override removed" : "Payroll override not found", removed ? "success" : "info")
+      queryClient.invalidateQueries({
+        queryKey: ["payroll", "override", overrideTarget?.employeeId, overrideTarget?.payPeriod],
+      })
+    },
+    onError: (error: unknown) => handleCrudError({ error, resourceLabel: "Payroll override", showToast }),
   })
 
   const stats = useMemo(() => {
@@ -122,6 +206,17 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
       key: "actions",
       render: (_, record) => (
         <div className="flex space-x-2 justify-end">
+          {hasPermission(PERMISSIONS.MANAGE_PAYROLL) && (
+            <button
+              onClick={() => {
+                setOverrideTarget({ employeeId: record.employeeId, payPeriod: record.payPeriod })
+              }}
+              className="text-gray-700 hover:text-gray-900 p-1"
+              title="Override payroll adjustments"
+            >
+              <AdjustmentsHorizontalIcon className="h-5 w-5" />
+            </button>
+          )}
           <button
             onClick={() => {
               setSelectedPayroll(record)
@@ -159,14 +254,42 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
                 <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Payroll Management</h1>
                 <p className="text-sm text-gray-500 mt-1">Manage salaries, payslips, and payments.</p>
               </div>
-              <button
-                onClick={() => setIsGenerateModalOpen(true)}
-                disabled={generateMutation.isPending}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-60"
-              >
-                <BanknotesIcon className="h-5 w-5 mr-2" />
-                {generateMutation.isPending ? "Generating..." : "Generate Payroll"}
-              </button>
+              <div className="flex items-center gap-3">
+                {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
+                  <button
+                    onClick={async () => {
+                      const value = window.prompt("Enter pay period (YYYY-MM)")
+                      const payPeriod = value ? value.trim() : ""
+                      if (!payPeriod) return
+                      try {
+                        await downloadPayrollPeriodCsv(payPeriod, token ?? undefined)
+                        showToast("Payroll exported", "success")
+                      } catch (error: unknown) {
+                        handleCrudError({ error, resourceLabel: "Payroll period export", showToast })
+                      }
+                    }}
+                    className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 flex items-center shadow-lg shadow-gray-900/20 transition-all hover:scale-105 active:scale-95"
+                  >
+                    Export Period CSV
+                  </button>
+                )}
+                {hasPermission(PERMISSIONS.CONFIGURE_PAYROLL) && (
+                  <button
+                    onClick={() => setIsConfigModalOpen(true)}
+                    className="px-4 py-2 bg-white text-gray-900 rounded-lg hover:bg-gray-50 flex items-center shadow-lg shadow-gray-900/10 transition-all hover:scale-105 active:scale-95 ring-1 ring-inset ring-gray-200"
+                  >
+                    Configure Payroll
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsGenerateModalOpen(true)}
+                  disabled={generateMutation.isPending}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-60"
+                >
+                  <BanknotesIcon className="h-5 w-5 mr-2" />
+                  {generateMutation.isPending ? "Generating..." : "Generate Payroll"}
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -227,6 +350,38 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
         onGenerate={async (payPeriod) => {
           await generateMutation.mutateAsync(payPeriod)
         }}
+      />
+
+      <PayrollConfigModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        loading={payrollConfigQuery.isLoading || payrollConfigMutation.isPending}
+        initialConfig={payrollConfigQuery.data ?? null}
+        onSave={async (config) => {
+          await payrollConfigMutation.mutateAsync(config)
+        }}
+      />
+
+      <PayrollConfigModal
+        isOpen={!!overrideTarget}
+        onClose={() => setOverrideTarget(null)}
+        loading={
+          payrollOverrideQuery.isLoading ||
+          upsertPayrollOverrideMutation.isPending ||
+          deletePayrollOverrideMutation.isPending
+        }
+        initialConfig={payrollOverrideQuery.data ?? null}
+        onSave={async (config) => {
+          await upsertPayrollOverrideMutation.mutateAsync(config)
+        }}
+        onDelete={
+          payrollOverrideQuery.data
+            ? async () => {
+                await deletePayrollOverrideMutation.mutateAsync()
+              }
+            : undefined
+        }
+        deleteLabel="Remove Override"
       />
     </div>
   )

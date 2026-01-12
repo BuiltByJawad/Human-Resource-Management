@@ -127,6 +127,34 @@ export class PayrollRepository {
         });
     }
 
+    async findByPeriodForExport(payPeriod: string, organizationId: string) {
+        return prisma.payrollRecord.findMany({
+            where: {
+                payPeriod,
+                employee: {
+                    organizationId,
+                },
+            },
+            include: {
+                employee: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        employeeNumber: true,
+                        department: {
+                            select: { name: true },
+                        },
+                    },
+                },
+            },
+            orderBy: {
+                employee: {
+                    employeeNumber: 'asc',
+                },
+            },
+        });
+    }
+
     async upsert(data: {
         employeeId: string;
         payPeriod: string;
@@ -243,6 +271,64 @@ export class PayrollRepository {
                             lt: endDate,
                         },
                     },
+                },
+            },
+        });
+    }
+
+    async findOverride(employeeId: string, payPeriod: string, organizationId: string) {
+        return prisma.payrollOverride.findFirst({
+            where: {
+                employeeId,
+                payPeriod,
+                employee: {
+                    organizationId,
+                },
+            },
+        });
+    }
+
+    async upsertOverride(employeeId: string, payPeriod: string, config: Prisma.InputJsonValue) {
+        return prisma.payrollOverride.upsert({
+            where: {
+                employeeId_payPeriod_override: {
+                    employeeId,
+                    payPeriod,
+                },
+            },
+            update: {
+                config,
+            },
+            create: {
+                employeeId,
+                payPeriod,
+                config,
+            },
+        });
+    }
+
+    async deleteOverride(employeeId: string, payPeriod: string, organizationId: string) {
+        const result = await prisma.payrollOverride.deleteMany({
+            where: {
+                employeeId,
+                payPeriod,
+                employee: {
+                    organizationId,
+                },
+            },
+        });
+
+        return result.count;
+    }
+
+    async findOverridesForEmployees(payPeriod: string, employeeIds: string[], organizationId: string) {
+        if (!employeeIds.length) return [];
+        return prisma.payrollOverride.findMany({
+            where: {
+                payPeriod,
+                employeeId: { in: employeeIds },
+                employee: {
+                    organizationId,
                 },
             },
         });

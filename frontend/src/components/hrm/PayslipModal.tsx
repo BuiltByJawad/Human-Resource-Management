@@ -1,7 +1,11 @@
 import { Fragment } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
-import { XMarkIcon, PrinterIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, PrinterIcon, ArrowDownTrayIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { useOrgStore } from '@/store/useOrgStore'
+import { useAuthStore } from '@/store/useAuthStore'
+import { downloadPayslipPdf, downloadPayslipsCsv } from '@/lib/hrmData'
+import { useToast } from '@/components/ui/ToastProvider'
+import { handleCrudError } from '@/lib/apiError'
 
 interface PayslipModalProps {
     isOpen: boolean
@@ -11,11 +15,32 @@ interface PayslipModalProps {
 
 export const PayslipModal = ({ isOpen, onClose, payroll }: PayslipModalProps) => {
     const { companyName, companyAddress } = useOrgStore()
+    const { token } = useAuthStore()
+    const { showToast } = useToast()
 
     if (!payroll) return null
 
     const handlePrint = () => {
         window.print()
+    }
+
+    const handleDownloadPdf = async () => {
+        try {
+            await downloadPayslipPdf(String(payroll.id), token ?? undefined)
+            showToast('Payslip downloaded', 'success')
+        } catch (error: unknown) {
+            handleCrudError({ error, resourceLabel: 'Payslip PDF export', showToast })
+        }
+    }
+
+    const handleDownloadCsv = async () => {
+        try {
+            const employeeId = payroll?.employee?.id
+            await downloadPayslipsCsv(employeeId ? String(employeeId) : undefined, token ?? undefined)
+            showToast('Payslips exported', 'success')
+        } catch (error: unknown) {
+            handleCrudError({ error, resourceLabel: 'Payslips CSV export', showToast })
+        }
     }
 
     return (
@@ -158,6 +183,22 @@ export const PayslipModal = ({ isOpen, onClose, payroll }: PayslipModalProps) =>
                                 </div>
 
                                 <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 no-print">
+                                    <button
+                                        type="button"
+                                        className="inline-flex w-full justify-center rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 sm:ml-3 sm:w-auto"
+                                        onClick={handleDownloadPdf}
+                                    >
+                                        <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
+                                        Download PDF
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:ml-3 sm:w-auto"
+                                        onClick={handleDownloadCsv}
+                                    >
+                                        <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+                                        Export CSV
+                                    </button>
                                     <button
                                         type="button"
                                         className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto"
