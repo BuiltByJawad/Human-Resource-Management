@@ -1,16 +1,81 @@
 import { Router } from 'express'
 import { Request, Response } from 'express'
 import { asyncHandler } from '../shared/middleware/errorHandler'
-import { authenticate, authorize } from '../shared/middleware/auth'
+import { AuthRequest, authenticate, checkPermission } from '../shared/middleware/auth'
 import { prisma } from '../shared/config/database'
 import Joi from 'joi'
+import { requireRequestOrganizationId } from '../shared/utils/tenant'
+import PDFDocument from 'pdfkit'
 
 const router = Router()
+
+const canExportReport = (req: AuthRequest): boolean => {
+  const permissions = Array.isArray(req.user?.permissions) ? req.user?.permissions : []
+  return req.user?.role === 'Super Admin' || permissions.includes('reports.export')
+}
+
+const toPdfBuffer = async (title: string, rows: Array<Record<string, unknown>>): Promise<Buffer> => {
+  const doc = new PDFDocument({ margin: 40, size: 'A4' })
+  const chunks: Buffer[] = []
+
+  doc.on('data', (chunk: Buffer) => chunks.push(chunk))
+
+  const endPromise = new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+  })
+
+  doc.fontSize(16).text(title)
+  doc.moveDown(0.75)
+
+  if (!rows.length) {
+    doc.fontSize(11).text('No data')
+    doc.end()
+    return endPromise
+  }
+
+  const headers = Object.keys(rows[0])
+  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right
+  const colWidth = Math.max(60, Math.floor(pageWidth / headers.length))
+  const rowHeight = 16
+
+  let y = doc.y
+
+  doc.fontSize(10)
+  let x = doc.page.margins.left
+  for (const h of headers) {
+    doc.text(h, x, y, { width: colWidth, continued: false })
+    x += colWidth
+  }
+  y += rowHeight
+  doc.moveTo(doc.page.margins.left, y).lineTo(doc.page.margins.left + pageWidth, y).stroke()
+  y += 6
+
+  for (const row of rows) {
+    if (y > doc.page.height - doc.page.margins.bottom - 40) {
+      doc.addPage()
+      y = doc.page.margins.top
+    }
+    x = doc.page.margins.left
+    for (const h of headers) {
+      const raw = (row as Record<string, unknown>)[h]
+      const text = raw === null || raw === undefined ? '' : String(raw)
+      doc.text(text, x, y, { width: colWidth, height: rowHeight, ellipsis: true })
+      x += colWidth
+    }
+    y += rowHeight
+  }
+
+  doc.end()
+  return endPromise
+}
 
 router.get(
   '/dashboard',
   authenticate,
+  checkPermission('reports', 'view'),
   asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const [
       totalEmployees,
       presentToday,
@@ -18,7 +83,7 @@ router.get(
       monthlyPayroll,
       recentActivities,
     ] = await Promise.all([
-      prisma.employee.count({ where: { status: 'active' } }),
+      prisma.employee.count({ where: { status: 'active', organizationId } }),
       prisma.attendance.count({
         where: {
           checkIn: {
@@ -26,20 +91,36 @@ router.get(
             lt: new Date(new Date().setHours(23, 59, 59, 999)),
           },
           status: 'present',
+          employee: {
+            organizationId,
+          },
         },
       }),
-      prisma.leaveRequest.count({ where: { status: 'pending' } }),
+      prisma.leaveRequest.count({
+        where: {
+          status: 'pending',
+          employee: {
+            organizationId,
+          },
+        },
+      }),
       prisma.payrollRecord.aggregate({
         where: {
           createdAt: {
             gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
             lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
           },
+          employee: {
+            organizationId,
+          },
         },
         _sum: { netSalary: true },
       }),
       prisma.employee.findMany({
         take: 5,
+        where: {
+          organizationId,
+        },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
@@ -76,11 +157,12 @@ router.get(
 router.get(
   '/employees',
   authenticate,
-  authorize(['Super Admin', 'HR Admin', 'Manager']),
+  checkPermission('reports', 'view'),
   asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { startDate, endDate, departmentId, format } = req.query as any
 
-    const where: any = {}
+    const where: any = { organizationId }
     if (startDate && endDate) {
       where.createdAt = {
         gte: new Date(startDate),
@@ -104,7 +186,11 @@ router.get(
       orderBy: { createdAt: 'desc' },
     })
 
-    if (format === 'csv') {
+    if (format === 'csv' || format === 'pdf') {
+      const authReq = req as unknown as AuthRequest
+      if (!canExportReport(authReq)) {
+        return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
+      }
       const csvData = employees.map((emp: any) => ({
         'Employee Number': emp.employeeNumber,
         'Name': `${emp.firstName} ${emp.lastName}`,
@@ -117,6 +203,13 @@ router.get(
         'Attendance Count': emp._count.attendance,
         'Approved Leaves': emp._count.leaveRequests,
       }))
+
+      if (format === 'pdf') {
+        const pdf = await toPdfBuffer('Employees Report', csvData)
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', 'attachment; filename="employees.pdf"')
+        return res.send(pdf)
+      }
 
       res.setHeader('Content-Type', 'text/csv')
       res.setHeader('Content-Disposition', 'attachment; filename="employees.csv"')
@@ -133,9 +226,10 @@ router.get(
 router.get(
   '/attendance',
   authenticate,
-  authorize(['Super Admin', 'HR Admin', 'Manager']),
+  checkPermission('reports', 'view'),
   asyncHandler(async (req: Request, res: Response) => {
-    const { startDate, endDate, departmentId } = req.query as any
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
+    const { startDate, endDate, departmentId, format } = req.query as any
 
     const where: any = {}
     if (startDate && endDate) {
@@ -144,8 +238,9 @@ router.get(
         lte: new Date(endDate),
       }
     }
-    if (departmentId) {
-      where.employee = { departmentId }
+    where.employee = {
+      organizationId,
+      ...(departmentId ? { departmentId } : {}),
     }
 
     const attendance = await prisma.attendance.findMany({
@@ -173,6 +268,35 @@ router.get(
       totalOvertimeHours: attendance.reduce((sum: number, a: any) => sum + Number(a.overtimeHours ?? 0), 0),
     }
 
+    if (format === 'csv' || format === 'pdf') {
+      const authReq = req as unknown as AuthRequest
+      if (!canExportReport(authReq)) {
+        return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
+      }
+
+      const csvData = attendance.map((a: any) => ({
+        'Employee': `${a.employee?.firstName ?? ''} ${a.employee?.lastName ?? ''}`.trim(),
+        'Employee Email': a.employee?.email,
+        'Department': a.employee?.department?.name,
+        'Check In': a.checkIn,
+        'Check Out': a.checkOut,
+        'Work Hours': a.workHours,
+        'Overtime Hours': a.overtimeHours,
+        'Status': a.status,
+      }))
+
+      if (format === 'pdf') {
+        const pdf = await toPdfBuffer('Attendance Report', csvData)
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', 'attachment; filename="attendance.pdf"')
+        return res.send(pdf)
+      }
+
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', 'attachment; filename="attendance.csv"')
+      return res.send(convertToCSV(csvData))
+    }
+
     res.json({
       success: true,
       data: {
@@ -186,9 +310,10 @@ router.get(
 router.get(
   '/leave',
   authenticate,
-  authorize(['Super Admin', 'HR Admin', 'Manager']),
+  checkPermission('reports', 'view'),
   asyncHandler(async (req: Request, res: Response) => {
-    const { startDate, endDate, departmentId } = req.query as any
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
+    const { startDate, endDate, departmentId, format } = req.query as any
 
     const where: any = {}
     if (startDate && endDate) {
@@ -197,8 +322,10 @@ router.get(
         lte: new Date(endDate),
       }
     }
-    if (departmentId) {
-      where.employee = { departmentId }
+
+    where.employee = {
+      organizationId,
+      ...(departmentId ? { departmentId } : {}),
     }
 
     const leaveRequests = await prisma.leaveRequest.findMany({
@@ -233,6 +360,36 @@ router.get(
       totalDaysRequested: leaveRequests.reduce((sum: number, lr: any) => sum + lr.daysRequested, 0),
     }
 
+    if (format === 'csv' || format === 'pdf') {
+      const authReq = req as unknown as AuthRequest
+      if (!canExportReport(authReq)) {
+        return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
+      }
+
+      const csvData = leaveRequests.map((lr: any) => ({
+        'Employee': `${lr.employee?.firstName ?? ''} ${lr.employee?.lastName ?? ''}`.trim(),
+        'Employee Email': lr.employee?.email,
+        'Department': lr.employee?.department?.name,
+        'Type': lr.leaveType,
+        'Start Date': lr.startDate,
+        'End Date': lr.endDate,
+        'Days Requested': lr.daysRequested,
+        'Status': lr.status,
+        'Approver': lr.approver ? `${lr.approver?.firstName ?? ''} ${lr.approver?.lastName ?? ''}`.trim() : null,
+      }))
+
+      if (format === 'pdf') {
+        const pdf = await toPdfBuffer('Leave Report', csvData)
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', 'attachment; filename="leave.pdf"')
+        return res.send(pdf)
+      }
+
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', 'attachment; filename="leave.csv"')
+      return res.send(convertToCSV(csvData))
+    }
+
     res.json({
       success: true,
       data: {
@@ -246,9 +403,10 @@ router.get(
 router.get(
   '/payroll',
   authenticate,
-  authorize(['Super Admin', 'HR Admin']),
+  checkPermission('reports', 'view'),
   asyncHandler(async (req: Request, res: Response) => {
-    const { startDate, endDate, departmentId } = req.query as any
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
+    const { startDate, endDate, departmentId, format } = req.query as any
 
     const where: any = {}
     if (startDate && endDate) {
@@ -257,8 +415,10 @@ router.get(
         lte: new Date(endDate),
       }
     }
-    if (departmentId) {
-      where.employee = { departmentId }
+
+    where.employee = {
+      organizationId,
+      ...(departmentId ? { departmentId } : {}),
     }
 
     const payrollRecords = await prisma.payrollRecord.findMany({
@@ -283,6 +443,36 @@ router.get(
       totalAllowances: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.allowances), 0),
       totalDeductions: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.deductions), 0),
       totalNetSalary: payrollRecords.reduce((sum: number, pr: any) => sum + Number(pr.netSalary), 0),
+    }
+
+    if (format === 'csv' || format === 'pdf') {
+      const authReq = req as unknown as AuthRequest
+      if (!canExportReport(authReq)) {
+        return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
+      }
+
+      const csvData = payrollRecords.map((pr: any) => ({
+        'Employee': `${pr.employee?.firstName ?? ''} ${pr.employee?.lastName ?? ''}`.trim(),
+        'Employee Email': pr.employee?.email,
+        'Department': pr.employee?.department?.name,
+        'Pay Period': pr.payPeriod,
+        'Base Salary': pr.baseSalary,
+        'Allowances': pr.allowances,
+        'Deductions': pr.deductions,
+        'Net Salary': pr.netSalary,
+        'Status': pr.status,
+      }))
+
+      if (format === 'pdf') {
+        const pdf = await toPdfBuffer('Payroll Report', csvData)
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', 'attachment; filename="payroll.pdf"')
+        return res.send(pdf)
+      }
+
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', 'attachment; filename="payroll.csv"')
+      return res.send(convertToCSV(csvData))
     }
 
     res.json({

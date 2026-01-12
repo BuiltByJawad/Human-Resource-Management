@@ -42,6 +42,31 @@ enum PayrollStatus {
   paid
 }
 
+enum ReportType {
+  employees
+  attendance
+  leave
+  payroll
+}
+
+enum ReportFormat {
+  csv
+  pdf
+}
+
+enum ReportScheduleFrequency {
+  daily
+  weekly
+  monthly
+}
+
+enum ReportRunStatus {
+  queued
+  running
+  success
+  failed
+}
+
 enum ReviewStatus {
   draft
   submitted
@@ -110,6 +135,8 @@ model User {
   // Backlink to Employee (Employee.userId)
   employee Employee?
   notifications Notification[]
+  scheduledReportsCreated ScheduledReport[]
+  scheduledReportRecipients ScheduledReportRecipient[]
 
   @@index([email])
   @@index([organizationId])
@@ -390,6 +417,60 @@ model PayrollOverride {
   @@index([payPeriod])
 }
 
+model ScheduledReport {
+  id             String                 @id @default(uuid())
+  organizationId String
+  name           String
+  type           ReportType
+  format         ReportFormat
+  frequency      ReportScheduleFrequency
+  filters        Json?
+  isEnabled      Boolean                @default(true)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  createdByUserId String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  recipients   ScheduledReportRecipient[]
+  runs         ScheduledReportRun[]
+
+  @@index([organizationId])
+  @@index([isEnabled])
+  @@index([nextRunAt])
+}
+
+model ScheduledReportRecipient {
+  id                String   @id @default(uuid())
+  scheduledReportId String
+  userId            String
+  createdAt         DateTime @default(now())
+
+  scheduledReport ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduledReportId, userId], name: "scheduledReportId_userId")
+  @@index([userId])
+}
+
+model ScheduledReportRun {
+  id                String        @id @default(uuid())
+  scheduledReportId String
+  status            ReportRunStatus @default(queued)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  errorMessage      String?
+  deliveredCount    Int           @default(0)
+  createdAt         DateTime      @default(now())
+
+  scheduledReport ScheduledReport @relation(fields: [scheduledReportId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledReportId])
+  @@index([status])
+}
+
 model Organization {
   id          String   @id @default(uuid())
   name        String
@@ -400,6 +481,7 @@ model Organization {
   updatedAt   DateTime @updatedAt
 
   users          User[]
+  scheduledReports ScheduledReport[]
   companySettings CompanySettings?
   departments    Department[]
   employees      Employee[]
