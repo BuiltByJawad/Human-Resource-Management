@@ -3,10 +3,11 @@
 import { useState, Fragment } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon, BanknotesIcon } from '@heroicons/react/24/outline'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import { Input } from '../ui/FormComponents'
+import { DatePicker } from '../ui/FormComponents'
+import { format } from 'date-fns'
 
 interface GeneratePayrollModalProps {
     isOpen: boolean
@@ -15,7 +16,10 @@ interface GeneratePayrollModalProps {
 }
 
 const payrollSchema = yup.object().shape({
-    payPeriod: yup.string().required('Pay period is required')
+    payPeriod: yup
+        .string()
+        .required('Pay period is required')
+        .matches(/^\d{4}-\d{2}$/, 'Use YYYY-MM format')
 })
 
 type PayrollFormData = yup.InferType<typeof payrollSchema>
@@ -23,7 +27,7 @@ type PayrollFormData = yup.InferType<typeof payrollSchema>
 export default function GeneratePayrollModal({ isOpen, onClose, onGenerate }: GeneratePayrollModalProps) {
     const [loading, setLoading] = useState(false)
 
-    const { register, handleSubmit, formState: { errors }, reset } = useForm<PayrollFormData>({
+    const { control, handleSubmit, formState: { errors }, reset } = useForm<PayrollFormData>({
         resolver: yupResolver(payrollSchema),
         defaultValues: {
             payPeriod: new Date().toISOString().slice(0, 7)
@@ -97,12 +101,25 @@ export default function GeneratePayrollModal({ isOpen, onClose, onGenerate }: Ge
 
                                         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-5">
                                             <div>
-                                                <Input
-                                                    label="Pay Period"
-                                                    type="month"
-                                                    required
-                                                    error={errors.payPeriod?.message}
-                                                    {...register('payPeriod')}
+                                                <Controller
+                                                    name="payPeriod"
+                                                    control={control}
+                                                    render={({ field }) => (
+                                                        <DatePicker
+                                                            label="Pay Period"
+                                                            value={field.value}
+                                                            onChange={(date) => {
+                                                                if (!date) {
+                                                                    field.onChange('')
+                                                                    return
+                                                                }
+                                                                field.onChange(format(date, 'yyyy-MM'))
+                                                            }}
+                                                            required
+                                                            error={errors.payPeriod?.message}
+                                                            mode="month"
+                                                        />
+                                                    )}
                                                 />
                                                 <p className="mt-2 text-xs text-gray-500">
                                                     Select the month and year for payroll generation

@@ -12,6 +12,7 @@ import { StoreHydrator } from "@/components/providers/StoreHydrator";
 import { BrandingProvider } from "@/components/providers/BrandingProvider";
 import { getServerAuthContext } from '@/lib/auth/serverAuth'
 import { AuthBootstrapProvider } from '@/components/providers/AuthBootstrapProvider'
+import { getBackendBaseUrl } from '@/lib/config/env'
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -48,10 +49,7 @@ function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
 }
 
 async function fetchBranding(): Promise<BrandingData> {
-  const apiBase =
-    process.env.BACKEND_URL ||
-    (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "") : null) ||
-    "http://localhost:5000";
+  const apiBase = getBackendBaseUrl()
 
   const headerList = await headers()
   const tenantSlug = extractTenantSlug({
@@ -68,7 +66,13 @@ async function fetchBranding(): Promise<BrandingData> {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch branding");
+      return {
+        siteName: "",
+        shortName: "HR",
+        tagline: "",
+        logoUrl: null,
+        faviconUrl: null,
+      };
     }
 
     const payload = await response.json();
@@ -85,7 +89,9 @@ async function fetchBranding(): Promise<BrandingData> {
       faviconUrl: normalizeAssetUrl(rawFaviconUrl, apiBase),
     };
   } catch (error) {
-    console.error("Branding fetch failed:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Branding fetch failed', error)
+    }
     return {
       siteName: "",
       shortName: "HR",

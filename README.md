@@ -156,6 +156,56 @@ The API documentation is available at `http://localhost:5000/api-docs` when runn
 - `GET /api/attendance` - Get attendance records
 - `GET /api/reports/dashboard` - Dashboard metrics
 
+### Scheduled Reports Runner (Cron / Task Scheduler)
+
+Scheduled reports are executed by calling a protected internal endpoint. This is intended to be triggered by a trusted scheduler (cron, Windows Task Scheduler, CI, etc.).
+
+- Endpoint: `POST /api/reports/schedules/run-due`
+- Auth: `X-Report-Scheduler-Token` header must match backend env var `REPORT_SCHEDULER_TOKEN`
+- Body: none
+
+**Backend (.env)**
+```
+REPORT_SCHEDULER_TOKEN=replace-with-a-long-random-secret
+```
+
+**Example (curl)**
+```bash
+curl -X POST "http://localhost:5000/api/reports/schedules/run-due" \
+  -H "X-Report-Scheduler-Token: replace-with-a-long-random-secret"
+```
+
+**Linux cron (every 5 minutes)**
+```cron
+*/5 * * * * curl -sS -X POST "http://localhost:5000/api/reports/schedules/run-due" -H "X-Report-Scheduler-Token: ${REPORT_SCHEDULER_TOKEN}" >/dev/null 2>&1
+```
+
+**Windows Task Scheduler (PowerShell action)**
+```powershell
+$headers = @{ "X-Report-Scheduler-Token" = $env:REPORT_SCHEDULER_TOKEN }
+Invoke-RestMethod -Method Post -Uri "http://localhost:5000/api/reports/schedules/run-due" -Headers $headers
+```
+
+**GitHub Actions (every 5 minutes)**
+```yaml
+name: Run Scheduled Reports
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger scheduled reports
+        run: |
+          curl -sS -X POST "${{ secrets.HRM_BACKEND_URL }}/api/reports/schedules/run-due" \
+            -H "X-Report-Scheduler-Token: ${{ secrets.REPORT_SCHEDULER_TOKEN }}"
+```
+
+Security note: treat `REPORT_SCHEDULER_TOKEN` as a secret. Do not expose it to the frontend or log it.
+
 ## Configuration
 
 ### Environment Variables

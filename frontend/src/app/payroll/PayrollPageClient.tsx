@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AdjustmentsHorizontalIcon,
@@ -13,6 +13,7 @@ import {
 import { DataTable, type Column } from "@/components/ui/DataTable"
 import { PayslipModal } from "@/components/hrm/PayslipModal"
 import GeneratePayrollModal from "@/components/hrm/GeneratePayrollModal"
+import ExportPayrollModal from "@/components/hrm/ExportPayrollModal"
 import PayrollConfigModal from "@/components/hrm/PayrollConfigModal"
 import Sidebar from "@/components/ui/Sidebar"
 import Header from "@/components/ui/Header"
@@ -48,9 +49,25 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
   const queryClient = useQueryClient()
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null)
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [overrideTarget, setOverrideTarget] = useState<{ employeeId: string; payPeriod: string } | null>(null)
+  const [hasHydrated, setHasHydrated] = useState(false)
+
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setHasHydrated(true)
+    })
+    if (useAuthStore.persist.hasHydrated()) {
+      setHasHydrated(true)
+    }
+    return unsub
+  }, [])
+
+  const canViewPayroll = hasHydrated && hasPermission(PERMISSIONS.VIEW_PAYROLL)
+  const canConfigurePayroll = hasHydrated && hasPermission(PERMISSIONS.CONFIGURE_PAYROLL)
+  const canManagePayroll = hasHydrated && hasPermission(PERMISSIONS.MANAGE_PAYROLL)
 
   const payrollQuery = useQuery<PayrollRecord[]>({
     queryKey: ["payroll", "list"],
@@ -206,17 +223,21 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
       key: "actions",
       render: (_, record) => (
         <div className="flex space-x-2 justify-end">
-          {hasPermission(PERMISSIONS.MANAGE_PAYROLL) && (
-            <button
-              onClick={() => {
-                setOverrideTarget({ employeeId: record.employeeId, payPeriod: record.payPeriod })
-              }}
-              className="text-gray-700 hover:text-gray-900 p-1"
-              title="Override payroll adjustments"
-            >
-              <AdjustmentsHorizontalIcon className="h-5 w-5" />
-            </button>
-          )}
+          <button
+            onClick={() => {
+              if (!canManagePayroll) return
+              setOverrideTarget({ employeeId: record.employeeId, payPeriod: record.payPeriod })
+            }}
+            disabled={!canManagePayroll}
+            className={`p-1 ${
+              canManagePayroll
+                ? "text-gray-700 hover:text-gray-900"
+                : "text-gray-300 cursor-not-allowed"
+            }`}
+            title="Override payroll adjustments"
+          >
+            <AdjustmentsHorizontalIcon className="h-5 w-5" />
+          </button>
           <button
             onClick={() => {
               setSelectedPayroll(record)
@@ -255,32 +276,28 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
                 <p className="text-sm text-gray-500 mt-1">Manage salaries, payslips, and payments.</p>
               </div>
               <div className="flex items-center gap-3">
-                {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
-                  <button
-                    onClick={async () => {
-                      const value = window.prompt("Enter pay period (YYYY-MM)")
-                      const payPeriod = value ? value.trim() : ""
-                      if (!payPeriod) return
-                      try {
-                        await downloadPayrollPeriodCsv(payPeriod, token ?? undefined)
-                        showToast("Payroll exported", "success")
-                      } catch (error: unknown) {
-                        handleCrudError({ error, resourceLabel: "Payroll period export", showToast })
-                      }
-                    }}
-                    className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 flex items-center shadow-lg shadow-gray-900/20 transition-all hover:scale-105 active:scale-95"
-                  >
-                    Export Period CSV
-                  </button>
-                )}
-                {hasPermission(PERMISSIONS.CONFIGURE_PAYROLL) && (
-                  <button
-                    onClick={() => setIsConfigModalOpen(true)}
-                    className="px-4 py-2 bg-white text-gray-900 rounded-lg hover:bg-gray-50 flex items-center shadow-lg shadow-gray-900/10 transition-all hover:scale-105 active:scale-95 ring-1 ring-inset ring-gray-200"
-                  >
-                    Configure Payroll
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsExportModalOpen(true)}
+                  disabled={!canViewPayroll}
+                  className={`px-4 py-2 rounded-lg flex items-center shadow-lg transition-all active:scale-95 ${
+                    canViewPayroll
+                      ? "bg-gray-900 text-white hover:bg-gray-800 shadow-gray-900/20 hover:scale-105"
+                      : "bg-gray-200 text-gray-400 shadow-gray-900/0 cursor-not-allowed"
+                  }`}
+                >
+                  Export Period CSV
+                </button>
+                <button
+                  onClick={() => setIsConfigModalOpen(true)}
+                  disabled={!canConfigurePayroll}
+                  className={`px-4 py-2 rounded-lg flex items-center shadow-lg transition-all active:scale-95 ring-1 ring-inset ${
+                    canConfigurePayroll
+                      ? "bg-white text-gray-900 hover:bg-gray-50 shadow-gray-900/10 hover:scale-105 ring-gray-200"
+                      : "bg-gray-100 text-gray-400 shadow-gray-900/0 cursor-not-allowed ring-gray-100"
+                  }`}
+                >
+                  Configure Payroll
+                </button>
                 <button
                   onClick={() => setIsGenerateModalOpen(true)}
                   disabled={generateMutation.isPending}
@@ -349,6 +366,19 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
         onClose={() => setIsGenerateModalOpen(false)}
         onGenerate={async (payPeriod) => {
           await generateMutation.mutateAsync(payPeriod)
+        }}
+      />
+
+      <ExportPayrollModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={async (payPeriod) => {
+          try {
+            await downloadPayrollPeriodCsv(payPeriod, token ?? undefined)
+            showToast("Payroll exported", "success")
+          } catch (error: unknown) {
+            handleCrudError({ error, resourceLabel: "Payroll period export", showToast })
+          }
         }}
       />
 

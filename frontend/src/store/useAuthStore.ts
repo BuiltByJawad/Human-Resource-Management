@@ -306,7 +306,7 @@ export const useAuthStore = create<AuthState>()(
                 refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
                     const { refreshToken, token, user, rememberMe } = get()
                     try {
-                        const requestBody = refreshToken ? { refreshToken, rememberMe } : { rememberMe }
+                        const requestBody = { rememberMe }
                         const tenantSlug = getClientTenantSlug()
                         const response = await fetch('/api/auth/refresh', {
                             method: 'POST',
@@ -323,7 +323,7 @@ export const useAuthStore = create<AuthState>()(
                         }
                         const payload = json?.data ?? json
                         const newAccessToken = payload?.accessToken || payload?.token || token
-                        const newRefreshToken = payload?.refreshToken || refreshToken
+                        const newRefreshToken = refreshToken
                         const nextUser = payload?.user
                             ? { ...(payload.user || {}), permissions: payload.permissions ?? payload.user?.permissions ?? user?.permissions ?? [] }
                             : user
@@ -338,8 +338,12 @@ export const useAuthStore = create<AuthState>()(
 
                         return true
                     } catch (error) {
-                        if (!silent && process.env.NODE_ENV !== 'production') {
-                            console.warn('Session refresh failed', error)
+                        if (process.env.NODE_ENV !== 'production') {
+                            if (silent) {
+                                console.warn('Session refresh failed (silent)', error)
+                            } else {
+                                console.warn('Session refresh failed', error)
+                            }
                         }
                         get().logout()
                         return false
