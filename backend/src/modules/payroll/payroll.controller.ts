@@ -160,6 +160,66 @@ export const exportPayslipsCsv = asyncHandler(async (req: AuthRequest, res: Resp
     res.send(csv);
 });
 
+export const getOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
+    const { employeeId, payPeriod } = req.params;
+
+    const override = await payrollService.getOverride(employeeId, payPeriod, organizationId);
+
+    res.json({
+        success: true,
+        data: override,
+    });
+});
+
+export const upsertOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
+    const { employeeId, payPeriod } = req.params;
+
+    const updated = await payrollService.upsertOverride(employeeId, payPeriod, req.body, organizationId);
+
+    const actorUserId = req.user?.id;
+    if (actorUserId) {
+        await createAuditLog({
+            userId: actorUserId,
+            action: 'payroll.override_upsert',
+            resourceId: `${employeeId}:${payPeriod}`,
+            newValues: { employeeId, payPeriod, config: updated },
+            req,
+        });
+    }
+
+    res.json({
+        success: true,
+        data: updated,
+        message: 'Payroll override saved',
+    });
+});
+
+export const deleteOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
+    const { employeeId, payPeriod } = req.params;
+
+    const removed = await payrollService.deleteOverride(employeeId, payPeriod, organizationId);
+
+    const actorUserId = req.user?.id;
+    if (actorUserId) {
+        await createAuditLog({
+            userId: actorUserId,
+            action: 'payroll.override_delete',
+            resourceId: `${employeeId}:${payPeriod}`,
+            newValues: { employeeId, payPeriod },
+            req,
+        });
+    }
+
+    res.json({
+        success: true,
+        data: { removed },
+        message: removed ? 'Payroll override removed' : 'Payroll override not found',
+    });
+});
+
 export const exportPayslipPdf = asyncHandler(async (req: AuthRequest, res: Response) => {
     const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const permissions: string[] = Array.isArray(req.user?.permissions) ? req.user.permissions : [];
@@ -238,4 +298,30 @@ export const updateConfig = asyncHandler(async (req: Request, res: Response) => 
         data: updated,
         message: 'Payroll configuration updated',
     });
+});
+
+export const exportPeriodCsv = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
+    const payPeriod = req.params.payPeriod;
+
+    if (!payPeriod) {
+        throw new BadRequestError('Pay period is required');
+    }
+
+    const { filename, csv } = await payrollService.exportPayrollPeriodCsv(payPeriod, organizationId);
+
+    const actorUserId = req.user?.id;
+    if (actorUserId) {
+        await createAuditLog({
+            userId: actorUserId,
+            action: 'payroll.export_period_csv',
+            resourceId: payPeriod,
+            newValues: { payPeriod },
+            req,
+        });
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
 });

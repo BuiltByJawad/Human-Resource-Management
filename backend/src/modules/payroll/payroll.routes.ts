@@ -24,6 +24,12 @@ router.get('/payslips/pdf/:id', payrollController.exportPayslipPdf);
 
 router.get('/payslips/:employeeId?', payrollController.getEmployeePayslips);
 
+router.get('/export/:payPeriod', checkPermission('payroll', 'view'), payrollController.exportPeriodCsv);
+
+router.get('/overrides/:employeeId/:payPeriod', checkPermission('payroll', 'manage'), payrollController.getOverride);
+router.put('/overrides/:employeeId/:payPeriod', checkPermission('payroll', 'manage'), validateRequest(payrollConfigSchema), payrollController.upsertOverride);
+router.delete('/overrides/:employeeId/:payPeriod', checkPermission('payroll', 'manage'), payrollController.deleteOverride);
+
 router.get('/summary/:payPeriod', checkPermission('payroll', 'view'), payrollController.getPeriodSummary);
 
 router.post('/generate', checkPermission('payroll', 'generate'), payrollController.generate);

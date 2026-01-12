@@ -27,6 +27,7 @@ const toSettingsObject = (value: unknown): Record<string, unknown> => {
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         return value as Record<string, unknown>;
     }
+
     return {};
 };
 
@@ -64,6 +65,54 @@ export class PayrollService {
         });
         const root = toSettingsObject(org?.settings);
         return normalizePayrollConfig(root.payroll);
+    }
+
+    async getOverride(employeeId: string, payPeriod: string, organizationId: string): Promise<PayrollConfig | null> {
+        const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+        if (!periodRegex.test(payPeriod)) {
+            throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
+        }
+
+        const record = await payrollRepository.findOverride(employeeId, payPeriod, organizationId);
+        if (!record) return null;
+        return normalizePayrollConfig(record.config);
+    }
+
+    async upsertOverride(
+        employeeId: string,
+        payPeriod: string,
+        config: PayrollConfig,
+        organizationId: string
+    ): Promise<PayrollConfig> {
+        const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+        if (!periodRegex.test(payPeriod)) {
+            throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
+        }
+
+        const employeeExists = await prisma.employee.findFirst({
+            where: { id: employeeId, organizationId },
+            select: { id: true },
+        });
+        if (!employeeExists) {
+            throw new NotFoundError('Employee not found');
+        }
+
+        const saved = await payrollRepository.upsertOverride(
+            employeeId,
+            payPeriod,
+            config as unknown as Prisma.InputJsonValue
+        );
+
+        return normalizePayrollConfig(saved.config);
+    }
+
+    async deleteOverride(employeeId: string, payPeriod: string, organizationId: string): Promise<boolean> {
+        const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+        if (!periodRegex.test(payPeriod)) {
+            throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
+        }
+        const deletedCount = await payrollRepository.deleteOverride(employeeId, payPeriod, organizationId);
+        return deletedCount > 0;
     }
 
     async updatePayrollConfig(config: PayrollConfig, organizationId: string): Promise<PayrollConfig> {
@@ -191,11 +240,19 @@ export class PayrollService {
 
         const payrollConfig = await this.getPayrollConfig(organizationId);
 
+        const employeeIds = employees.map((e) => e.id);
+        const overrides = await payrollRepository.findOverridesForEmployees(data.payPeriod, employeeIds, organizationId);
+        const overrideByEmployeeId = new Map<string, PayrollConfig>();
+        for (const o of overrides) {
+            overrideByEmployeeId.set(o.employeeId, normalizePayrollConfig(o.config));
+        }
+
         const payrolls = [];
 
         for (const employee of employees) {
             // Calculate payroll
-            const calculation = this.calculatePayroll(employee, data.payPeriod, payrollConfig);
+            const effectiveConfig = overrideByEmployeeId.get(employee.id) ?? payrollConfig;
+            const calculation = this.calculatePayroll(employee, data.payPeriod, effectiveConfig);
 
             // Upsert payroll record
             const payroll = await payrollRepository.upsert({
@@ -441,6 +498,67 @@ export class PayrollService {
             filename: `payslip-${employeeNumber || record.employeeId}-${record.payPeriod}.pdf`,
             pdf,
             employeeId: record.employeeId,
+        };
+    }
+
+    async exportPayrollPeriodCsv(
+        payPeriod: string,
+        organizationId: string
+    ): Promise<{ filename: string; csv: string }> {
+        const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+        if (!periodRegex.test(payPeriod)) {
+            throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
+        }
+
+        const records = await payrollRepository.findByPeriodForExport(payPeriod, organizationId);
+
+        const escapeCsv = (value: string): string => {
+            const needsQuotes = /[",\n\r]/.test(value);
+            const escaped = value.replace(/"/g, '""');
+            return needsQuotes ? `"${escaped}"` : escaped;
+        };
+
+        const toCell = (value: unknown): string => {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'number') return String(value);
+            if (typeof value === 'string') return escapeCsv(value);
+            if (value instanceof Date) return escapeCsv(value.toISOString());
+            return escapeCsv(String(value));
+        };
+
+        const headers = [
+            'Pay Period',
+            'Employee Number',
+            'Employee Name',
+            'Department',
+            'Base Salary',
+            'Allowances',
+            'Deductions',
+            'Net Salary',
+            'Status',
+            'Processed At',
+        ];
+
+        const rows = records.map((r) => {
+            const employeeName = `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.trim();
+            return [
+                toCell(r.payPeriod),
+                toCell(r.employee?.employeeNumber ?? ''),
+                toCell(employeeName),
+                toCell(r.employee?.department?.name ?? ''),
+                toCell(Number(r.baseSalary)),
+                toCell(Number(r.allowances)),
+                toCell(Number(r.deductions)),
+                toCell(Number(r.netSalary)),
+                toCell(String(r.status)),
+                toCell(r.processedAt ?? null),
+            ].join(',');
+        });
+
+        const csv = `${headers.join(',')}\n${rows.join('\n')}`;
+        return {
+            filename: `payroll-${payPeriod}.csv`,
+            csv,
         };
     }
 
