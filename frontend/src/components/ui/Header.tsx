@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useBranding } from '@/components/providers/BrandingProvider'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-
 import { BellIcon, MagnifyingGlassIcon, ChevronDownIcon, Bars3Icon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
 
@@ -13,12 +12,13 @@ import { useRouter } from 'next/navigation'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import MobileMenu from './MobileMenu'
 import { useOrgStore } from '@/store/useOrgStore'
-import api from '@/lib/axios'
 import { cn } from '@/lib/utils'
-import { useToast } from './ToastProvider'
 import { PERMISSIONS } from '@/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 import { getClientTenantSlug } from '@/lib/tenant'
+import { buildTenantStorageKey } from '@/lib/tenant'
+import api from '@/lib/axios'
+import { useToast } from './ToastProvider'
 
 type NotificationCategory =
   | 'payroll'
@@ -166,11 +166,18 @@ export default function Header() {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const readCachedUnreadCount = (): number => {
     if (typeof window === 'undefined') return 0
+    const tenantKey = buildTenantStorageKey('notification-unread-count', getClientTenantSlug())
+    const rawTenantLocal = window.localStorage.getItem(tenantKey)
+    const rawTenantSession = window.sessionStorage.getItem(tenantKey)
     const rawLocal = window.localStorage.getItem('hrm:notificationUnreadCount')
     const rawLegacySession = window.sessionStorage.getItem('ui:lastUnreadCount')
-    const candidate = rawLocal ?? rawLegacySession
+    const candidate = rawTenantLocal ?? rawTenantSession ?? rawLocal ?? rawLegacySession
     const parsed = candidate ? Number(candidate) : 0
     if (!Number.isFinite(parsed) || parsed < 0) return 0
+    if (rawTenantLocal == null && rawTenantSession == null) {
+      window.localStorage.setItem(tenantKey, String(parsed))
+      window.sessionStorage.setItem(tenantKey, String(parsed))
+    }
     if (rawLocal == null && rawLegacySession != null) {
       window.localStorage.setItem('hrm:notificationUnreadCount', String(parsed))
     }
@@ -181,15 +188,49 @@ export default function Header() {
   })
   const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null)
 
+  const cachedUser = useMemo(() => {
+    if (typeof window === 'undefined') return null
+
+    const parseCachedUser = (raw: string | null) => {
+      if (!raw) return null
+      try {
+        const parsed = JSON.parse(raw) as { state?: { user?: unknown }; user?: unknown }
+        const state = parsed?.state ?? parsed
+        const user = state?.user as Record<string, unknown> | undefined
+        if (!user || typeof user !== 'object') return null
+        return {
+          id: typeof user.id === 'string' ? user.id : undefined,
+          email: typeof user.email === 'string' ? user.email : undefined,
+          firstName: typeof user.firstName === 'string' ? user.firstName : null,
+          lastName: typeof user.lastName === 'string' ? user.lastName : null,
+          role: typeof user.role === 'string' ? user.role : undefined,
+          avatarUrl: typeof user.avatarUrl === 'string' ? user.avatarUrl : null,
+        }
+      } catch {
+        return null
+      }
+    }
+
+    const tenantKey = buildTenantStorageKey('auth-storage', getClientTenantSlug())
+    const local = parseCachedUser(window.localStorage.getItem(tenantKey))
+    if (local) return local
+    const session = parseCachedUser(window.sessionStorage.getItem(tenantKey))
+    if (session) return session
+    return parseCachedUser(window.localStorage.getItem('auth-storage'))
+  }, [])
+
   const [searchQuery, setSearchQuery] = useState('')
-  const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const [notificationsError, setNotificationsError] = useState<string | null>(null)
+  const [dismissedIds, setDismissedIds] = useState<string[]>([])
 
   const { user, token, logout, hasPermission, isAuthenticated, isAuthTransition, endAuthTransition } = useAuthStore()
   const initialAuth = useInitialAuth()
+  const effectiveToken = token ?? initialAuth?.token ?? null
+  const hasInitialAuth = !!initialAuth?.user || !!initialAuth?.token
   // Prefer server-fetched user on first paint to avoid showing stale
   // persisted auth data, then fall back to the client store user.
   const effectiveUser = (initialAuth?.user ?? user) as any
+  const displayUser = effectiveUser ?? cachedUser
   const branding = useBranding()
   const { siteName: storeSiteName, tagline: storeTagline, loaded: orgLoaded } = useOrgStore()
 
@@ -200,14 +241,20 @@ export default function Header() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
 
+  useEffect(() => {
+    if (!effectiveToken && !isAuthenticated && !hasInitialAuth) return
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    queryClient.refetchQueries({ queryKey: ['notifications'] })
+  }, [effectiveToken, isAuthenticated, hasInitialAuth, queryClient])
+
   const avatarUrl = useMemo(() => {
-    const raw = effectiveUser?.avatarUrl
+    const raw = displayUser?.avatarUrl
     if (!raw) return null
     if (/ui-avatars\.com\/api\//i.test(raw)) {
       return raw.includes('format=') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}format=png`
     }
     return raw
-  }, [effectiveUser?.avatarUrl])
+  }, [displayUser?.avatarUrl])
 
   const profileRef = useClickOutside<HTMLDivElement>(() => setIsProfileOpen(false))
   const notificationsRef = useClickOutside<HTMLDivElement>(() => setIsNotificationsOpen(false))
@@ -239,8 +286,8 @@ export default function Header() {
   }
 
   const notificationsQuery = useQuery<NotificationItem[]>({
-    queryKey: ['notifications', token],
-    enabled: isAuthenticated,
+    queryKey: ['notifications', effectiveToken],
+    enabled: !!effectiveToken || isAuthenticated || hasInitialAuth,
     queryFn: async (): Promise<NotificationItem[]> => {
       try {
         const res = await fetch('/api/notifications', {
@@ -250,10 +297,9 @@ export default function Header() {
           headers: {
             'Cache-Control': 'no-store',
             ...(getClientTenantSlug() ? { 'X-Tenant-Slug': getClientTenantSlug() as string } : {}),
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {}),
           },
         })
-
         const text = await res.text()
         const parsed = text ? (JSON.parse(text) as unknown) : null
 
@@ -274,7 +320,7 @@ export default function Header() {
           if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value
           if (!value || typeof value !== 'object') return null
           const obj = value as Record<string, unknown>
-          const direct = obj.unreadCount
+          const direct = obj.unreadCount ?? obj.unread ?? obj.unread_count ?? obj.totalUnread ?? obj.unreadTotal
           if (typeof direct === 'number' && Number.isFinite(direct) && direct >= 0) return direct
           if (obj.data) {
             const nested = extractUnreadCount(obj.data)
@@ -320,7 +366,23 @@ export default function Header() {
         }
 
         setNotificationsError(null)
-        return extractArray(root).map(mapNotificationPayload)
+        const rawItems = extractArray(root)
+        if (rawItems.length > 0) {
+          const unreadFromPayload = rawItems.filter((item) => {
+            if (!item || typeof item !== 'object') return false
+            const raw = item as Record<string, unknown>
+            const hasReadAt = !!raw.readAt
+            const isRead = raw.read === true || raw.isRead === true
+            return !hasReadAt && !isRead
+          }).length
+          setServerUnreadCount(unreadFromPayload)
+          setCachedUnreadCount(unreadFromPayload)
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('hrm:notificationUnreadCount', String(unreadFromPayload))
+            window.sessionStorage.setItem('ui:lastUnreadCount', String(unreadFromPayload))
+          }
+        }
+        return rawItems.map(mapNotificationPayload)
       } catch (err: any) {
         if (err?.response?.status === 403) {
           setNotificationsError('You do not have permission to view notifications.')
@@ -338,38 +400,8 @@ export default function Header() {
     refetchOnReconnect: true,
   })
 
-  useEffect(() => {
-    if (!isAuthenticated) return
-    queryClient.invalidateQueries({ queryKey: ['notifications'] })
-    queryClient.refetchQueries({ queryKey: ['notifications'] })
-  }, [isAuthenticated, token, queryClient])
-
   const notificationData: NotificationItem[] = notificationsQuery.data ?? []
   const notificationsLoading = notificationsQuery.isLoading
-
-  const markAllReadMutation = useMutation({
-    mutationFn: () => api.post('/notifications/mark-all-read'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
-    onError: (err: any) => {
-      if (err?.response?.status === 403) {
-        showToast('You do not have permission to modify notifications.', 'error')
-      } else {
-        showToast('Failed to update notifications.', 'error')
-      }
-    },
-  })
-
-  const markReadMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
-    onError: (err: any) => {
-      if (err?.response?.status === 403) {
-        showToast('You do not have permission to modify notifications.', 'error')
-      } else {
-        showToast('Failed to update notification.', 'error')
-      }
-    },
-  })
 
   const notifications = useMemo(
     () => notificationData.filter((n: NotificationItem) => !dismissedIds.includes(n.id)),
@@ -396,9 +428,33 @@ export default function Header() {
   )
 
   const unreadFromArray = categorizedNotifications.filter((n) => !n.read).length
-  const unreadCount = notificationsError
+  const renderUnreadCount = notificationsError
     ? 0
     : serverUnreadCount ?? (categorizedNotifications.length > 0 ? unreadFromArray : cachedUnreadCount)
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => api.post('/notifications/mark-all-read'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: (err: any) => {
+      if (err?.response?.status === 403) {
+        showToast('You do not have permission to modify notifications.', 'error')
+      } else {
+        showToast('Failed to update notifications.', 'error')
+      }
+    },
+  })
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: (err: any) => {
+      if (err?.response?.status === 403) {
+        showToast('You do not have permission to modify notifications.', 'error')
+      } else {
+        showToast('Failed to update notification.', 'error')
+      }
+    },
+  })
 
   const handleMarkAllRead = () => {
     if (!notifications.length) return
@@ -418,32 +474,35 @@ export default function Header() {
     }
   }
 
-  const initials = effectiveUser?.firstName && effectiveUser?.lastName
-    ? `${effectiveUser.firstName[0]}${effectiveUser.lastName[0]}`
-    : (effectiveUser?.email?.[0]?.toUpperCase() ?? 'U')
+  const initials = displayUser?.firstName && displayUser?.lastName
+    ? `${displayUser.firstName[0]}${displayUser.lastName[0]}`
+    : (displayUser?.email?.[0]?.toUpperCase() ?? 'U')
 
-  const userFullName = `${effectiveUser?.firstName ?? ''} ${effectiveUser?.lastName ?? ''}`.trim() || (effectiveUser?.email ?? '')
-  const userRole = effectiveUser?.role ?? ''
+  const userFullName = `${displayUser?.firstName ?? ''} ${displayUser?.lastName ?? ''}`.trim() || (displayUser?.email ?? '')
+  const userRole = displayUser?.role ?? ''
 
-  const hasValidUser = !!effectiveUser?.id && !!effectiveUser?.email
-  const shouldShowNotificationControls = isAuthenticated
-
-  const shouldUseLiveUnreadCount = notificationsQuery.isSuccess && !notificationsError
-
-  const displayUnreadCount = shouldUseLiveUnreadCount ? unreadCount : cachedUnreadCount
-  const renderUnreadCount = displayUnreadCount
+  const hasValidUser = !!displayUser?.id && !!displayUser?.email
+  const shouldShowNotificationControls = !!effectiveToken || isAuthenticated
 
   useEffect(() => {
-    if (!shouldUseLiveUnreadCount) return
-    const nextCount =
-      serverUnreadCount ?? (categorizedNotifications.length > 0 ? unreadFromArray : null)
-    if (nextCount == null) return
-    setCachedUnreadCount(nextCount)
+    if (notificationsError) return
+    const liveUnreadFromItems = notificationData.filter((item) => !item.read).length
+    const nextUnread = serverUnreadCount ?? liveUnreadFromItems
+
+    if (!Number.isFinite(nextUnread) || nextUnread < 0) return
+
+    setServerUnreadCount((prev) => (prev === nextUnread ? prev : nextUnread))
+    setCachedUnreadCount((prev) => (prev === nextUnread ? prev : nextUnread))
+
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('hrm:notificationUnreadCount', String(nextCount))
-      window.sessionStorage.setItem('ui:lastUnreadCount', String(nextCount))
+      const tenantKey = buildTenantStorageKey('notification-unread-count', getClientTenantSlug())
+      const value = String(nextUnread)
+      window.localStorage.setItem(tenantKey, value)
+      window.sessionStorage.setItem(tenantKey, value)
+      window.localStorage.setItem('hrm:notificationUnreadCount', value)
+      window.sessionStorage.setItem('ui:lastUnreadCount', value)
     }
-  }, [shouldUseLiveUnreadCount, serverUnreadCount, categorizedNotifications.length, unreadFromArray])
+  }, [notificationsQuery.isSuccess, notificationsError, notificationData, serverUnreadCount])
 
   return (
     <header className="glass-header sticky top-0 z-30">
@@ -616,7 +675,7 @@ export default function Header() {
                           {initials}
                         </div>
                       )}
-                      <div className="hidden md:flex flex-col text-left max-w-32">
+                      <div className="hidden md:flex flex-col text-left max-w-32" suppressHydrationWarning>
                         <span className="text-sm font-semibold truncate leading-tight">{userFullName}</span>
                         <span className="text-xs text-slate-400 truncate leading-tight uppercase tracking-wider">{userRole}</span>
                       </div>

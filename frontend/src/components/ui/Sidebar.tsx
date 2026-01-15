@@ -33,6 +33,7 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useOrgStore } from '@/store/useOrgStore'
 import { PERMISSIONS, type Permission } from '@/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
+import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 
 type NavIcon = typeof HomeIcon
 
@@ -164,15 +165,6 @@ export default function Sidebar() {
   const isSuperAdmin = user?.role === 'Super Admin'
   const userPermissions: string[] = Array.isArray(user?.permissions) ? user.permissions : []
 
-  const avatarUrl = useMemo(() => {
-    const raw = user?.avatarUrl
-    if (!raw) return null
-    if (/ui-avatars\.com\/api\//i.test(raw)) {
-      return raw.includes('format=') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}format=png`
-    }
-    return raw
-  }, [user?.avatarUrl])
-
   const activeHref = (() => {
     const allItems = navigation.flatMap(section => section.items)
     const matches = allItems
@@ -194,16 +186,56 @@ export default function Sidebar() {
     return item.permissions.some((perm) => userPermissions.includes(perm))
   }
 
-  const hasUser = !!user
+  const cachedUser = useMemo(() => {
+    if (typeof window === 'undefined') return null
 
-  const initials = hasUser && user?.firstName && user?.lastName
-    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-    : (user?.email?.[0]?.toUpperCase() ?? 'U')
+    const parseCachedUser = (raw: string | null) => {
+      if (!raw) return null
+      try {
+        const parsed = JSON.parse(raw) as { state?: { user?: unknown }; user?: unknown }
+        const state = parsed?.state ?? parsed
+        const cached = state?.user as Record<string, unknown> | undefined
+        if (!cached || typeof cached !== 'object') return null
+        return {
+          id: typeof cached.id === 'string' ? cached.id : undefined,
+          email: typeof cached.email === 'string' ? cached.email : undefined,
+          firstName: typeof cached.firstName === 'string' ? cached.firstName : null,
+          lastName: typeof cached.lastName === 'string' ? cached.lastName : null,
+          avatarUrl: typeof cached.avatarUrl === 'string' ? cached.avatarUrl : null,
+        }
+      } catch {
+        return null
+      }
+    }
+
+    const tenantKey = buildTenantStorageKey('auth-storage', getClientTenantSlug())
+    const local = parseCachedUser(window.localStorage.getItem(tenantKey))
+    if (local) return local
+    const session = parseCachedUser(window.sessionStorage.getItem(tenantKey))
+    if (session) return session
+    return parseCachedUser(window.localStorage.getItem('auth-storage'))
+  }, [])
+
+  const displayUser = user ?? cachedUser
+  const hasUser = !!displayUser
+
+  const avatarUrl = useMemo(() => {
+    const raw = displayUser?.avatarUrl
+    if (!raw) return null
+    if (/ui-avatars\.com\/api\//i.test(raw)) {
+      return raw.includes('format=') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}format=png`
+    }
+    return raw
+  }, [displayUser?.avatarUrl])
+
+  const initials = hasUser && displayUser?.firstName && displayUser?.lastName
+    ? `${displayUser.firstName[0]}${displayUser.lastName[0]}`.toUpperCase()
+    : (displayUser?.email?.[0]?.toUpperCase() ?? 'U')
 
   const userDisplayName = hasUser
-    ? (`${user!.firstName ?? ''} ${user!.lastName ?? ''}`.trim() || user!.email)
+    ? (`${displayUser!.firstName ?? ''} ${displayUser!.lastName ?? ''}`.trim() || displayUser!.email)
     : ''
-  const userEmail = hasUser ? user!.email : ''
+  const userEmail = hasUser ? displayUser!.email : ''
 
   // Prefetch visible routes to make sidebar navigation feel instant
   useEffect(() => {
