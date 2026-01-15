@@ -74,6 +74,26 @@ export interface EmployeesPage {
   pagination: EmployeesPagination
 }
 
+export interface EmployeesQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  status?: string
+  departmentId?: string
+}
+
+export interface EmployeePayload {
+  firstName: string
+  lastName: string
+  email: string
+  employeeNumber: string
+  departmentId: string
+  roleId: string
+  hireDate: string
+  salary: number
+  status: EmployeeStatus
+}
+
 export interface AttendanceRecord {
   id: string
   checkIn: string
