@@ -27,7 +27,10 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
     enabled: !!token,
     retry: false,
     initialData: initialAttendance,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   useEffect(() => {

@@ -28,7 +28,7 @@ const schema = yup.object({
     .mixed<PaymentMethod>()
     .oneOf(['bank_transfer', 'cash', 'cheque', 'mobile_money', 'other'])
     .required('Payment method is required'),
-  paymentReference: yup.string().optional(),
+  paymentReference: yup.string().default(''),
 })
 
 type FormData = yup.InferType<typeof schema>

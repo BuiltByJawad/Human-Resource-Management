@@ -1,6 +1,8 @@
-'use client'
+import PageSkeleton from '@/components/ui/PageSkeleton'
 
-// Disable the global route-level loader to avoid flashes on sidebar navigation.
+/**
+ * Root-level loading fallback for any routes without their own loading.tsx
+ */
 export default function Loading() {
-    return null
+    return <PageSkeleton variant="table" itemCount={6} />
 }

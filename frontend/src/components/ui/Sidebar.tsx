@@ -213,7 +213,7 @@ export default function Sidebar() {
       try {
         router.prefetch(item.href)
       } catch {
-        // ignore prefetch errors (e.g., during rapid mounts/unmounts)
+        console.warn('Sidebar prefetch failed for route', item.href)
       }
     })
   }, [isMounted, router])

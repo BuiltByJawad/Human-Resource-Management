@@ -145,7 +145,7 @@ function mapNotificationPayload(raw: any): NotificationItem {
     title: raw.title ?? 'Notification',
     message: raw.message ?? '',
     time: raw.createdAt ? new Date(raw.createdAt).toLocaleString() : 'Just now',
-    read: !!raw.readAt,
+    read: !!raw.readAt || raw.read === true || raw.isRead === true,
     link: raw.link,
     category: meta.category,
     categoryLabel: meta.categoryLabel,
@@ -164,12 +164,22 @@ export default function Header() {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
-  const [cachedUnreadCount, setCachedUnreadCount] = useState<number>(() => {
+  const readCachedUnreadCount = (): number => {
     if (typeof window === 'undefined') return 0
-    const raw = window.sessionStorage.getItem('ui:lastUnreadCount')
-    const parsed = raw ? Number(raw) : 0
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+    const rawLocal = window.localStorage.getItem('hrm:notificationUnreadCount')
+    const rawLegacySession = window.sessionStorage.getItem('ui:lastUnreadCount')
+    const candidate = rawLocal ?? rawLegacySession
+    const parsed = candidate ? Number(candidate) : 0
+    if (!Number.isFinite(parsed) || parsed < 0) return 0
+    if (rawLocal == null && rawLegacySession != null) {
+      window.localStorage.setItem('hrm:notificationUnreadCount', String(parsed))
+    }
+    return parsed
+  }
+  const [cachedUnreadCount, setCachedUnreadCount] = useState<number>(() => {
+    return readCachedUnreadCount()
   })
+  const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
@@ -210,11 +220,7 @@ export default function Header() {
   useEffect(() => {
     if (!isMounted) return
     if (typeof window === 'undefined') return
-    const raw = window.sessionStorage.getItem('ui:lastUnreadCount')
-    const parsed = raw ? Number(raw) : 0
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      setCachedUnreadCount(parsed)
-    }
+    setCachedUnreadCount(readCachedUnreadCount())
   }, [isMounted])
 
   useEffect(() => {
@@ -264,16 +270,51 @@ export default function Header() {
         const payload = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
         const root = (payload as { data?: unknown }).data ?? payload
 
+        const extractUnreadCount = (value: unknown): number | null => {
+          if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value
+          if (!value || typeof value !== 'object') return null
+          const obj = value as Record<string, unknown>
+          const direct = obj.unreadCount
+          if (typeof direct === 'number' && Number.isFinite(direct) && direct >= 0) return direct
+          if (obj.data) {
+            const nested = extractUnreadCount(obj.data)
+            if (nested != null) return nested
+          }
+          return null
+        }
+
+        const maybeUnreadCount = extractUnreadCount(payload)
+        if (maybeUnreadCount != null) {
+          setServerUnreadCount(maybeUnreadCount)
+          setCachedUnreadCount(maybeUnreadCount)
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('hrm:notificationUnreadCount', String(maybeUnreadCount))
+            window.sessionStorage.setItem('ui:lastUnreadCount', String(maybeUnreadCount))
+          }
+        }
+
         const extractArray = (value: unknown): unknown[] => {
           if (Array.isArray(value)) return value
           if (!value || typeof value !== 'object') return []
           const obj = value as Record<string, unknown>
           if (Array.isArray(obj.notifications)) return obj.notifications
           if (Array.isArray(obj.items)) return obj.items
+          if (Array.isArray(obj.docs)) return obj.docs
+          if (Array.isArray(obj.results)) return obj.results
           if (obj.data && typeof obj.data === 'object') {
             const nested = obj.data as Record<string, unknown>
             if (Array.isArray(nested.notifications)) return nested.notifications
             if (Array.isArray(nested.items)) return nested.items
+            if (Array.isArray(nested.docs)) return nested.docs
+            if (Array.isArray(nested.results)) return nested.results
+
+            if (nested.data && typeof nested.data === 'object') {
+              const nested2 = nested.data as Record<string, unknown>
+              if (Array.isArray(nested2.notifications)) return nested2.notifications
+              if (Array.isArray(nested2.items)) return nested2.items
+              if (Array.isArray(nested2.docs)) return nested2.docs
+              if (Array.isArray(nested2.results)) return nested2.results
+            }
           }
           return []
         }
@@ -354,7 +395,10 @@ export default function Header() {
     [categorizedNotifications]
   )
 
-  const unreadCount = notificationsError ? 0 : categorizedNotifications.filter((n) => !n.read).length
+  const unreadFromArray = categorizedNotifications.filter((n) => !n.read).length
+  const unreadCount = notificationsError
+    ? 0
+    : serverUnreadCount ?? (categorizedNotifications.length > 0 ? unreadFromArray : cachedUnreadCount)
 
   const handleMarkAllRead = () => {
     if (!notifications.length) return
@@ -382,20 +426,24 @@ export default function Header() {
   const userRole = effectiveUser?.role ?? ''
 
   const hasValidUser = !!effectiveUser?.id && !!effectiveUser?.email
+  const shouldShowNotificationControls = isAuthenticated
 
-  const shouldUseLiveUnreadCount =
-    notificationsQuery.isSuccess && !notificationsError && !notificationsQuery.isFetching
+  const shouldUseLiveUnreadCount = notificationsQuery.isSuccess && !notificationsError
 
   const displayUnreadCount = shouldUseLiveUnreadCount ? unreadCount : cachedUnreadCount
   const renderUnreadCount = displayUnreadCount
 
   useEffect(() => {
     if (!shouldUseLiveUnreadCount) return
-    setCachedUnreadCount(unreadCount)
+    const nextCount =
+      serverUnreadCount ?? (categorizedNotifications.length > 0 ? unreadFromArray : null)
+    if (nextCount == null) return
+    setCachedUnreadCount(nextCount)
     if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('ui:lastUnreadCount', String(unreadCount))
+      window.localStorage.setItem('hrm:notificationUnreadCount', String(nextCount))
+      window.sessionStorage.setItem('ui:lastUnreadCount', String(nextCount))
     }
-  }, [shouldUseLiveUnreadCount, unreadCount])
+  }, [shouldUseLiveUnreadCount, serverUnreadCount, categorizedNotifications.length, unreadFromArray])
 
   return (
     <header className="glass-header sticky top-0 z-30">
@@ -485,7 +533,7 @@ export default function Header() {
 
             <div className="ml-4 flex items-center gap-3">
               {/* Notification & Profile Section */}
-              {hasValidUser ? (
+              {shouldShowNotificationControls ? (
                 <>
                   <div className="relative" ref={notificationsRef}>
                     <button
