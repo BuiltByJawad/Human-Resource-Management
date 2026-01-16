@@ -33,6 +33,7 @@ function EmployeesContent({
     editingEmployee,
     viewingEmployee,
     pendingDelete,
+    setPendingDelete,
     setViewingEmployee,
     setIsModalOpen,
     onSearchChange,

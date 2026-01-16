@@ -43,6 +43,7 @@ export interface UseEmployeesPageResult {
   editingEmployee?: Employee
   viewingEmployee?: Employee
   pendingDelete: Employee | null
+  setPendingDelete: (employee: Employee | null) => void
   setViewingEmployee: (employee?: Employee) => void
   setIsModalOpen: (open: boolean) => void
   onSearchChange: (value: string) => void
@@ -241,6 +242,7 @@ export function useEmployeesPage({
     editingEmployee,
     viewingEmployee,
     pendingDelete,
+    setPendingDelete,
     setViewingEmployee,
     setIsModalOpen,
     onSearchChange: setSearchTerm,
