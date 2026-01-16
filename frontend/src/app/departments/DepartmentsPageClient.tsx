@@ -1,29 +1,12 @@
 "use client"
 
-import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon } from '@heroicons/react/24/outline'
-
 import DashboardShell from '@/components/ui/DashboardShell'
-import {
-  Department,
-  DepartmentForm,
-  type DepartmentFormErrors,
-  DepartmentList,
-} from '@/components/hrm/DepartmentComponents'
-import type { EmployeeSummary } from '@/types/hrm'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useToast } from '@/components/ui/ToastProvider'
+import { DepartmentForm, DepartmentList, type DepartmentFormField } from '@/components/features/departments'
+import type { Department, EmployeeSummary } from '@/types/hrm'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { LoadingSpinner } from '@/components/ui/CommonComponents'
-import {
-  fetchDepartments,
-  fetchEmployeesForManagers,
-  createDepartment,
-  updateDepartment,
-  deleteDepartmentById,
-} from '@/lib/hrmData'
-import { handleCrudError } from '@/lib/apiError'
+import { useDepartmentsPage } from '@/hooks/useDepartmentsPage'
 
 interface DepartmentsPageClientProps {
   initialDepartments?: Department[]
@@ -34,137 +17,36 @@ export function DepartmentsPageClient({
   initialDepartments = [],
   initialEmployees = [],
 }: DepartmentsPageClientProps) {
-  const { token } = useAuthStore()
-  const { showToast } = useToast()
-  // State
-  const queryClient = useQueryClient()
-
-  const [formErrors, setFormErrors] = useState<DepartmentFormErrors>({})
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
-
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [departmentToDelete, setDepartmentToDelete] = useState<Department | null>(null)
-
   const {
-    data: departments = [],
-    isPending: departmentsPending,
-  } = useQuery<Department[]>({
-    queryKey: ['departments', token],
-    queryFn: () => fetchDepartments(token ?? undefined),
-    initialData: initialDepartments.length > 0 ? initialDepartments : undefined,
-  })
+    departments,
+    employees,
+    loading,
+    formErrors,
+    setFormErrors,
+    isModalOpen,
+    editingDepartment,
+    isDeleteOpen,
+    departmentToDelete,
+    setIsModalOpen,
+    setIsDeleteOpen,
+    setDepartmentToDelete,
+    handleCreate,
+    handleEdit,
+    handleDeleteRequest,
+    handleSubmit,
+    handleDeleteConfirm,
+    saveDepartment,
+    deleteDepartmentMutation,
+  } = useDepartmentsPage(initialDepartments, initialEmployees)
 
-  const {
-    data: employees = initialEmployees,
-    isPending: employeesPending,
-  } = useQuery<EmployeeSummary[]>({
-    queryKey: ['employees', 'manager-list', token],
-    queryFn: () => fetchEmployeesForManagers(token ?? undefined),
-    initialData: initialEmployees.length > 0 ? initialEmployees : undefined,
-  })
-
-  const listLoading = departmentsPending || employeesPending || !token
-
-  const refetchLists = () => {
-    queryClient.invalidateQueries({ queryKey: ['departments', token] })
-    queryClient.invalidateQueries({ queryKey: ['employees', 'manager-list', token] })
-  }
-
-  const handleCreate = () => {
-    setFormErrors({})
-    setEditingDepartment(null)
-    setIsModalOpen(true)
-  }
-
-  const handleEdit = (dept: Department) => {
-    setFormErrors({})
-    setEditingDepartment(dept)
-    setIsModalOpen(true)
-  }
-
-  const handleDeleteClick = (dept: Department) => {
-    setDepartmentToDelete(dept)
-    setIsDeleteOpen(true)
-  }
-
-  const saveDepartment = useMutation({
-    mutationFn: async ({
-      payload,
-      department,
-    }: {
-      payload: Partial<Department>
-      department?: Department | null
-    }) => {
-      if (department) {
-        await updateDepartment(department.id, payload)
-        return 'updated'
-      }
-      await createDepartment(payload)
-      return 'created'
-    },
-    onSuccess: (action) => {
-      showToast(
-        action === 'updated' ? 'Department updated successfully' : 'Department created successfully',
-        'success',
-      )
-      setFormErrors({})
-      setIsModalOpen(false)
-      setEditingDepartment(null)
-      refetchLists()
-    },
-    onError: (error: any) => {
-      handleCrudError({
-        error,
-        resourceLabel: 'Department',
-        showToast,
-        setFieldError: (field, message) => {
-          setFormErrors((prev) => ({ ...prev, [field]: message }))
-        },
-        defaultField: 'name',
-        onUnauthorized: () => console.warn('Department action unauthorized'),
-      })
-    },
-  })
-
-  const deleteDepartment = useMutation({
-    mutationFn: async (departmentId: string) => {
-      await deleteDepartmentById(departmentId)
-    },
-    onSuccess: () => {
-      showToast('Department deleted successfully', 'success')
-      setIsDeleteOpen(false)
-      setDepartmentToDelete(null)
-      refetchLists()
-    },
-    onError: (error: any) => {
-      handleCrudError({
-        error,
-        resourceLabel: 'Department',
-        showToast,
-        onUnauthorized: () => console.warn('Department delete unauthorized'),
-      })
-    },
-  })
-
-  const handleSubmit = async (data: Partial<Department>) => {
-    await saveDepartment.mutateAsync({ payload: data, department: editingDepartment })
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!departmentToDelete) return
-    await deleteDepartment.mutateAsync(departmentToDelete.id)
-  }
-
-  const actionLoading = saveDepartment.isPending || deleteDepartment.isPending
-  const currentEmployees = useMemo(() => employees ?? [], [employees])
+  const actionLoading = saveDepartment.isPending || deleteDepartmentMutation.isPending
 
   return (
     <DashboardShell>
       <div className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="space-y-6">
-            {departmentsPending ? (
+            {loading ? (
               <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <LoadingSpinner size="lg" />
                 <p className="mt-4 text-sm font-medium text-gray-500">Loading departments…</p>
@@ -191,8 +73,8 @@ export function DepartmentsPageClient({
                   <DepartmentList
                     departments={departments}
                     onEdit={handleEdit}
-                    onDelete={handleDeleteClick}
-                    loading={departmentsPending && !departments.length}
+                    onDelete={handleDeleteRequest}
+                    loading={loading && !departments.length}
                   />
                 </div>
               </div>
@@ -207,10 +89,10 @@ export function DepartmentsPageClient({
         onSubmit={handleSubmit}
         initialData={editingDepartment}
         departments={departments}
-        employees={currentEmployees}
+        employees={employees}
         loading={actionLoading}
         apiErrors={formErrors}
-        onClearApiErrors={(field) => {
+        onClearApiErrors={(field: DepartmentFormField) => {
           setFormErrors((prev) => {
             if (!prev[field]) return prev
             const next = { ...prev }
@@ -229,7 +111,7 @@ export function DepartmentsPageClient({
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"
-        loading={deleteDepartment.isPending}
+        loading={deleteDepartmentMutation.isPending}
       />
     </DashboardShell>
   )

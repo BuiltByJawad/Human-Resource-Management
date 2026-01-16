@@ -1,8 +1,5 @@
 "use client"
 
-import { Suspense } from 'react'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { EmployeeForm, type Employee } from '@/components/hrm/EmployeeComponents'
 import EmployeeDetailsModal from '@/components/hrm/EmployeeDetailsModal'
 import { Modal } from '@/components/ui/Modal'
@@ -10,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmployeesToolbar, EmployeesListSection } from '@/components/hrm/EmployeesPageComponents'
 import type { Department, EmployeesPage, Role } from '@/types/hrm'
 import { useEmployeesPage } from '@/hooks/useEmployeesPage'
+import DashboardShell from '@/components/ui/DashboardShell'
 
 interface EmployeesPageClientProps {
   initialDepartments?: Department[]
@@ -20,7 +18,7 @@ interface EmployeesPageClientProps {
 function EmployeesContent({
   initialDepartments = [],
   initialRoles = [],
-  initialEmployees
+  initialEmployees = null,
 }: EmployeesPageClientProps) {
   const {
     departments,
@@ -50,36 +48,32 @@ function EmployeesContent({
   } = useEmployeesPage({ initialDepartments, initialRoles, initialEmployees })
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx_auto space-y-6">
-            <EmployeesToolbar
-              totalEmployees={pagination.total}
-              searchTerm={searchTerm}
-              onSearchChange={onSearchChange}
-              filterStatus={filterStatus}
-              onFilterStatusChange={onFilterStatusChange}
-              filterDepartment={filterDepartment}
-              onFilterDepartmentChange={onFilterDepartmentChange}
-              departments={departments}
-              onCreateEmployee={onCreate}
-            />
+    <DashboardShell>
+      <div className="p-4 md:p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <EmployeesToolbar
+            totalEmployees={pagination.total}
+            searchTerm={searchTerm}
+            onSearchChange={onSearchChange}
+            filterStatus={filterStatus}
+            onFilterStatusChange={onFilterStatusChange}
+            filterDepartment={filterDepartment}
+            onFilterDepartmentChange={onFilterDepartmentChange}
+            departments={departments}
+            onCreateEmployee={onCreate}
+          />
 
-            <EmployeesListSection
-              employees={employees}
-              loading={loading}
-              pagination={pagination}
-              onPageChange={onPageChange}
-              onViewEmployee={setViewingEmployee}
-              onEditEmployee={onEdit}
-              onDeleteEmployee={onDeleteRequest}
-              onSendInvite={onSendInvite}
-            />
-          </div>
-        </main>
+          <EmployeesListSection
+            employees={employees}
+            loading={loading}
+            pagination={pagination}
+            onPageChange={onPageChange}
+            onViewEmployee={setViewingEmployee}
+            onEditEmployee={onEdit}
+            onDeleteEmployee={onDeleteRequest}
+            onSendInvite={onSendInvite}
+          />
+        </div>
       </div>
 
       <Modal
@@ -116,14 +110,10 @@ function EmployeesContent({
         onClose={() => setPendingDelete(null)}
         type="danger"
       />
-    </div>
+    </DashboardShell>
   )
 }
 
 export function EmployeesPageClient(props: EmployeesPageClientProps) {
-  return (
-    <Suspense fallback={<div className="p-6">Loading employees...</div>}>
-      <EmployeesContent {...props} />
-    </Suspense>
-  )
+  return <EmployeesContent {...props} />
 }
