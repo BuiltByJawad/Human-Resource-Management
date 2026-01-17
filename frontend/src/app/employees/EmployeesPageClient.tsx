@@ -1,11 +1,9 @@
 "use client"
 
-import { EmployeeForm, type Employee } from '@/components/hrm/EmployeeComponents'
-import EmployeeDetailsModal from '@/components/hrm/EmployeeDetailsModal'
+import { EmployeeForm, EmployeeDetailsModal, EmployeesToolbar, EmployeesListSection } from '@/components/features/employees'
+import type { Employee, Department, EmployeesPage, Role } from '@/types/hrm'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { EmployeesToolbar, EmployeesListSection } from '@/components/hrm/EmployeesPageComponents'
-import type { Department, EmployeesPage, Role } from '@/types/hrm'
 import { useEmployeesPage } from '@/hooks/useEmployeesPage'
 import DashboardShell from '@/components/ui/DashboardShell'
 

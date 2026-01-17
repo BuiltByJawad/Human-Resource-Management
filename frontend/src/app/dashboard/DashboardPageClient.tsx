@@ -19,7 +19,8 @@ import api from '@/app/api/api'
 import { useAuthStore } from '@/store/useAuthStore'
 import { PERMISSIONS } from '@/constants/permissions'
 import type { LeaveRequest } from '@/types/hrm'
-import { analyticsService, type DashboardMetrics } from '@/services/analyticsService'
+import { analyticsService } from '@/services/analyticsService'
+import type { DashboardMetrics } from '@/services/analytics/types'
 import { useRouter } from 'next/navigation'
 
 export interface DashboardStats {

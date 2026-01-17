@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
-import { KeyResult, goalsService } from '@/services/goalsService';
+import { goalsService } from '@/services/goalsService'
+import type { KeyResult } from '@/services/goals/types'
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Shift, shiftService } from '@/services/shiftService';
+import { shiftService } from '@/services/shiftService'
+import type { Shift } from '@/services/shifts/types'
 import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 
 interface SwapRequestDialogProps {

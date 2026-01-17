@@ -1,8 +1,15 @@
 "use client"
 
-import { PlusIcon } from '@heroicons/react/24/outline'
+import { useMemo, useState } from 'react'
+
 import DashboardShell from '@/components/ui/DashboardShell'
-import { DepartmentForm, DepartmentList, type DepartmentFormField } from '@/components/features/departments'
+import {
+  DepartmentForm,
+  DepartmentList,
+  DepartmentFilters,
+  DepartmentStats,
+  type DepartmentFormField,
+} from '@/components/features/departments'
 import type { Department, EmployeeSummary } from '@/types/hrm'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { LoadingSpinner } from '@/components/ui/CommonComponents'
@@ -39,6 +46,19 @@ export function DepartmentsPageClient({
     deleteDepartmentMutation,
   } = useDepartmentsPage(initialDepartments, initialEmployees)
 
+  const [searchTerm, setSearchTerm] = useState('')
+  const filteredDepartments = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return departments
+    return departments.filter((dept) => {
+      const managerName = dept.manager ? `${dept.manager.firstName} ${dept.manager.lastName}` : ''
+      return [dept.name, dept.description ?? '', dept.parentDepartment?.name ?? '', managerName]
+        .join(' ')
+        .toLowerCase()
+        .includes(term)
+    })
+  }, [departments, searchTerm])
+
   const actionLoading = saveDepartment.isPending || deleteDepartmentMutation.isPending
 
   return (
@@ -55,23 +75,13 @@ export function DepartmentsPageClient({
               <div className="py-8 text-center text-sm text-gray-500">No departments found.</div>
             ) : (
               <div className="space-y-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Departments</h1>
-                    <p className="mt-1 text-sm text-gray-500">Manage company organizational structure and hierarchy</p>
-                  </div>
-                  <button
-                    onClick={handleCreate}
-                    className="inline-flex items-center px-4 py-2.5 border border-transparent rounded-xl shadow-lg shadow-blue-600/20 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
-                    Add Department
-                  </button>
-                </div>
+                <DepartmentFilters searchTerm={searchTerm} onSearchChange={setSearchTerm} onCreate={handleCreate} />
+
+                <DepartmentStats departments={departments} />
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                   <DepartmentList
-                    departments={departments}
+                    departments={filteredDepartments}
                     onEdit={handleEdit}
                     onDelete={handleDeleteRequest}
                     loading={loading && !departments.length}

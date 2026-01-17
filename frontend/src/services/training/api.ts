@@ -1,4 +1,5 @@
-import { trainingService, type TrainingCourse, type EmployeeTraining } from '@/services/trainingService'
+import { trainingService } from '@/services/trainingService'
+import type { TrainingCourse, EmployeeTraining } from '@/services/training/types'
 
 export type { TrainingCourse, EmployeeTraining }
 

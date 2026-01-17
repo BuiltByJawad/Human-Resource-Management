@@ -1,7 +1,7 @@
 ﻿import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import type { EmployeeTraining } from '@/services/trainingService'
+import type { EmployeeTraining } from '@/services/training/types'
 import { TrainingPageClient } from './TrainingPageClient'
 
 function buildApiBase() {

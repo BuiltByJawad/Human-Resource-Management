@@ -1,11 +1,5 @@
 import api from '@/lib/axios'
-
-export interface OnboardingTaskPayload {
-  title: string
-  description?: string
-  assigneeUserId?: string
-  dueDate?: string
-}
+import type { OnboardingTaskPayload } from '@/services/onboarding/types'
 
 export const startOnboardingProcess = async (employeeId: string, payload?: { startDate?: string; dueDate?: string }) => {
   const res = await api.post(`/onboarding/process/${employeeId}/start`, payload ?? {})

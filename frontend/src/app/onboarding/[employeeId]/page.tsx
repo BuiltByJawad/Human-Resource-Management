@@ -25,8 +25,8 @@ import {
   getOnboardingProcess,
   createOnboardingTask,
   completeOnboardingTask,
-  OnboardingTaskPayload
 } from '@/services/onboardingService'
+import type { OnboardingTaskPayload } from '@/services/onboarding/types'
 
 export default function OnboardingEmployeePage() {
   const { employeeId } = useParams<{ employeeId: string }>()

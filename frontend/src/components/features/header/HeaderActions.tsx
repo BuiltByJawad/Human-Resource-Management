@@ -1,8 +1,8 @@
 'use client'
 
 import { NotificationItem } from '@/services/notifications/types'
-import { NotificationMenu } from './NotificationMenu'
-import { ProfileMenu } from './ProfileMenu'
+import { HeaderNotifications } from './HeaderNotifications'
+import { HeaderProfile } from './HeaderProfile'
 
 export type HeaderActionsProps = {
   shouldShowNotificationControls: boolean
@@ -67,7 +67,7 @@ export function HeaderActions({
 
   return (
     <div className="flex items-center gap-3">
-      <NotificationMenu
+      <HeaderNotifications
         isOpen={isNotificationsOpen}
         onToggle={onToggleNotifications}
         unreadCount={unreadCount}
@@ -79,7 +79,7 @@ export function HeaderActions({
         hasPermission={hasPermission}
       />
 
-      <ProfileMenu
+      <HeaderProfile
         userFullName={userFullName}
         userRole={userRole}
         email={email}

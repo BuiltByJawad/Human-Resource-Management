@@ -1,7 +1,7 @@
 "use client"
 
 import { PlusIcon, AcademicCapIcon, UserPlusIcon, ClockIcon } from '@heroicons/react/24/outline'
-import type { TrainingCourse } from '@/services/training/api'
+import type { TrainingCourse } from '@/services/training/types'
 
 interface CoursesGridProps {
   courses: TrainingCourse[]

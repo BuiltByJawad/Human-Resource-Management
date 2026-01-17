@@ -11,7 +11,7 @@ import {
 } from "@heroicons/react/24/outline"
 
 import { DataTable, type Column } from "@/components/ui/DataTable"
-import { PayslipModal } from "@/components/hrm/PayslipModal"
+import { PayslipModal } from "@/components/features/payroll"
 import GeneratePayrollModal from "@/components/hrm/GeneratePayrollModal"
 import ExportPayrollModal from "@/components/hrm/ExportPayrollModal"
 import PayrollConfigModal from "@/components/hrm/PayrollConfigModal"
@@ -45,7 +45,7 @@ interface PayrollPageClientProps {
 
 export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientProps) {
   const { token } = useAuthStore()
-  const { hasPermission } = useAuthStore()
+  const { hasPermission } = useAuthStore()  
   const { showToast } = useToast()
   const queryClient = useQueryClient()
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null)

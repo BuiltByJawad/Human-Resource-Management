@@ -8,7 +8,7 @@ import { TimeTrackingTabs } from '@/components/features/time-tracking/TimeTracki
 import { ProjectsGrid } from '@/components/features/time-tracking/ProjectsGrid'
 import { TimesheetPanel } from '@/components/features/time-tracking/TimesheetPanel'
 import { useTimeTrackingPage } from '@/hooks/useTimeTrackingPage'
-import type { Project } from '@/services/time-tracking/api'
+import type { Project } from '@/services/time-tracking/types'
 
 interface TimeTrackingPageClientProps {
   initialProjects: Project[]

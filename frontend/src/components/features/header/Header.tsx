@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -14,6 +14,7 @@ import { HeaderActions } from './HeaderActions'
 import { HeaderBranding } from './HeaderBranding'
 import { HeaderSearchControls } from './HeaderSearchControls'
 import { HeaderMobileSearch } from './HeaderMobileSearch'
+import { HeaderShell } from './HeaderShell'
 import { useToast } from '@/components/ui/ToastProvider'
 
 export default function Header() {
@@ -97,65 +98,64 @@ export default function Header() {
   }
 
   return (
-    <header className="glass-header sticky top-0 z-30">
-      <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-        {isMobileSearchOpen ? (
-          <HeaderMobileSearch
-            searchQuery={searchQuery}
-            onChange={setSearchQuery}
-            onSubmit={() => {
-              handleSearchSubmit()
-              setIsMobileSearchOpen(false)
-            }}
-            onClose={() => setIsMobileSearchOpen(false)}
-          />
-        ) : (
-          <>
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden h-10 w-10 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center mr-3 flex-shrink-0"
-            >
-              <Bars3Icon className="h-6 w-6" />
-            </button>
+    <HeaderShell
+      isMobileSearchOpen={isMobileSearchOpen}
+      mobileSearch={
+        <HeaderMobileSearch
+          searchQuery={searchQuery}
+          onChange={setSearchQuery}
+          onSubmit={() => {
+            handleSearchSubmit()
+            setIsMobileSearchOpen(false)
+          }}
+          onClose={() => setIsMobileSearchOpen(false)}
+        />
+      }
+      defaultContent={
+        <>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="md:hidden h-10 w-10 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center mr-3 flex-shrink-0"
+          >
+            <Bars3Icon className="h-6 w-6" />
+          </button>
 
-            <div className="flex items-center flex-1 gap-3 min-w-0">
-              <HeaderBranding siteName={siteName} tagline={tagline} />
+          <div className="flex items-center flex-1 gap-3 min-w-0">
+            <HeaderBranding siteName={siteName} tagline={tagline} />
 
-              <div className="flex-1" />
+            <div className="flex-1" />
 
-              <HeaderSearchControls
-                searchQuery={searchQuery}
-                onChange={setSearchQuery}
-                onSubmit={handleSearchSubmit}
-                onOpenMobileSearch={() => setIsMobileSearchOpen(true)}
-              />
-            </div>
+            <HeaderSearchControls
+              searchQuery={searchQuery}
+              onChange={setSearchQuery}
+              onSubmit={handleSearchSubmit}
+              onOpenMobileSearch={() => setIsMobileSearchOpen(true)}
+            />
+          </div>
 
-            <div className="ml-4 flex items-center gap-3">
-              <HeaderActions
-                shouldShowNotificationControls={shouldShowNotificationControls}
-                isNotificationsOpen={isNotificationsOpen}
-                onToggleNotifications={() => setIsNotificationsOpen((prev) => !prev)}
-                unreadCount={unreadCount}
-                notifications={notifications}
-                error={error}
-                isLoading={isLoading}
-                onMarkAllRead={markAllRead}
-                onNotificationClick={handleNotificationClick}
-                hasPermission={hasPermission}
-                userFullName={userFullName}
-                userRole={userRole}
-                email={displayUser?.email}
-                initials={initials}
-                avatarUrl={avatarUrl}
-                onLogout={handleLogout}
-              />
-            </div>
-          </>
-        )}
-      </div>
-      <MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={user}
-      />
-    </header>
+          <div className="ml-4 flex items-center gap-3">
+            <HeaderActions
+              shouldShowNotificationControls={shouldShowNotificationControls}
+              isNotificationsOpen={isNotificationsOpen}
+              onToggleNotifications={() => setIsNotificationsOpen((prev) => !prev)}
+              unreadCount={unreadCount}
+              notifications={notifications}
+              error={error}
+              isLoading={isLoading}
+              onMarkAllRead={markAllRead}
+              onNotificationClick={handleNotificationClick}
+              hasPermission={hasPermission}
+              userFullName={userFullName}
+              userRole={userRole}
+              email={displayUser?.email}
+              initials={initials}
+              avatarUrl={avatarUrl}
+              onLogout={handleLogout}
+            />
+          </div>
+        </>
+      }
+      mobileMenu={<MobileMenu isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} user={user} />}
+    />
   )
 }

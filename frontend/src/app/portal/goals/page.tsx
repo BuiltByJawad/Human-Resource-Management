@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import type { PerformanceGoal } from '@/services/goalsService';
+import type { PerformanceGoal } from '@/services/goals/types'
 import { GoalsPageClient } from './GoalsPageClient';
 
 function buildApiBase() {

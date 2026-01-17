@@ -1,3 +1,5 @@
 export * from './PerformanceHeader'
 export * from './StatsGrid'
 export * from './PerformanceTabs'
+export * from './PendingCyclesSection'
+export * from './CompletedCyclesSection'

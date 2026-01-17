@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import { TimeTrackingPageClient } from "./TimeTrackingPageClient"
-import type { Project, TimeEntry } from "@/services/timeTrackingService"
+import type { Project, TimeEntry } from "@/services/time-tracking/types"
 
 function buildApiBase() {
     return (

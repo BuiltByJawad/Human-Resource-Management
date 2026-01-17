@@ -8,7 +8,8 @@ import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { getEmployeeOffboarding, type OffboardingProcess } from '@/services/offboardingService'
+import type { OffboardingProcess } from '@/services/offboarding/types'
+import { fetchEmployeeOffboarding } from '@/services/offboarding/api'
 import { handleCrudError } from '@/lib/apiError'
 
 interface OffboardingPageClientProps {
@@ -26,7 +27,7 @@ export function OffboardingPageClient({ employeeId, initialProcess }: Offboardin
     error
   } = useQuery<OffboardingProcess | null, Error>({
     queryKey: ['offboarding', employeeId],
-    queryFn: () => getEmployeeOffboarding(employeeId as string),
+    queryFn: () => fetchEmployeeOffboarding(employeeId as string),
     enabled: !!employeeId,
     retry: false,
     initialData: employeeId ? initialProcess : null

@@ -2,7 +2,8 @@
 
 import { Dialog } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import { Employee } from './EmployeeComponents'
+
+import type { Employee } from './EmployeeCard'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -30,13 +31,8 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <Dialog.Title className="text-xl font-semibold text-gray-900">
-              Employee Details
-            </Dialog.Title>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
-            >
+            <Dialog.Title className="text-xl font-semibold text-gray-900">Employee Details</Dialog.Title>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
               <XMarkIcon className="h-6 w-6" aria-hidden="true" />
             </button>
           </div>
@@ -46,7 +42,8 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
               <div className="flex-shrink-0">
                 <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center">
                   <span className="text-2xl font-medium text-blue-600">
-                    {employee.firstName.charAt(0)}{employee.lastName.charAt(0)}
+                    {employee.firstName.charAt(0)}
+                    {employee.lastName.charAt(0)}
                   </span>
                 </div>
               </div>
@@ -57,12 +54,15 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
                 <p className="text-sm text-gray-500">{employee.email}</p>
                 <p className="text-sm text-gray-500">#{employee.employeeNumber}</p>
                 <div className="flex items-center mt-2">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${employee.status === 'active'
-                    ? 'bg-green-100 text-green-800'
-                    : employee.status === 'inactive'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-red-100 text-red-800'
-                    }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      employee.status === 'active'
+                        ? 'bg-green-100 text-green-800'
+                        : employee.status === 'inactive'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                    }`}
+                  >
                     {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
                   </span>
                 </div>
@@ -82,15 +82,11 @@ export default function EmployeeDetailsModal({ isOpen, onClose, employee }: Empl
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Hire Date</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {formatIsoDate(employee.hireDate)}
-                  </dd>
+                  <dd className="mt-1 text-sm text-gray-900">{formatIsoDate(employee.hireDate)}</dd>
                 </div>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">Salary</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    ${employee.salary.toLocaleString('en-US')}
-                  </dd>
+                  <dd className="mt-1 text-sm text-gray-900">${employee.salary.toLocaleString('en-US')}</dd>
                 </div>
               </dl>
             </div>

@@ -12,7 +12,8 @@ import {
     ClockIcon,
     MapPinIcon,
 } from "@heroicons/react/24/outline"
-import { shiftService, type Shift } from "@/services/shiftService"
+import { shiftService } from "@/services/shiftService"
+import type { Shift } from "@/services/shifts/types"
 import { useToast } from "@/components/ui/ToastProvider"
 import { Modal } from "@/components/ui/Modal"
 import { Input } from "@/components/ui/FormComponents"
