@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import { TrainingPageClient } from "./TrainingPageClient"
-import type { TrainingCourse, EmployeeTraining } from "@/services/trainingService"
+import type { TrainingCourse, EmployeeTraining } from "@/services/training/types"
 
 function buildApiBase() {
     return (

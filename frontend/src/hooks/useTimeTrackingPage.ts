@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { Project, TimeEntry } from '@/services/time-tracking/api'
+import type { Project, TimeEntry } from '@/services/time-tracking/types'
 import { createProject, fetchTimesheet } from '@/services/time-tracking/api'
 
 interface EmployeeOption {

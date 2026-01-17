@@ -3,7 +3,8 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { trainingService, type EmployeeTraining } from '@/services/trainingService'
+import { trainingService } from '@/services/trainingService'
+import type { EmployeeTraining } from '@/services/training/types'
 import { CourseCard } from '@/components/modules/training/CourseCard'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'

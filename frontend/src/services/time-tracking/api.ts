@@ -1,4 +1,5 @@
-import { timeTrackingService, type Project, type TimeEntry } from '@/services/timeTrackingService'
+import { timeTrackingService } from '@/services/timeTrackingService'
+import type { Project, TimeEntry } from '@/services/time-tracking/types'
 
 export type { Project, TimeEntry }
 

@@ -1,0 +1,6 @@
+export * from './PayslipModal'
+export * from './PayslipHeader'
+export * from './PayslipEmployeeDetails'
+export * from './PayslipBreakdown'
+export * from './PayslipNetPay'
+export * from './PayslipFooter'

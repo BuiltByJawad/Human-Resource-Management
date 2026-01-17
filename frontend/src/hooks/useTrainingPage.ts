@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useToast } from '@/components/ui/ToastProvider'
-import type { TrainingCourse } from '@/services/training/api'
+import type { TrainingCourse } from '@/services/training/types'
 import { createCourse, assignCourse } from '@/services/training/api'
 
 interface EmployeeOption {

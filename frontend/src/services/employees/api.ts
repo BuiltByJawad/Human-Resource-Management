@@ -1,4 +1,4 @@
-import type { Department, EmployeesPage, EmployeesQueryParams, Role, EmployeePayload } from '@/types/hrm'
+import type { Department, EmployeesPage, EmployeesQueryParams, Role, EmployeePayload } from './types'
 import {
   fetchDepartments as fetchDepartmentsLegacy,
   fetchRolesWithToken as fetchRolesWithTokenLegacy,

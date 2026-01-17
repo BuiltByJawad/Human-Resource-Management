@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { trainingService, EmployeeTraining } from '@/services/trainingService';
+import { trainingService } from '@/services/trainingService'
+import type { EmployeeTraining } from '@/services/training/types'
 import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
 import { Button } from '@/components/ui/button';

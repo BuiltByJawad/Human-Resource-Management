@@ -12,7 +12,8 @@ import {
     ArrowPathIcon
 } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
-import { analyticsService, type DashboardMetrics, type DepartmentStat } from '@/services/analyticsService'
+import { analyticsService } from '@/services/analyticsService'
+import type { DashboardMetrics, DepartmentStat } from '@/services/analytics/types'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'

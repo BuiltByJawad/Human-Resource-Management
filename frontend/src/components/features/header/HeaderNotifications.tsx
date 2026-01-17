@@ -1,14 +1,14 @@
-'use client'
+"use client"
 
 import { useMemo, useState } from 'react'
 import { BellIcon } from '@heroicons/react/24/outline'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
 import { NotificationItem } from '@/services/notifications/types'
-import { SEVERITY_COLORS } from '@/lib/utils/notifications'
 import { PERMISSIONS } from '@/constants/permissions'
+import { HeaderNotificationList } from './HeaderNotificationList'
 
-export type NotificationMenuProps = {
+export type HeaderNotificationsProps = {
   isOpen: boolean
   onToggle: () => void
   unreadCount: number
@@ -20,7 +20,7 @@ export type NotificationMenuProps = {
   hasPermission: (perm: (typeof PERMISSIONS)[keyof typeof PERMISSIONS]) => boolean
 }
 
-export function NotificationMenu({
+export function HeaderNotifications({
   isOpen,
   onToggle,
   unreadCount,
@@ -30,7 +30,7 @@ export function NotificationMenu({
   onMarkAllRead,
   onNotificationClick,
   hasPermission,
-}: NotificationMenuProps) {
+}: HeaderNotificationsProps) {
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const notificationsRef = useClickOutside<HTMLDivElement>(() => {
     if (isOpen) onToggle()
@@ -41,18 +41,15 @@ export function NotificationMenu({
     [notifications, dismissedIds]
   )
 
-  const categorized = useMemo(
-    () =>
-      filtered.map((notification) => ({
-        ...notification,
-        isRelevant: !notification.requiresPermission || hasPermission(notification.requiresPermission),
-      })),
-    [filtered, hasPermission]
-  )
-
   const actionable = useMemo(
-    () => categorized.filter((n) => n.isRelevant),
-    [categorized]
+    () =>
+      filtered
+        .map((notification) => ({
+          ...notification,
+          isRelevant: !notification.requiresPermission || hasPermission(notification.requiresPermission),
+        }))
+        .filter((n) => n.isRelevant),
+    [filtered, hasPermission]
   )
 
   const handleClick = (notification: NotificationItem) => {
@@ -92,38 +89,13 @@ export function NotificationMenu({
               Mark all read
             </button>
           </div>
-          <div className="max-h-72 overflow-y-auto">
-            {error ? (
-              <div className="px-4 py-6 text-sm text-rose-500 text-center">{error}</div>
-            ) : isLoading && categorized.length === 0 ? (
-              <div className="px-4 py-3 space-y-2">
-                <div className="h-3 w-1/2 bg-slate-100 rounded animate-pulse" />
-                <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
-              </div>
-            ) : categorized.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-500 text-center">No new notifications</div>
-            ) : (
-              actionable.map((notification) => (
-                <button
-                  key={notification.id}
-                  className={cn(
-                    'w-full px-4 py-3 text-left hover:bg-slate-50 transition border-l-2',
-                    notification.read ? 'border-transparent' : 'border-blue-500'
-                  )}
-                  onClick={() => handleClick(notification)}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-900">{notification.title}</span>
-                      <span className={cn('h-1.5 w-1.5 rounded-full', SEVERITY_COLORS[notification.severity])} />
-                    </div>
-                    <p className="text-xs text-slate-500 line-clamp-2">{notification.message}</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-tight">{notification.time}</p>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
+
+          <HeaderNotificationList
+            notifications={actionable}
+            isLoading={isLoading}
+            error={error}
+            onNotificationClick={handleClick}
+          />
         </div>
       )}
     </div>
