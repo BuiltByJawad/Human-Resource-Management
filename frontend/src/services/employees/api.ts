@@ -1,4 +1,5 @@
-import type { Department, EmployeesPage, EmployeesQueryParams, Role, EmployeePayload } from './types'
+import type { Department, EmployeesPage, EmployeesQueryParams, Role, EmployeePayload, Employee } from './types'
+import api from '@/lib/axios'
 import {
   fetchDepartments as fetchDepartmentsLegacy,
   fetchRolesWithToken as fetchRolesWithTokenLegacy,
@@ -27,10 +28,16 @@ export const sendEmployeeInvite = (
   token?: string
 ): Promise<void> => sendEmployeeInviteLegacy(payload, token)
 
+export const fetchEmployeeById = async (employeeId: string) => {
+  const response = await api.get(`/employees/${employeeId}`)
+  return response.data?.data ?? response.data
+}
+
 export type {
   Department,
   EmployeesPage,
   EmployeesQueryParams,
   Role,
   EmployeePayload,
+  Employee,
 }

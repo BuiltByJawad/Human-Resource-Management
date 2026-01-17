@@ -1,33 +1,18 @@
-export type LoginHighlight = {
-  title: string
-  description: string
-}
-
-export interface LoginBranding {
-  siteName: string
-  tagline?: string | null
-  heroTitle: string
-  heroSubtitle: string
-  highlights: LoginHighlight[]
-  logoUrl?: string | null
-  faviconUrl?: string | null
-  companyName?: string | null
-  companyAddress?: string | null
-}
+import type { LoginBranding, LoginHighlight } from '@/services/login/types'
 
 export const FALLBACK_HIGHLIGHTS: LoginHighlight[] = [
   {
     title: 'Unified HR operations',
-    description: 'Manage employees, payroll, leaves and performance from a single hub.'
+    description: 'Manage employees, payroll, leaves and performance from a single hub.',
   },
   {
     title: 'Enterprise-grade security',
-    description: 'Single sign-on ready with full audit trails and SOC aligned controls.'
+    description: 'Single sign-on ready with full audit trails and SOC aligned controls.',
   },
   {
     title: 'Real-time insights',
-    description: 'Live dashboards help HR partners respond faster to workforce changes.'
-  }
+    description: 'Live dashboards help HR partners respond faster to workforce changes.',
+  },
 ]
 
 export const FALLBACK_BRANDING: LoginBranding = {
@@ -39,7 +24,7 @@ export const FALLBACK_BRANDING: LoginBranding = {
   logoUrl: null,
   faviconUrl: null,
   companyName: 'Nimbus HR',
-  companyAddress: 'Global HQ'
+  companyAddress: 'Global HQ',
 }
 
 export function deriveHeroTitle(siteName?: string | null, fallback = FALLBACK_BRANDING.heroTitle) {
@@ -66,14 +51,14 @@ export function buildHighlights(
   if (source.tagline) {
     highlights.push({
       title: 'Why teams choose us',
-      description: source.tagline
+      description: source.tagline,
     })
   }
 
   if (source.companyName) {
     highlights.push({
       title: source.companyName,
-      description: source.companyAddress || 'People operations HQ'
+      description: source.companyAddress || 'People operations HQ',
     })
   }
 

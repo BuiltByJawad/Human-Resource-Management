@@ -1,4 +1,4 @@
-import type { PayrollRecord } from '@/app/payroll/types'
+import type { PayrollRecord } from '@/services/payroll/types'
 
 interface PayslipBreakdownProps {
   payroll: PayrollRecord
