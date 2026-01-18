@@ -17,18 +17,21 @@ export class EmployeeService {
 
         // Search filter
         if (query.search) {
-            const search = query.search;
+            const search = query.search.trim();
             const numericSearch = Number(search);
             const isNumeric = !isNaN(numericSearch);
 
             const dateFromSearch = new Date(search);
             const isValidDate = !isNaN(dateFromSearch.getTime());
 
-            const orConditions: any[] = [
-                { firstName: { contains: search, mode: 'insensitive' } },
-                { lastName: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } },
-            ];
+            const tokens = search.split(/\s+/).filter(Boolean);
+            const orConditions: any[] = [];
+
+            for (const token of tokens) {
+                orConditions.push({ firstName: { contains: token, mode: 'insensitive' } });
+                orConditions.push({ lastName: { contains: token, mode: 'insensitive' } });
+                orConditions.push({ email: { contains: token, mode: 'insensitive' } });
+            }
 
             if (isNumeric) {
                 orConditions.push({ salary: numericSearch });

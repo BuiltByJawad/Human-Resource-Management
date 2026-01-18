@@ -26,7 +26,7 @@ const fetchWithToken = async <T>(path: string, token: string | null): Promise<T 
 }
 
 export const fetchCompanyDocumentsServer = async (token: string | null): Promise<CompanyDocument[]> => {
-  const data = await fetchWithToken<CompanyDocument[]>('/api/documents/company', token)
+  const data = await fetchWithToken<CompanyDocument[]>('/api/documents', token)
   return Array.isArray(data) ? data : []
 }
 
@@ -37,7 +37,7 @@ export const fetchEmployeeDocumentsServer = async (token: string | null): Promis
 
 export const fetchCompanyDocuments = async (): Promise<CompanyDocument[]> => {
   try {
-    const response = await api.get<{ data: CompanyDocument[] }>('/documents/company')
+    const response = await api.get<{ data: CompanyDocument[] }>('/documents')
     return Array.isArray(response.data?.data) ? response.data.data : []
   } catch {
     return []
@@ -57,7 +57,7 @@ export const uploadCompanyDocument = async (file: File, payload: CompanyDocument
   formData.append('category', payload.category)
   if (payload.description) formData.append('description', payload.description)
 
-  const response = await api.post('/documents/company', formData, {
+  const response = await api.post('/documents', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return response.data
@@ -69,7 +69,7 @@ export const uploadDocument = async (payload: DocumentUploadPayload) => {
 }
 
 export const deleteCompanyDocument = async (documentId: string) => {
-  const response = await api.delete(`/documents/company/${documentId}`)
+  const response = await api.delete(`/documents/${documentId}`)
   return response.data
 }
 
@@ -79,6 +79,6 @@ export const deleteDocument = async (documentId: string) => {
 }
 
 export const toggleDocumentVisibility = async (documentId: string, isVisible: boolean) => {
-  const response = await api.patch(`/documents/company/${documentId}`, { isVisible })
+  const response = await api.patch(`/documents/${documentId}`, { isVisible })
   return response.data
 }

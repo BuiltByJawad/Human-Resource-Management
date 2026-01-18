@@ -6,11 +6,36 @@ import { createDocumentSchema, updateDocumentSchema } from './dto';
 import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const uploadDocument = asyncHandler(async (req: Request, res: Response) => {
-    const { error, value } = createDocumentSchema.validate(req.body);
+    const file = (req as any).file as any;
+    if (!file) {
+        throw new Error('No file uploaded');
+    }
+
+    const fileUrl =
+        file.path && typeof file.path === 'string' && /^https?:\/\//.test(file.path)
+            ? file.path
+            : (() => {
+                const baseUrl = process.env.FILE_BASE_URL || `${req.protocol}://${req.get('host')}`;
+                const filename =
+                    file.filename ||
+                    (typeof file.path === 'string' ? file.path.split(/[\\/]/).pop() : undefined);
+                if (!filename) {
+                    throw new Error('Unable to determine uploaded file name');
+                }
+                return `${baseUrl}/uploads/${filename}`;
+            })();
+
+    const payload = {
+        ...req.body,
+        fileUrl,
+        type: file.mimetype,
+    };
+
+    const { error, value } = createDocumentSchema.validate(payload);
     if (error) throw new Error(error.details[0].message);
 
     const uploadedBy = (req as any).user?.id;
-    if (!uploadedBy) throw new Error("User not authenticated");
+    if (!uploadedBy) throw new Error('User not authenticated');
 
     const organizationId = requireRequestOrganizationId(req as any);
 

@@ -30,5 +30,17 @@ export const storage = isCloudinaryConfigured
     })
     : null;
 
-export default cloudinary;
+export const documentStorage = isCloudinaryConfigured
+    ? new CloudinaryStorage({
+        cloudinary: cloudinary,
+        params: {
+            folder: 'hrm-documents',
+            resource_type: 'raw',
+            use_filename: true,
+            unique_filename: false,
+            allowed_formats: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'],
+        } as any,
+    })
+    : null;
 
+export default cloudinary;
