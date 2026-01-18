@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { shiftService } from '@/services/shiftService'
+import { requestShiftSwap } from '@/services/shifts/api'
 import type { Shift } from '@/services/shifts/types'
 import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 
@@ -23,7 +23,7 @@ export const SwapRequestDialog: React.FC<SwapRequestDialogProps> = ({ shift, onS
         e.preventDefault();
         setLoading(true);
         try {
-            await shiftService.requestSwap(shift.id, reason);
+            await requestShiftSwap(shift.id, reason);
             setOpen(false);
             if (onSuccess) onSuccess();
         } catch (error) {

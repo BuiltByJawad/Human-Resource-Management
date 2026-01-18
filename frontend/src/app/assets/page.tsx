@@ -3,15 +3,17 @@
 import { cookies } from "next/headers"
 
 import { AssetsPageClient } from "./AssetsPageClient"
-import type { Asset, Employee } from "@/types/hrm"
-import { fetchAssets, fetchEmployees } from "@/lib/hrmData"
+import type { Asset } from "@/services/assets/types"
+import type { Employee } from "@/services/employees/types"
+import { fetchAssetsServer } from "@/services/assets/api"
+import { fetchEmployees } from "@/services/employees/api"
 
 export default async function AssetPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get("accessToken")?.value ?? null
 
   const [initialAssets, employeesPage] = await Promise.all([
-    fetchAssets({}, token ?? undefined),
+    fetchAssetsServer(token, {}),
     fetchEmployees({ page: 1, limit: 200 }, token ?? undefined),
   ])
 
@@ -19,7 +21,7 @@ export default async function AssetPage() {
 
   return (
     <AssetsPageClient
-      initialAssets={(initialAssets ?? []) as Asset[]}
+      initialAssets={initialAssets as Asset[]}
       initialEmployees={employees}
     />
   )

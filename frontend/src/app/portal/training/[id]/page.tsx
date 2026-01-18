@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { trainingService } from '@/services/trainingService'
+import { fetchMyCourses, updateTrainingProgress } from '@/services/training/api'
 import type { EmployeeTraining } from '@/services/training/types'
 import Sidebar from '@/components/ui/Sidebar';
 import Header from '@/components/ui/Header';
@@ -24,7 +24,7 @@ export default function CoursePlayerPage() {
 
     const coursesQuery = useQuery<EmployeeTraining[]>({
         queryKey: ['training', 'my-courses'],
-        queryFn: trainingService.getMyCourses,
+        queryFn: () => fetchMyCourses(),
         enabled: !!trainingId,
         staleTime: 5 * 60 * 1000,
         initialData: [],
@@ -46,7 +46,7 @@ export default function CoursePlayerPage() {
     );
 
     const progressMutation = useMutation({
-        mutationFn: (newProgress: number) => trainingService.updateProgress(trainingId, newProgress),
+        mutationFn: (newProgress: number) => updateTrainingProgress(trainingId, newProgress),
         onError: (err) =>
             handleCrudError({
                 error: err,

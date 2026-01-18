@@ -1,19 +1,14 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React from 'react'
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
-import { documentService, type CompanyDocument } from '@/services/documentService'
-import { DocumentCard } from '@/components/modules/documents/DocumentCard'
-import { UploadDocumentDialog } from '@/components/modules/documents/UploadDocumentDialog'
+import type { CompanyDocument } from '@/services/documents/types'
+import { DocumentCard, UploadDocumentDialog } from '@/components/features/documents'
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { useToast } from '@/components/ui/ToastProvider'
-import { handleCrudError } from '@/lib/apiError'
-
-const categories = ['All', 'HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other']
+import { useDocumentsPortal } from '@/hooks/useDocumentsPortal'
 
 interface DocumentsPageClientProps {
   initialDocuments?: CompanyDocument[]
@@ -24,51 +19,19 @@ export function DocumentsPageClient({
   initialDocuments = [],
   initialCategory = 'All'
 }: DocumentsPageClientProps) {
-  const { showToast } = useToast()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory)
   const isAdmin = true
-
   const {
-    data: documents = [],
+    categories,
+    searchTerm,
+    setSearchTerm,
+    selectedCategory,
+    setSelectedCategory,
+    filteredDocs,
+    showSkeletons,
     isLoading,
-    isFetching,
     isError,
-    error,
     refetch,
-  } = useQuery<CompanyDocument[], Error>({
-    queryKey: ['documents'],
-    queryFn: () => documentService.getDocuments(),
-    retry: false,
-    initialData: initialDocuments,
-    placeholderData: (previousData) => previousData ?? initialDocuments,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: false,
-  })
-
-  useEffect(() => {
-    if (isError && error) {
-      handleCrudError({
-        error,
-        resourceLabel: 'Documents',
-        showToast
-      })
-    }
-  }, [isError, error, showToast])
-
-  const filteredDocs = useMemo<CompanyDocument[]>(() => {
-    const term = searchTerm.toLowerCase()
-    return (documents || []).filter((doc: CompanyDocument) => {
-      const matchesSearch =
-        doc.title.toLowerCase().includes(term) || doc.category.toLowerCase().includes(term)
-      const matchesCategory = selectedCategory === 'All' || doc.category === selectedCategory
-      return matchesSearch && matchesCategory
-    })
-  }, [documents, searchTerm, selectedCategory])
-
-  const skeletonCount = filteredDocs.length || documents.length || initialDocuments.length || 0
-  const showSkeletons = (isLoading || isFetching) && skeletonCount > 0
-  const isEmpty = !showSkeletons && filteredDocs.length === 0
+  } = useDocumentsPortal({ initialDocuments, initialCategory })
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -114,11 +77,11 @@ export function DocumentsPageClient({
             </div>
 
             {showSkeletons ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {Array.from({ length: skeletonCount }).map((_, idx) => (
-                    <Skeleton key={`doc-skeleton-${idx}`} className="h-40 w-full rounded-lg" />
-                  ))}
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {Array.from({ length: filteredDocs.length || initialDocuments.length || 0 }).map((_, idx) => (
+                  <Skeleton key={`doc-skeleton-${idx}`} className="h-40 w-full rounded-lg" />
+                ))}
+              </div>
             ) : isLoading ? (
               <div className="text-center py-20 text-gray-500 border-2 border-dashed rounded-xl bg-white">
                 <p>No documents found matching your criteria.</p>

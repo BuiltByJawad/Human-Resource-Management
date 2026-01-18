@@ -6,7 +6,7 @@ import { TableSkeleton, EmptyState } from './ReportStates'
 import { SummaryCard } from './SummaryCard'
 import { attendanceColumns } from './columns'
 
-interface AttendanceSummary {
+export interface AttendanceSummary {
   totalRecords: number
   presentDays: number
   absentDays: number
@@ -15,8 +15,13 @@ interface AttendanceSummary {
   totalOvertimeHours: number
 }
 
+export interface AttendanceReportData {
+  attendance: Array<Record<string, unknown>>
+  summary?: AttendanceSummary
+}
+
 interface AttendanceSectionProps {
-  data: { attendance: Array<Record<string, unknown>>; summary?: AttendanceSummary } | null
+  data: AttendanceReportData | null
   isLoading: boolean
   onExportCSV: () => void
   onExportPDF: () => void

@@ -14,7 +14,6 @@ import type {
   EmployeesPagination,
   JobPosting,
   LeaveRequest,
-  ExpenseClaim,
   PayrollRecord,
   Permission,
   PerformanceReview,
@@ -479,93 +478,6 @@ export async function runComplianceCheck(token?: string): Promise<ComplianceRunR
   return data as ComplianceRunResult
 }
 
-export interface AssetsFilterParams {
-	status?: string
-	search?: string
-}
-
-export async function fetchAssets(
-	params: AssetsFilterParams,
-	token?: string,
-): Promise<Asset[]> {
-	const query: Record<string, string> = {}
-	if (params.status) query.status = params.status
-	if (params.search) query.search = params.search
-
-	try {
-		const response = await api.get('/assets', {
-			params: query,
-			...withAuthConfig(token),
-		})
-		const payload = response.data
-		const root = (payload as { data?: unknown }).data ?? payload
-
-		if (Array.isArray(root)) return root as Asset[]
-
-		const assets = (root as { assets?: unknown[] }).assets
-		if (Array.isArray(assets)) return assets as Asset[]
-
-		return []
-	} catch (error: unknown) {
-		const status = extractStatusCode(error)
-		if (status === 401 || status === 404) return []
-		throw error
-	}
-}
-
-export interface UpsertAssetPayload {
-	name: string
-	serialNumber: string
-	type: string
-	purchaseDate: string
-	purchasePrice?: number | null
-	vendor?: string
-	description?: string
-}
-
-export async function createAsset(
-	payload: UpsertAssetPayload,
-	token?: string,
-): Promise<Asset> {
-	const response = await api.post('/assets', payload, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return data as Asset
-}
-
-export async function updateAsset(
-	assetId: string,
-	payload: Partial<UpsertAssetPayload>,
-	token?: string,
-): Promise<Asset> {
-	const response = await api.patch(`/assets/${assetId}`, payload, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return data as Asset
-}
-
-export interface AssignAssetPayload {
-	employeeId: string
-	notes?: string
-}
-
-export async function assignAsset(
-	assetId: string,
-	payload: AssignAssetPayload,
-	token?: string,
-): Promise<Asset> {
-	const response = await api.post(`/assets/${assetId}/assign`, payload, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return data as Asset
-}
-
-export async function returnAsset(
-	assetId: string,
-	token?: string,
-): Promise<Asset> {
-	const response = await api.post(`/assets/${assetId}/return`, undefined, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return data as Asset
-}
-
 export interface LeaveFilterParams {
 	status?: string
 }
@@ -605,56 +517,6 @@ export async function createLeaveRequest(
 	const response = await api.post('/leave', payload, withAuthConfig(token))
 	const data = response.data?.data ?? response.data
 	return data as LeaveRequest
-}
-
-export interface SubmitExpenseClaimPayload {
-	employeeId: string
-	amount: number
-	currency?: string
-	category: string
-	date: string
-	description?: string
-	receiptUrl?: string
-}
-
-export async function submitExpenseClaim(
-	payload: SubmitExpenseClaimPayload,
-	token?: string,
-): Promise<ExpenseClaim> {
-	const response = await api.post('/expenses', payload, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return data as ExpenseClaim
-}
-
-export async function fetchMyExpenses(
-	employeeId: string,
-	token?: string,
-): Promise<ExpenseClaim[]> {
-	if (!employeeId) return []
-	const response = await api.get(`/expenses/my/${employeeId}`, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return Array.isArray(data) ? (data as ExpenseClaim[]) : []
-}
-
-export async function fetchPendingExpenses(token?: string): Promise<ExpenseClaim[]> {
-	const response = await api.get('/expenses/pending', withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return Array.isArray(data) ? (data as ExpenseClaim[]) : []
-}
-
-export interface UpdateExpenseStatusPayload {
-	status: 'approved' | 'rejected' | 'reimbursed'
-	rejectionReason?: string
-}
-
-export async function updateExpenseStatus(
-	expenseId: string,
-	payload: UpdateExpenseStatusPayload,
-	token?: string,
-): Promise<ExpenseClaim> {
-	const response = await api.patch(`/expenses/${expenseId}/status`, payload, withAuthConfig(token))
-	const data = response.data?.data ?? response.data
-	return data as ExpenseClaim
 }
 
 export async function approveLeave(

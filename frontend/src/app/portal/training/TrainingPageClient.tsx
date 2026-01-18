@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import { trainingService } from '@/services/trainingService'
+import { fetchMyCourses } from '@/services/training/api'
 import type { EmployeeTraining } from '@/services/training/types'
 import { CourseCard } from '@/components/modules/training/CourseCard'
 import Sidebar from '@/components/ui/Sidebar'
@@ -20,7 +20,7 @@ export function TrainingPageClient({ initialCourses = [] }: TrainingPageClientPr
 
   const coursesQuery = useQuery<EmployeeTraining[], Error>({
     queryKey: ['training', 'my-courses'],
-    queryFn: trainingService.getMyCourses,
+    queryFn: () => fetchMyCourses(),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     initialData: initialCourses

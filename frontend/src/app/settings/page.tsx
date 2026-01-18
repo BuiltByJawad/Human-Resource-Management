@@ -3,7 +3,8 @@
 import { cookies } from "next/headers"
 import { headers } from 'next/headers'
 
-import { SettingsPageClient, type OrgSettingsPayload } from "./SettingsPageClient"
+import { SettingsPageClient } from "./SettingsPageClient"
+import type { OrgSettingsPayload } from "@/services/settings/types"
 import { extractTenantSlug } from '@/lib/tenant'
 
 type OrgSettingsApiResponse = {

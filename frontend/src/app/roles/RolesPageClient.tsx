@@ -31,7 +31,6 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
     isDeleteOpen,
     setIsDeleteOpen,
     roleToDelete,
-    setRoleToDelete,
     handleCreate,
     handleEdit,
     handleDeleteRequest,

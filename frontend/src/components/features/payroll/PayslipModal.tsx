@@ -3,7 +3,7 @@
 import { Fragment } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import type { PayrollRecord } from '@/app/payroll/types'
+import type { PayrollRecord } from '@/services/payroll/types'
 import { usePayslip } from '@/hooks/usePayslip'
 import { PayslipHeader } from './PayslipHeader'
 import { PayslipEmployeeDetails } from './PayslipEmployeeDetails'

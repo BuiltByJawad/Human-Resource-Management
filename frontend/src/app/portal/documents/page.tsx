@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import type { CompanyDocument } from '@/services/documentService'
 import { DocumentsPageClient } from './DocumentsPageClient'
+import { fetchEmployeeDocumentsServer } from '@/services/documents/api'
 
 function buildApiBase() {
   return (
@@ -39,29 +39,6 @@ async function fetchCurrentUser() {
   }
 }
 
-async function fetchInitialDocuments(token: string | null): Promise<CompanyDocument[]> {
-  try {
-    if (!token) return []
-    const base = buildApiBase()
-    const response = await fetch(`${base}/api/documents`, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      cache: 'no-store'
-    })
-
-    if (!response.ok) {
-      return []
-    }
-
-    const payload = await response.json().catch(() => null)
-    const data = payload?.data ?? payload
-    return Array.isArray(data) ? data : []
-  } catch {
-    return []
-  }
-}
 
 export default async function DocumentsPage() {
   const { user, token } = await fetchCurrentUser()
@@ -70,6 +47,6 @@ export default async function DocumentsPage() {
     redirect('/dashboard')
   }
 
-  const initialDocuments = await fetchInitialDocuments(token)
+  const initialDocuments = await fetchEmployeeDocumentsServer(token)
   return <DocumentsPageClient initialDocuments={initialDocuments} initialCategory="All" />
 }

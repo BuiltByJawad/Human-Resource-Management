@@ -6,7 +6,7 @@ import { TableSkeleton, EmptyState } from './ReportStates'
 import { SummaryCard } from './SummaryCard'
 import { leaveColumns } from './columns'
 
-interface LeaveSummary {
+export interface LeaveSummary {
   totalRequests: number
   approvedRequests: number
   pendingRequests: number
@@ -14,8 +14,13 @@ interface LeaveSummary {
   totalDaysRequested: number
 }
 
+export interface LeaveReportData {
+  leaveRequests: Array<Record<string, unknown>>
+  summary?: LeaveSummary
+}
+
 interface LeaveSectionProps {
-  data: { leaveRequests: Array<Record<string, unknown>>; summary?: LeaveSummary } | null
+  data: LeaveReportData | null
   isLoading: boolean
   onExportCSV: () => void
   onExportPDF: () => void

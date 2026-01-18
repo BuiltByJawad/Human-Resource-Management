@@ -11,3 +11,19 @@ export interface Shift {
     lastName: string
   }
 }
+
+export interface ShiftEmployee {
+  id: string
+  firstName: string
+  lastName: string
+}
+
+export type ShiftType = 'Regular' | 'Overtime' | 'OnCall'
+
+export interface ShiftFormState {
+  employeeId: string
+  startTime: string
+  endTime: string
+  type: ShiftType
+  location: string
+}

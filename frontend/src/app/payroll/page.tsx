@@ -3,8 +3,8 @@
 import { cookies } from "next/headers"
 
 import { PayrollPageClient } from "./PayrollPageClient"
-import { fetchPayrollRecords } from "@/lib/hrmData"
-import type { PayrollRecord } from "@/types/hrm"
+import { fetchPayrollRecords } from "@/services/payroll/api"
+import type { PayrollRecord } from "@/services/payroll/types"
 
 export default async function PayrollPage() {
   const cookieStore = await cookies()
