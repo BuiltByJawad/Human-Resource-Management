@@ -17,7 +17,7 @@ export const LeavePolicyHeader = ({
     <Button variant="outline" onClick={onBack}>
       Back to Settings
     </Button>
-    <Button variant="primary" onClick={onSave} loading={isSaving} disabled={!canManage}>
+    <Button variant="primary" onClick={onSave} disabled={!canManage || isSaving}>
       Save Policy
     </Button>
   </div>
