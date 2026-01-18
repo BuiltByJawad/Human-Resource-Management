@@ -4,10 +4,12 @@ import { useCallback } from "react"
 import { useRouter } from "next/navigation"
 import type { Shift, ShiftEmployee } from "@/services/shifts/types"
 import { useShiftsPage } from "@/hooks/useShiftsPage"
-import { ShiftsHeader } from "@/components/features/shifts/ShiftsHeader"
-import { ShiftsWeekNavigator } from "@/components/features/shifts/ShiftsWeekNavigator"
-import { ShiftsCalendarGrid } from "@/components/features/shifts/ShiftsCalendarGrid"
-import { CreateShiftModal } from "@/components/features/shifts/CreateShiftModal"
+import {
+    CreateShiftModal,
+    ShiftsCalendarGrid,
+    ShiftsHeader,
+    ShiftsWeekNavigator,
+} from "@/components/features/shifts"
 
 interface ShiftsPageClientProps {
     initialShifts: Shift[]

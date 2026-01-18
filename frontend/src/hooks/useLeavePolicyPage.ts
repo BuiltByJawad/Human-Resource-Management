@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useToast } from '@/components/ui/ToastProvider'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -37,7 +37,13 @@ interface UseLeavePolicyPageOptions {
 export const useLeavePolicyPage = ({ initialLeavePolicy }: UseLeavePolicyPageOptions) => {
   const { showToast } = useToast()
   const { hasPermission } = useAuthStore()
-  const canManage = hasPermission(PERMISSIONS.MANAGE_LEAVE_POLICIES)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  const canManage = isHydrated && hasPermission(PERMISSIONS.MANAGE_LEAVE_POLICIES)
 
   const initialPolicies = useMemo(() => {
     const policies = initialLeavePolicy.policies ?? {}
@@ -78,6 +84,10 @@ export const useLeavePolicyPage = ({ initialLeavePolicy }: UseLeavePolicyPageOpt
     if (!canManage) {
       showToast('You do not have permission to manage leave policies', 'error')
       return
+    }
+
+    if (isSaving) {
+      return false
     }
 
     const holidays = normalizeHolidayList(holidaysText)
@@ -133,10 +143,11 @@ export const useLeavePolicyPage = ({ initialLeavePolicy }: UseLeavePolicyPageOpt
     } finally {
       setIsSaving(false)
     }
-  }, [canManage, holidaysText, policies, showToast])
+  }, [canManage, holidaysText, isSaving, policies, showToast])
 
   return {
     canManage,
+    isHydrated,
     policies,
     holidaysText,
     isSaving,
