@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -63,6 +64,7 @@ export function useEmployeesPage({
   initialRoles = [],
   initialEmployees,
 }: UseEmployeesPageProps): UseEmployeesPageResult {
+  const searchParams = useSearchParams()
   const { token } = useAuthStore()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
@@ -76,7 +78,12 @@ export function useEmployeesPage({
   const [pendingDelete, setPendingDelete] = useState<Employee | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterDepartment, setFilterDepartment] = useState<string>('all')
-  const [searchTerm, setSearchTerm] = useState('')
+  const initialSearchTerm = useMemo(() => (searchParams.get('search') ?? '').trim(), [searchParams])
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm)
+
+  useEffect(() => {
+    setSearchTerm(initialSearchTerm)
+  }, [initialSearchTerm])
   const debouncedSearch = useDebounce(searchTerm, 500)
 
   const baseQueryParams: EmployeesQueryParams = useMemo(
