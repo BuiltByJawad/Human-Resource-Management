@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
+import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
@@ -65,6 +66,9 @@ export const createApp = (): { app: Application; httpServer: any } => {
   // Body parsers
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Serve locally stored uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Cookies (for httpOnly refresh tokens)
   app.use(cookieMiddleware);

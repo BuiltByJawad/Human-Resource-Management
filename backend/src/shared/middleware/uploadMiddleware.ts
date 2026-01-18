@@ -1,5 +1,5 @@
 import multer from 'multer'
-import { storage } from '../config/cloudinary'
+import { documentStorage, storage } from '../config/cloudinary'
 
 // Allow image formats including WebP, SVG, ICO
 const allowedMimeTypes = [
@@ -10,6 +10,17 @@ const allowedMimeTypes = [
     'image/svg+xml',
     'image/x-icon',
     'image/vnd.microsoft.icon',
+]
+
+const allowedDocumentMimeTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
 ]
 
 const fileFilter = (req: any, file: any, cb: any) => {
@@ -41,6 +52,7 @@ const diskStorage = multer.diskStorage({
 
 // Use Cloudinary storage if available, otherwise fall back to disk
 const storageConfig = storage || diskStorage
+const documentStorageConfig = documentStorage || diskStorage
 
 export const upload = multer({
     storage: storageConfig,
@@ -56,6 +68,22 @@ export const uploadBranding = multer({
     fileFilter: fileFilter,
     limits: {
         fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+})
+
+const documentFileFilter = (req: any, file: any, cb: any) => {
+    if (allowedDocumentMimeTypes.includes(file.mimetype)) {
+        cb(null, true)
+    } else {
+        cb(new Error('Invalid document type. Please upload a supported document.'), false)
+    }
+}
+
+export const uploadDocument = multer({
+    storage: documentStorageConfig,
+    fileFilter: documentFileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
     }
 })
 

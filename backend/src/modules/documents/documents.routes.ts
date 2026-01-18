@@ -1,6 +1,7 @@
 
 import { Router } from 'express';
 import { authenticate, checkPermission } from '../../shared/middleware/auth';
+import { uploadDocument } from '../../shared/middleware/uploadMiddleware';
 import * as documentsController from './documents.controller';
 
 const router = Router();
@@ -23,6 +24,7 @@ router.post(
     '/',
     authenticate,
     checkPermission('documents', 'manage'),
+    uploadDocument.single('file'),
     documentsController.uploadDocument
 );
 
