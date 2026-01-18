@@ -7,8 +7,8 @@ import DashboardShell from "@/components/ui/DashboardShell"
 import { useAuthStore } from "@/store/useAuthStore"
 import { useToast } from "@/components/ui/ToastProvider"
 import { handleCrudError } from "@/lib/apiError"
-import { fetchPendingExpenses, updateExpenseStatus, type UpdateExpenseStatusPayload } from "@/lib/hrmData"
-import type { ExpenseClaim } from "@/types/hrm"
+import { fetchPendingExpenses, updateExpenseStatus } from "@/services/expenses/api"
+import type { ExpenseClaim, UpdateExpenseStatusPayload } from "@/services/expenses/types"
 import { format } from "date-fns"
 
 interface ExpensesAdminPageClientProps {

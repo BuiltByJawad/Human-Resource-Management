@@ -1,15 +1,14 @@
 "use client"
 
-import { useMemo, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { format } from 'date-fns'
 
 import Sidebar from '@/components/ui/Sidebar'
 import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
 import { DatePicker } from '@/components/ui/FormComponents'
-import { ExpenseClaim, getMyExpenses, submitExpenseClaim } from '@/services/expenseService'
-import { handleCrudError } from '@/lib/apiError'
+import type { ExpenseClaim } from '@/services/expenses/types'
+import { useExpensesPage } from '@/hooks/useExpensesPage'
 
 const categories = ['Travel', 'Meals', 'Equipment', 'Training', 'Other']
 
@@ -20,75 +19,19 @@ interface ExpensesPageClientProps {
 
 export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageClientProps) {
   const { showToast } = useToast()
-  const queryClient = useQueryClient()
-  const [form, setForm] = useState({
-    amount: 0,
-    currency: 'USD',
-    category: 'Travel',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    description: '',
-    receiptUrl: ''
-  })
-
-  const {
-    data: claims = [],
-    isLoading,
-    isError,
-    error,
-    refetch
-  } = useQuery<ExpenseClaim[], Error>({
-    queryKey: ['expenses', employeeId],
-    queryFn: () => getMyExpenses(employeeId as string),
-    enabled: !!employeeId,
-    retry: false,
-    initialData: employeeId ? initialClaims : []
-  })
+  const { form, setForm, claimsQuery, handleSubmit } = useExpensesPage({ employeeId, initialClaims })
+  const claims = claimsQuery.data ?? []
+  const isLoading = claimsQuery.isLoading
+  const isError = claimsQuery.isError
+  const error = claimsQuery.error
 
   const hasEmployee = !!employeeId
 
   useMemo(() => {
     if (isError && error) {
-      handleCrudError({
-        error,
-        resourceLabel: 'Expenses',
-        showToast
-      })
+      showToast('Unable to load expenses', 'error')
     }
   }, [isError, error, showToast])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!employeeId) {
-      showToast('Employee profile missing', 'error')
-      return
-    }
-
-    try {
-      await submitExpenseClaim({
-        employeeId,
-        amount: form.amount,
-        currency: form.currency,
-        category: form.category,
-        date: form.date,
-        description: form.description,
-        receiptUrl: form.receiptUrl || undefined
-      })
-      showToast('Expense submitted', 'success')
-      setForm({
-        amount: 0,
-        currency: 'USD',
-        category: 'Travel',
-        date: format(new Date(), 'yyyy-MM-dd'),
-        description: '',
-        receiptUrl: ''
-      })
-      queryClient.invalidateQueries({ queryKey: ['expenses', employeeId] })
-      refetch()
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to submit expense'
-      showToast(message, 'error')
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -110,7 +53,21 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white rounded-lg border border-gray-100 shadow p-5">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Submit Claim</h2>
-                  <form className="space-y-4" onSubmit={handleSubmit}>
+                  <form
+                    className="space-y-4"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void handleSubmit({
+                        employeeId: employeeId ?? '',
+                        amount: form.amount,
+                        currency: form.currency,
+                        category: form.category,
+                        date: form.date,
+                        description: form.description,
+                        receiptUrl: form.receiptUrl || undefined,
+                      })
+                    }}
+                  >
                     <div>
                       <label className="text-sm font-medium text-gray-700">Amount</label>
                       <input

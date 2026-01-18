@@ -6,7 +6,7 @@ import { TableSkeleton, EmptyState } from './ReportStates'
 import { SummaryCard } from './SummaryCard'
 import { payrollColumns } from './columns'
 
-interface PayrollSummary {
+export interface PayrollSummary {
   totalRecords: number
   totalBaseSalary: number
   totalAllowances: number
@@ -14,8 +14,13 @@ interface PayrollSummary {
   totalNetSalary: number
 }
 
+export interface PayrollReportData {
+  payrollRecords: Array<Record<string, unknown>>
+  summary?: PayrollSummary
+}
+
 interface PayrollSectionProps {
-  data: { payrollRecords: Array<Record<string, unknown>>; summary?: PayrollSummary } | null
+  data: PayrollReportData | null
   isLoading: boolean
   onExportCSV: () => void
   onExportPDF: () => void

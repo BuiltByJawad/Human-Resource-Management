@@ -24,6 +24,9 @@ import {
   type ScheduledReportFormat,
   type ScheduledReportFrequency,
 } from '@/services/reports/api'
+import type { AttendanceReportData } from '@/components/features/reports/AttendanceSection'
+import type { LeaveReportData } from '@/components/features/reports/LeaveSection'
+import type { PayrollReportData } from '@/components/features/reports/PayrollSection'
 
 export type TabType = 'overview' | 'employees' | 'attendance' | 'leave' | 'payroll' | 'schedules'
 
@@ -325,13 +328,19 @@ export function useReportsPage({ initialDashboardData, initialDepartments }: Rep
     setEditingSchedule(null)
   }, [])
 
-  const employeesData = activeTab === 'employees'
-    ? (Array.isArray(reportQuery.data) ? reportQuery.data : (reportQuery.data as any)?.items ?? [])
-    : []
+  const employeesData: Array<Record<string, unknown>> =
+    activeTab === 'employees'
+      ? (Array.isArray(reportQuery.data)
+        ? (reportQuery.data as Array<Record<string, unknown>>)
+        : ((reportQuery.data as { items?: Array<Record<string, unknown>> })?.items ?? []))
+      : []
 
-  const attendanceData = activeTab === 'attendance' ? ((reportQuery.data as any) ?? null) : null
-  const leaveData = activeTab === 'leave' ? ((reportQuery.data as any) ?? null) : null
-  const payrollData = activeTab === 'payroll' ? ((reportQuery.data as any) ?? null) : null
+  const attendanceData: AttendanceReportData | null =
+    activeTab === 'attendance' ? ((reportQuery.data as AttendanceReportData) ?? null) : null
+  const leaveData: LeaveReportData | null =
+    activeTab === 'leave' ? ((reportQuery.data as LeaveReportData) ?? null) : null
+  const payrollData: PayrollReportData | null =
+    activeTab === 'payroll' ? ((reportQuery.data as PayrollReportData) ?? null) : null
 
   const isLoading = activeTab === 'overview' ? dashboardQuery.isLoading : reportQuery.isLoading
   const isSchedulesLoading = schedulesQuery.isLoading

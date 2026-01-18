@@ -1,6 +1,6 @@
 import api from '@/app/api/api'
 import type { DashboardStats, RecentActivity, UpcomingEvent } from '@/services/dashboard/types'
-import { analyticsService } from '@/services/analyticsService'
+import { fetchUpcomingEvents as fetchAnalyticsUpcomingEvents } from '@/services/analytics/api'
 import type { LeaveRequest } from '@/types/hrm'
 
 const normalizeStats = (payload: unknown): DashboardStats => {
@@ -55,7 +55,7 @@ export const fetchDashboardRecentActivities = async (): Promise<RecentActivity[]
 }
 
 export const fetchUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
-  const events = await analyticsService.getUpcomingEvents()
+  const events = await fetchAnalyticsUpcomingEvents()
   const dateFormatter = new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
     month: 'short',
@@ -64,7 +64,7 @@ export const fetchUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
     timeZone: 'UTC',
   })
 
-  return events.map((event) => ({
+  return events.map((event: UpcomingEvent) => ({
     ...event,
     date: dateFormatter.format(new Date(event.date)),
   })) as UpcomingEvent[]

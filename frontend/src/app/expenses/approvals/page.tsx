@@ -1,17 +1,13 @@
-import { cookies } from "next/headers"
-
 import { ExpensesAdminPageClient } from "../ExpensesAdminPageClient"
-import { fetchCurrentUser, fetchPendingExpenses } from "@/lib/hrmData"
+import { getServerAuthContext } from "@/lib/auth/serverAuth"
+import { fetchPendingExpensesServer } from "@/services/expenses/api"
 
 export default async function ExpenseApprovalsPage() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get("accessToken")?.value ?? null
-
-  const user = await fetchCurrentUser(token ?? undefined)
+  const { user, token } = await getServerAuthContext()
   const permissions: string[] = Array.isArray(user?.permissions) ? user!.permissions : []
   const canApprove = permissions.includes("expenses.approve")
 
-  const initialClaims = await fetchPendingExpenses(token ?? undefined)
+  const initialClaims = await fetchPendingExpensesServer(token)
 
   return <ExpensesAdminPageClient initialClaims={initialClaims} initialCanApprove={canApprove} />
 }

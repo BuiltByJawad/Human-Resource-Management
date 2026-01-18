@@ -23,7 +23,6 @@ interface PayrollPageClientProps {
 
 export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientProps) {
   const {
-    columns,
     payrollQuery,
     payrollConfigQuery,
     payrollConfigMutation,
@@ -92,9 +91,17 @@ export function PayrollPageClient({ initialPayrolls = [] }: PayrollPageClientPro
             <PayrollStatsGrid {...statsDisplay} />
 
             <PayrollRecordsTable
-              columns={columns}
               records={payrollQuery.data ?? []}
               isLoading={payrollQuery.isLoading}
+              canManagePayrollAction={canManagePayrollAction}
+              canManagePayrollUi={canManagePayrollUi}
+              hasHydrated={hasHydrated}
+              showToast={showToast}
+              setOverrideTarget={setOverrideTarget}
+              setSelectedPayroll={setSelectedPayroll}
+              setIsModalOpen={setIsModalOpen}
+              statusMutation={statusMutation}
+              setMarkPaidTarget={setMarkPaidTarget}
             />
           </div>
         </main>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/useAuthStore'
 import { PERMISSIONS } from '@/constants/permissions'
-import { analyticsService } from '@/services/analyticsService'
+import { fetchDashboardMetrics } from '@/services/analytics/api'
 import type { DashboardMetrics } from '@/services/analytics/types'
 import type { DashboardStats, RecentActivity, UpcomingEvent } from '@/services/dashboard/types'
 import { fetchDashboardRecentActivities, fetchDashboardStats, fetchUpcomingEvents } from '@/services/dashboard/api'
@@ -70,7 +70,7 @@ export function useDashboardPage({
       const endDate = new Date()
       const startDate = new Date(endDate)
       startDate.setDate(endDate.getDate() - 30)
-      const metrics = await analyticsService.getDashboardMetrics({
+      const metrics = await fetchDashboardMetrics({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
       })

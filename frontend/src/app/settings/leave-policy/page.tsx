@@ -3,7 +3,8 @@
 import { cookies } from 'next/headers'
 import { headers } from 'next/headers'
 
-import LeavePolicyPageClient, { type LeavePolicyPayload } from './LeavePolicyPageClient'
+import LeavePolicyPageClient from './LeavePolicyPageClient'
+import type { LeavePolicyPayload } from '@/services/leave-policy/types'
 import { extractTenantSlug } from '@/lib/tenant'
 
 type LeavePolicyApiResponse = {

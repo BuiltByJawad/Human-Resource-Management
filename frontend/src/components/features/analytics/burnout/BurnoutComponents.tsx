@@ -1,4 +1,8 @@
-export function RiskScoreCard({ summary }: { summary: any }) {
+"use client"
+
+import type { BurnoutEmployee, BurnoutSummary } from '@/services/analytics/burnout/types'
+
+export function RiskScoreCard({ summary }: { summary: BurnoutSummary }) {
     const getRiskColor = (level: string) => {
         switch (level) {
             case 'Critical': return 'bg-red-100 text-red-700 border-red-200';
@@ -42,7 +46,7 @@ export function RiskScoreCard({ summary }: { summary: any }) {
     );
 }
 
-export function AtRiskList({ employees }: { employees: any[] }) {
+export function AtRiskList({ employees }: { employees: BurnoutEmployee[] }) {
     const getRiskBadge = (level: string) => {
         switch (level) {
             case 'Critical':
@@ -89,7 +93,7 @@ export function AtRiskList({ employees }: { employees: any[] }) {
                                 </td>
                             </tr>
                         ) : (
-                            (Array.isArray(employees) ? employees : []).map((employee) => (
+                            employees.map((employee) => (
                                 <tr key={employee.employeeId} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900">{employee.employeeName}</div>
@@ -105,7 +109,7 @@ export function AtRiskList({ employees }: { employees: any[] }) {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="text-xs text-gray-600 space-y-1">
-                                            {(Array.isArray(employee.flags) ? employee.flags : []).map((flag: string, idx: number) => (
+                                            {employee.flags.map((flag, idx) => (
                                                 <div key={idx} className="flex items-center">
                                                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400 mr-2"></span>
                                                     {flag}
@@ -123,21 +127,24 @@ export function AtRiskList({ employees }: { employees: any[] }) {
     );
 }
 
-export function WorkPatternChart({ employees }: { employees: any[] }) {
+export function WorkPatternChart({ employees }: { employees: BurnoutEmployee[] }) {
     // Group employees by risk level for visualization
-    const chartData = (Array.isArray(employees) ? employees : []).reduce((acc: any, emp) => {
-        if (!acc[emp.riskLevel]) {
-            acc[emp.riskLevel] = {
-                count: 0,
-                totalOvertime: 0,
-                totalWorkHours: 0
-            };
-        }
-        acc[emp.riskLevel].count++;
-        acc[emp.riskLevel].totalOvertime += emp.metrics.avgOvertimeHours;
-        acc[emp.riskLevel].totalWorkHours += emp.metrics.totalWorkHours;
-        return acc;
-    }, {});
+    const chartData = employees.reduce<Record<string, { count: number; totalOvertime: number; totalWorkHours: number }>>(
+        (acc, emp) => {
+            if (!acc[emp.riskLevel]) {
+                acc[emp.riskLevel] = {
+                    count: 0,
+                    totalOvertime: 0,
+                    totalWorkHours: 0,
+                }
+            }
+            acc[emp.riskLevel].count += 1
+            acc[emp.riskLevel].totalOvertime += emp.metrics.avgOvertimeHours
+            acc[emp.riskLevel].totalWorkHours += emp.metrics.totalWorkHours
+            return acc
+        },
+        {}
+    )
 
     const riskLevels = ['Critical', 'High', 'Medium', 'Low'];
 
