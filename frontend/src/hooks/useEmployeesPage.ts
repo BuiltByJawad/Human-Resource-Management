@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/components/ui/ToastProvider'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -65,6 +65,8 @@ export function useEmployeesPage({
   initialEmployees,
 }: UseEmployeesPageProps): UseEmployeesPageResult {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
   const { token } = useAuthStore()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
@@ -80,11 +82,34 @@ export function useEmployeesPage({
   const [filterDepartment, setFilterDepartment] = useState<string>('all')
   const initialSearchTerm = useMemo(() => (searchParams.get('search') ?? '').trim(), [searchParams])
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm)
+  const skipNextUrlSyncRef = useRef(false)
 
   useEffect(() => {
     setSearchTerm(initialSearchTerm)
+    skipNextUrlSyncRef.current = true
   }, [initialSearchTerm])
   const debouncedSearch = useDebounce(searchTerm, 500)
+
+  useEffect(() => {
+    if (!pathname.startsWith('/employees')) return
+    if (skipNextUrlSyncRef.current) {
+      skipNextUrlSyncRef.current = false
+      return
+    }
+    const currentQuery = (searchParams.get('search') ?? '').trim()
+    const nextQuery = debouncedSearch.trim()
+    if (currentQuery === nextQuery) return
+
+    const params = new URLSearchParams(searchParams.toString())
+    if (nextQuery) {
+      params.set('search', nextQuery)
+    } else {
+      params.delete('search')
+    }
+
+    const queryString = params.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname)
+  }, [debouncedSearch, pathname, router, searchParams])
 
   const baseQueryParams: EmployeesQueryParams = useMemo(
     () => ({
