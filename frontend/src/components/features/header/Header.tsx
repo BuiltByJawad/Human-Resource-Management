@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Bars3Icon } from '@heroicons/react/24/outline'
 import { useBranding } from '@/components/providers/BrandingProvider'
 import { useOrgStore } from '@/store/useOrgStore'
@@ -33,9 +33,16 @@ export default function Header() {
   const branding = useBranding()
   const { siteName: storeSiteName, tagline: storeTagline } = useOrgStore()
 
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const handleSearchSubmit = () => {
-    if (!searchQuery.trim()) return
-    router.push(`/employees?search=${encodeURIComponent(searchQuery.trim())}`)
+    const trimmed = searchQuery.trim()
+    if (!trimmed) {
+      router.push('/employees')
+      return
+    }
+    router.push(`/employees?search=${encodeURIComponent(trimmed)}`)
   }
 
   const { notifications, unreadCount, isLoading, error, markAllRead, markOneRead } = useNotifications({
@@ -57,6 +64,13 @@ export default function Header() {
     if (!isAuthenticated) return
     endAuthTransition()
   }, [isAuthTransition, isAuthenticated, endAuthTransition])
+
+  const urlSearchQuery = useMemo(() => (searchParams.get('search') ?? '').trim(), [searchParams])
+
+  useEffect(() => {
+    if (!pathname.startsWith('/employees')) return
+    setSearchQuery(urlSearchQuery)
+  }, [pathname, urlSearchQuery])
 
   const siteName = branding?.siteName || storeSiteName
   const tagline = branding?.tagline || storeTagline
