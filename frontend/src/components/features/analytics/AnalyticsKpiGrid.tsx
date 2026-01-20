@@ -57,18 +57,23 @@ export function AnalyticsKpiGrid({ metrics }: AnalyticsKpiGridProps) {
       {kpis(metrics).map((item) => (
         <Card
           key={item.name}
-          className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white group"
+          className="border border-slate-200/70 shadow-sm hover:shadow-lg transition-all duration-300 bg-white group overflow-hidden"
         >
-          <CardContent className="p-6">
-            <div className="flex flex-col space-y-4">
-              <div className={`p-3 rounded-xl w-fit transition-transform group-hover:scale-110 duration-300 ${item.bg}`}>
-                <item.icon className={`h-6 w-6 ${item.color}`} aria-hidden="true" />
-              </div>
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{item.name}</p>
-                <p className="text-2xl font-black text-gray-900 mt-1">{item.value}</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-[0.2em]">{item.name}</p>
+                <p className="text-3xl font-semibold text-slate-900 mt-3 tracking-tight">
+                  {item.value}
+                </p>
+              </div>
+              <div
+                className={`h-11 w-11 rounded-2xl flex items-center justify-center border border-white/60 shadow-sm ${item.bg}`}
+              >
+                <item.icon className={`h-5 w-5 ${item.color}`} aria-hidden="true" />
               </div>
             </div>
+            <div className={`mt-5 h-1.5 w-16 rounded-full ${item.bg}`} />
           </CardContent>
         </Card>
       ))}
