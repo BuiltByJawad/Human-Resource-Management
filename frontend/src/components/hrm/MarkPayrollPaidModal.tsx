@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import { format } from 'date-fns'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import { Controller, useForm } from 'react-hook-form'
@@ -44,7 +45,7 @@ export default function MarkPayrollPaidModal({ isOpen, onClose, onConfirm }: Mar
   } = useForm<FormData>({
     resolver: yupResolver(schema),
     defaultValues: {
-      paidAt: new Date().toISOString().slice(0, 10),
+      paidAt: format(new Date(), 'yyyy-MM-dd'),
       paymentMethod: 'bank_transfer',
       paymentReference: '',
     },
@@ -133,7 +134,7 @@ export default function MarkPayrollPaidModal({ isOpen, onClose, onConfirm }: Mar
                                   field.onChange('')
                                   return
                                 }
-                                field.onChange(date.toISOString().slice(0, 10))
+                                field.onChange(format(date, 'yyyy-MM-dd'))
                               }}
                               required
                               error={errors.paidAt?.message}

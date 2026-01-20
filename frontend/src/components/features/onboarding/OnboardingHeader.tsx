@@ -5,9 +5,12 @@ interface OnboardingHeaderProps {
   employee?: Employee
   isLoading: boolean
   onBack: () => void
+  totalTasks: number
+  completedTasks: number
 }
 
-export function OnboardingHeader({ employee, isLoading, onBack }: OnboardingHeaderProps) {
+export function OnboardingHeader({ employee, isLoading, onBack, totalTasks, completedTasks }: OnboardingHeaderProps) {
+  const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
       <div className="flex items-start gap-4">
@@ -35,6 +38,23 @@ export function OnboardingHeader({ employee, isLoading, onBack }: OnboardingHead
                 </span>
               </span>
             )}
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Progress</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-slate-900">{progress}%</span>
+            <span className="text-sm text-slate-500">
+              {completedTasks}/{totalTasks} done
+            </span>
+          </div>
+          <div className="mt-2 h-2 w-40 rounded-full bg-slate-100">
+            <div
+              className="h-2 rounded-full bg-blue-600 transition-all"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
       </div>

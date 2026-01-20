@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
+import { format } from 'date-fns'
 
 import { fetchShifts, createShift } from '@/services/shifts/api'
 import type { Shift, ShiftEmployee, ShiftFormState, ShiftType } from '@/services/shifts/types'
@@ -54,12 +55,12 @@ export const useShiftsPage = ({ initialShifts, employees }: UseShiftsPageOptions
   const shiftsByDay = useMemo(() => {
     const grouped: Record<string, Shift[]> = {}
     weekDays.forEach((day) => {
-      const dateKey = day.toISOString().split('T')[0]
+      const dateKey = format(day, 'yyyy-MM-dd')
       grouped[dateKey] = []
     })
 
     shifts.forEach((shift) => {
-      const shiftDate = new Date(shift.startTime).toISOString().split('T')[0]
+      const shiftDate = format(new Date(shift.startTime), 'yyyy-MM-dd')
       if (grouped[shiftDate]) {
         grouped[shiftDate].push(shift)
       }

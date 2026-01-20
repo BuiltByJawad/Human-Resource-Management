@@ -7,6 +7,7 @@ import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { errorHandler } from '@/shared/middleware/errorHandler';
 import { logger, stream } from '@/shared/config/logger';
 import { rateLimiter } from '@/shared/middleware/security';
@@ -28,6 +29,51 @@ export const createApp = (): { app: Application; httpServer: any } => {
       methods: ['GET', 'POST'],
       credentials: true,
     },
+  });
+
+  io.use(async (socket, next) => {
+    try {
+      const token = typeof socket.handshake.auth?.token === 'string' ? socket.handshake.auth.token : '';
+      if (!token) {
+        return next(new Error('Unauthorized'));
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+        userId?: string;
+        organizationId?: string | null;
+      };
+
+      if (!decoded?.userId) {
+        return next(new Error('Unauthorized'));
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+      if (!user || user.status !== 'active') {
+        return next(new Error('Unauthorized'));
+      }
+
+      const tokenOrgId = decoded.organizationId ?? null;
+      const userOrgId = (user as any)?.organizationId ?? null;
+      if (userOrgId && tokenOrgId !== userOrgId) {
+        return next(new Error('Unauthorized'));
+      }
+      if (!userOrgId && tokenOrgId) {
+        return next(new Error('Unauthorized'));
+      }
+
+      socket.data.userId = user.id;
+      socket.data.organizationId = userOrgId;
+      return next();
+    } catch {
+      return next(new Error('Unauthorized'));
+    }
+  });
+
+  io.on('connection', (socket) => {
+    const userId = socket.data.userId as string | undefined;
+    if (userId) {
+      socket.join(`user:${userId}`);
+    }
   });
 
   // Set app variables

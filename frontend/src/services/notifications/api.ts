@@ -35,8 +35,42 @@ export const fetchNotifications = async (token?: string | null, tenantSlug?: str
   return (parsed as NotificationsResponse) || {}
 }
 
-export const markAllNotificationsRead = (token?: string | null, tenantSlug?: string | null) =>
-  api.post('/notifications/mark-all-read', undefined, { headers: headersFor(token, tenantSlug) })
+export const markAllNotificationsRead = async (token?: string | null, tenantSlug?: string | null) => {
+  const headers = headersFor(token, tenantSlug)
 
-export const markNotificationRead = (id: string, token?: string | null, tenantSlug?: string | null) =>
-  api.patch(`/notifications/${id}/read`, undefined, { headers: headersFor(token, tenantSlug) })
+  const res = await fetch('/api/notifications/mark-all-read', {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers,
+  })
+
+  if (!res.ok) {
+    const error: any = new Error('Failed to update notifications')
+    error.status = res.status
+    error.body = await res.text().catch(() => null)
+    throw error
+  }
+
+  return res.json().catch(() => null)
+}
+
+export const markNotificationRead = async (id: string, token?: string | null, tenantSlug?: string | null) => {
+  const headers = headersFor(token, tenantSlug)
+
+  const res = await fetch(`/api/notifications/${id}/read`, {
+    method: 'PATCH',
+    credentials: 'include',
+    cache: 'no-store',
+    headers,
+  })
+
+  if (!res.ok) {
+    const error: any = new Error('Failed to update notification')
+    error.status = res.status
+    error.body = await res.text().catch(() => null)
+    throw error
+  }
+
+  return res.json().catch(() => null)
+}

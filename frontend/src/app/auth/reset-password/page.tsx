@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import api from '@/app/api/api'
+import api from '@/lib/axios'
 import { PasswordStrengthBar } from '@/components/ui/PasswordStrengthBar'
 
 import { Suspense } from 'react'

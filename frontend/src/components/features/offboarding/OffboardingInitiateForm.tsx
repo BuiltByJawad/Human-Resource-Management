@@ -1,4 +1,5 @@
 import { DatePicker } from '@/components/ui/FormComponents'
+import { format } from 'date-fns'
 import type { OffboardingEmployeeOption } from '@/services/offboarding/api'
 
 interface OffboardingInitiateFormProps {
@@ -53,7 +54,7 @@ export function OffboardingInitiateForm({
             label="Exit Date"
             required
             value={form.exitDate}
-            onChange={(date) => onFormChange({ exitDate: date ? date.toISOString().slice(0, 10) : '' })}
+            onChange={(date) => onFormChange({ exitDate: date ? format(date, 'yyyy-MM-dd') : '' })}
             error={errors.exitDate}
           />
         </div>

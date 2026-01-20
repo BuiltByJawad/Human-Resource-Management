@@ -37,7 +37,7 @@ export function HeaderNotifications({
   })
 
   const filtered = useMemo(
-    () => notifications.filter((n) => !dismissedIds.includes(n.id)),
+    () => notifications.filter((n) => !n.read && !dismissedIds.includes(n.id)),
     [notifications, dismissedIds]
   )
 
@@ -64,15 +64,14 @@ export function HeaderNotifications({
         className="relative h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:text-slate-700 flex items-center justify-center"
       >
         <BellIcon className="h-5 w-5" />
-        <span
-          suppressHydrationWarning
-          className={cn(
-            'absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white transition-opacity',
-            unreadCount > 0 ? 'opacity-100' : 'opacity-0'
-          )}
-        >
-          {unreadCount > 9 ? '9+' : unreadCount}
-        </span>
+        {unreadCount > 0 && (
+          <span
+            suppressHydrationWarning
+            className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white"
+          >
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
       </button>
       {isOpen && (
         <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50">

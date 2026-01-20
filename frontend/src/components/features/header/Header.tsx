@@ -101,10 +101,8 @@ export default function Header() {
     }
   }
 
-  const handleNotificationClick = (notification: NotificationItem) => {
-    if (!notification.read) {
-      markOneRead(notification.id)
-    }
+  const handleNotificationClick = async (notification: NotificationItem) => {
+    await markOneRead(notification.id)
     if (notification.link) {
       router.push(notification.link)
     }

@@ -87,29 +87,24 @@ export async function POST(request: NextRequest) {
     const payload = nestedData ?? dataRecord ?? {}
 
     const accessToken = typeof payload.accessToken === 'string' ? payload.accessToken : null
-    const refreshTokenFromBody = typeof payload.refreshToken === 'string' ? payload.refreshToken : null
+    const nextResponse = NextResponse.json(data)
 
     const headerObj = response.headers as unknown as { getSetCookie?: () => string[] }
     const setCookies = typeof headerObj.getSetCookie === 'function' ? headerObj.getSetCookie() : []
-    const combined = setCookies.length ? setCookies.join(',') : response.headers.get('set-cookie')
-    const refreshMatch = typeof combined === 'string' ? combined.match(/(?:^|,\s*)refreshToken=([^;]+)/) : null
-    const refreshTokenFromCookie = refreshMatch?.[1]
-
-    const refreshToken = refreshTokenFromBody || refreshTokenFromCookie
-
-    const nextResponse = NextResponse.json(data)
+    if (setCookies.length) {
+      setCookies.forEach((cookie) => {
+        nextResponse.headers.append('set-cookie', cookie)
+      })
+    } else {
+      const rawSetCookie = response.headers.get('set-cookie')
+      if (rawSetCookie) {
+        nextResponse.headers.set('set-cookie', rawSetCookie)
+      }
+    }
     
     nextResponse.cookies.delete('accessToken')
-    nextResponse.cookies.delete('refreshToken')
 
     nextResponse.cookies.set('accessToken', '', {
-      httpOnly: true,
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      expires: new Date(0),
-    })
-    nextResponse.cookies.set('refreshToken', '', {
       httpOnly: true,
       path: '/',
       secure: process.env.NODE_ENV === 'production',
@@ -127,15 +122,7 @@ export async function POST(request: NextRequest) {
       })
     }
     
-    if (refreshToken) {
-      nextResponse.cookies.set('refreshToken', refreshToken, {
-        httpOnly: true,
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        ...(shouldRemember ? { maxAge: 60 * 60 * 24 * 7 } : {}),
-      })
-    }
+    // refreshToken cookie is managed by the backend and forwarded above.
     
     return nextResponse
   } catch (error) {

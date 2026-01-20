@@ -1,10 +1,11 @@
 "use client"
 
 import Link from 'next/link'
-import { ChevronLeftIcon, ChevronRightIcon, RocketLaunchIcon } from '@heroicons/react/24/outline'
+import { RocketLaunchIcon } from '@heroicons/react/24/outline'
 
 import { Button } from '@/components/ui/FormComponents'
 import { DataTable, type Column } from '@/components/ui/DataTable'
+import { PaginationFooter } from '@/components/ui/PaginationFooter'
 import type { Employee } from './EmployeeCard'
 
 interface EmployeesListSectionProps {
@@ -17,6 +18,7 @@ interface EmployeesListSectionProps {
     pages: number
   }
   onPageChange: (page: number) => void
+  onPageSizeChange: (size: number) => void
   onViewEmployee: (employee: Employee) => void
   onEditEmployee: (employee: Employee) => void
   onDeleteEmployee: (employee: Employee) => void
@@ -28,6 +30,7 @@ export function EmployeesListSection({
   loading,
   pagination,
   onPageChange,
+  onPageSizeChange,
   onViewEmployee,
   onEditEmployee,
   onDeleteEmployee,
@@ -152,46 +155,23 @@ export function EmployeesListSection({
     },
   ]
 
-  const start = (pagination.page - 1) * pagination.limit + 1
-  const end = Math.min(pagination.page * pagination.limit, pagination.total)
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-500">
-          Showing <span className="font-medium text-gray-900">{start}</span> to <span className="font-medium text-gray-900">{end}</span> of{' '}
-          <span className="font-medium text-gray-900">{pagination.total}</span> employees
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(pagination.page - 1)}
-            disabled={pagination.page === 1}
-            className="flex items-center gap-1"
-          >
-            <ChevronLeftIcon className="h-4 w-4" />
-            Prev
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(pagination.page + 1)}
-            disabled={pagination.page === pagination.pages}
-            className="flex items-center gap-1"
-          >
-            Next
-            <ChevronRightIcon className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
       <DataTable
         data={employees}
         columns={employeeColumns}
         loading={loading}
         pageSize={employees.length || pagination.limit}
-        searchKeys={['firstName', 'lastName', 'email', 'employeeNumber', 'department.name']}
+      />
+
+      <PaginationFooter
+        currentPage={pagination.page}
+        totalPages={pagination.pages}
+        totalItems={pagination.total}
+        pageSize={pagination.limit}
+        pageSizeOptions={[10, 20, 30, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
       />
     </div>
   )

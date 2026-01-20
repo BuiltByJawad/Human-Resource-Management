@@ -51,6 +51,7 @@ export interface UseEmployeesPageResult {
   onFilterStatusChange: (value: string) => void
   onFilterDepartmentChange: (value: string) => void
   onPageChange: (page: number) => void
+  onPageSizeChange: (size: number) => void
   onCreate: () => void
   onEdit: (employee: Employee) => void
   onSubmit: (data: EmployeePayload | (EmployeePayload & { id?: string })) => void
@@ -261,6 +262,11 @@ export function useEmployeesPage({
     }
   }
 
+  const handlePageSizeChange = (size: number) => {
+    if (!Number.isFinite(size) || size <= 0) return
+    setPagination((prev) => ({ ...prev, limit: size, page: 1 }))
+  }
+
   return {
     departments: departmentsQuery.data ?? [],
     roles: rolesQuery.data ?? [],
@@ -281,6 +287,7 @@ export function useEmployeesPage({
     onFilterStatusChange: setFilterStatus,
     onFilterDepartmentChange: setFilterDepartment,
     onPageChange: handlePageChange,
+    onPageSizeChange: handlePageSizeChange,
     onCreate: handleCreate,
     onEdit: handleEdit,
     onSubmit: handleSubmit,
