@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { BenefitsPageClient, type BenefitsResponse } from './BenefitsPageClient'
+import { BenefitsPageClient } from './BenefitsPageClient'
+import type { BenefitsResponse } from '@/services/benefits/types'
 
 function buildApiBase() {
   return (
