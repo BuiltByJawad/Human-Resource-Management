@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { OffboardingPageClient } from './OffboardingPageClient'
-import { fetchOffboardingCurrentUser, fetchOffboardingEmployeeProcess } from '@/services/offboarding/server'
+import { fetchOffboardingCurrentUser, fetchOffboardingEmployeeProcess } from '@/services/offboarding/api'
 
 export default async function MyOffboardingPage() {
   const cookieStore = await cookies()
