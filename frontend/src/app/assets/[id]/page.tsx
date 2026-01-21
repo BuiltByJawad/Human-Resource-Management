@@ -7,13 +7,14 @@ import { fetchEmployees } from '@/services/employees/api'
 import type { Employee } from '@/services/employees/types'
 
 interface AssetDetailsPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function AssetDetailsPage({ params }: AssetDetailsPageProps) {
   const cookieStore = await cookies()
   const token = cookieStore.get('accessToken')?.value ?? null
-  const assetId = params?.id ?? ''
+  const resolvedParams = await params
+  const assetId = resolvedParams?.id ?? ''
 
   const [initialAsset, employeesPage] = await Promise.all([
     assetId ? fetchAssetByIdServer(token, assetId) : Promise.resolve(null),
