@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import { ShiftsPageClient } from "./ShiftsPageClient"
-import type { Shift } from "@/services/shiftService"
+import type { Shift } from "@/services/shifts/types"
 
 function buildApiBase() {
     return (
