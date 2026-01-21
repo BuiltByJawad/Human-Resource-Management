@@ -1,7 +1,2 @@
-export {
-  RoleForm,
-  RoleList,
-  type RoleFormField,
-  type Role,
-  type Permission,
-} from '@/components/features/roles'
+export { RoleForm, RoleList, type RoleFormField } from '@/components/features/roles'
+export type { Role, Permission } from '@/types/hrm'
