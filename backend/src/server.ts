@@ -1,4 +1,4 @@
-// import './module-alias'; // Commented out for dev mode - using tsconfig-paths instead. Uncomment for production if needed.
+import './module-alias';
 import 'reflect-metadata';
 import { createApp } from './app';
 import { prisma } from './app';
