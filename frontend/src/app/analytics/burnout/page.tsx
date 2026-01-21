@@ -5,14 +5,15 @@ import { fetchBurnoutAnalyticsServer } from '@/services/analytics/burnout/api'
 const FALLBACK_PERIOD = 30
 
 interface BurnoutPageProps {
-  searchParams?: { period?: string }
+  searchParams?: Promise<{ period?: string }>
 }
 
 export default async function BurnoutAnalyticsPage({ searchParams }: BurnoutPageProps) {
   const cookieStore = await cookies()
   const token = cookieStore.get('accessToken')?.value ?? null
 
-  const periodParam = searchParams?.period
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const periodParam = resolvedSearchParams?.period
   const parsedPeriod = periodParam ? Number.parseInt(periodParam, 10) : FALLBACK_PERIOD
   const initialPeriod = Number.isNaN(parsedPeriod) ? FALLBACK_PERIOD : parsedPeriod
 
