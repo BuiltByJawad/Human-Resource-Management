@@ -42,8 +42,8 @@ export function useTrainingPage({ initialCourses, employees }: UseTrainingPagePr
         duration: courseForm.duration ? parseInt(courseForm.duration, 10) : undefined,
       })
 
-      if (newCourse?.data) {
-        setCourses((prev) => [...prev, newCourse.data])
+      if (newCourse) {
+        setCourses((prev) => [...prev, newCourse])
         showToast('Course created successfully', 'success')
         setShowCreateModal(false)
         setCourseForm({ title: '', description: '', contentUrl: '', duration: '' })
