@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import type { Server } from 'socket.io'
 import { asyncHandler } from '../../shared/utils/async-handler'
 import { notificationService } from './notification.service'
 
@@ -21,5 +22,9 @@ export const markAllRead = asyncHandler(async (req: any, res: Response) => {
 export const createNotification = asyncHandler(async (req: Request, res: Response) => {
   const { userId, title, message, type, link } = req.body
   const created = await notificationService.create({ userId, title, message, type, link })
+  const io = req.app.get('io') as Server | undefined
+  if (io) {
+    io.to(`user:${userId}`).emit('notification:created', created)
+  }
   res.status(201).json({ success: true, data: created })
 })

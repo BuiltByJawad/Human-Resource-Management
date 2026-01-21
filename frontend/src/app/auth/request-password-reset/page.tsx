@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import api from '@/app/api/api'
+import api from '@/lib/axios'
 
 const requestSchema = yup.object().shape({
   email: yup.string().email('Enter a valid email').required('Email is required')

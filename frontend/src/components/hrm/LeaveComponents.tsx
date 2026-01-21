@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button, Select, TextArea, Input, DatePicker } from '../ui/FormComponents'
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline'
-import { format } from 'date-fns'
+import { format, parseISO, isValid, startOfDay } from 'date-fns'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -25,6 +25,12 @@ const leaveRequestSchema = yup.object().shape({
 export type LeaveRequestFormData = yup.InferType<typeof leaveRequestSchema>
 
 export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFormProps) {
+    const today = startOfDay(new Date())
+    const parseDateValue = (value: string): Date | null => {
+        if (!value) return null
+        const parsed = parseISO(value)
+        return isValid(parsed) ? parsed : null
+    }
     const { register, handleSubmit, control, reset, formState: { errors } } = useForm<LeaveRequestFormData>({
         resolver: yupResolver(leaveRequestSchema),
         defaultValues: {
@@ -36,8 +42,12 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
     })
 
     const onFormSubmit = async (data: LeaveRequestFormData) => {
-        await onSubmit(data)
-        reset()
+        try {
+            await onSubmit(data)
+            reset()
+        } catch {
+            // Error handling is surfaced via toasts in the parent mutation.
+        }
     }
 
     return (
@@ -73,7 +83,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
                             label="Start Date"
                             required
                             value={field.value}
-                            onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                            minDate={today}
+                            onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                             error={errors.startDate?.message}
                         />
                     )}
@@ -86,7 +97,8 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
                             label="End Date"
                             required
                             value={field.value}
-                            onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                            minDate={parseDateValue(control._formValues.startDate) ?? today}
+                            onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                             error={errors.endDate?.message}
                         />
                     )}

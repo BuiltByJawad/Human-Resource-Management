@@ -25,7 +25,7 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
   const { showToast } = useToast()
   const queryClient = useQueryClient()
 
-  const [filterStatus, setFilterStatus] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending')
+  const [filterStatus, setFilterStatus] = useState<'pending' | 'approved' | 'rejected' | 'all' | 'history'>('pending')
 
   const canApprove = hasAnyPermission([PERMISSIONS.APPROVE_LEAVE])
   const canManageLeave = hasAnyPermission([PERMISSIONS.MANAGE_LEAVE_REQUESTS, PERMISSIONS.MANAGE_LEAVE_POLICIES])
@@ -45,7 +45,7 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
     queryFn: () =>
       fetchLeaveRequests(
         {
-          status: filterStatus,
+          status: filterStatus === 'history' ? 'all' : filterStatus,
         },
         token ?? undefined,
       ),
@@ -103,7 +103,13 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
       })
   })
 
-  const requests = useMemo(() => leaveQuery.data || [], [leaveQuery.data])
+  const requests = useMemo(() => {
+    const data = leaveQuery.data || []
+    if (filterStatus === 'history') {
+      return data.filter((request) => request.status !== 'pending')
+    }
+    return data
+  }, [leaveQuery.data, filterStatus])
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -127,8 +133,7 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
                       onChange={(value) => setFilterStatus(value as typeof filterStatus)}
                       options={[
                         { value: 'pending', label: 'Pending' },
-                        { value: 'approved', label: 'Approved' },
-                        { value: 'rejected', label: 'Rejected' },
+                        { value: 'history', label: 'History' },
                         { value: 'all', label: 'All Status' },
                       ]}
                     />

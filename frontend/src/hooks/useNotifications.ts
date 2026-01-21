@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { io, type Socket } from 'socket.io-client'
 import { getClientTenantSlug } from '@/lib/tenant'
+import { getBackendBaseUrl } from '@/lib/config/env'
 import { readTenantUnreadCount, writeTenantUnreadCount } from '@/lib/utils/notificationStorage'
 import { mapNotificationPayload } from '@/lib/utils/notifications'
 import {
@@ -64,7 +66,7 @@ export type UseNotificationsResult = {
   isLoading: boolean
   error: string | null
   markAllRead: () => void
-  markOneRead: (id: string) => void
+  markOneRead: (id: string) => Promise<void>
 }
 
 export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMutationError }: UseNotificationsParams): UseNotificationsResult {
@@ -73,9 +75,10 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
   const [error, setError] = useState<string | null>(null)
   const tenantSlug = typeof window !== 'undefined' ? getClientTenantSlug() ?? null : null
   const queryClient = useQueryClient()
+  const notificationsQueryKey = useMemo(() => ['notifications', token, tenantSlug], [token, tenantSlug])
 
   const notificationsQuery = useQuery<NotificationItem[]>({
-    queryKey: ['notifications', token],
+    queryKey: notificationsQueryKey,
     enabled: Boolean(token) || isAuthenticated || hasInitialAuth,
     queryFn: async (): Promise<NotificationItem[]> => {
       try {
@@ -116,22 +119,65 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
       }
     },
     staleTime: 15_000,
-    refetchInterval: isAuthenticated ? 30_000 : false,
+    refetchInterval: false,
     refetchIntervalInBackground: true,
     refetchOnMount: isAuthenticated ? 'always' : false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   })
 
+  useEffect(() => {
+    if (!token || !isAuthenticated) return
+
+    const backendUrl = getBackendBaseUrl()
+    const socket: Socket = io(backendUrl, {
+      transports: ['websocket'],
+      withCredentials: true,
+      auth: { token },
+    })
+
+    socket.on('notification:created', (payload: RawNotification) => {
+      const mapped = mapNotificationPayload(payload)
+      queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, (current) => {
+        const list = current ?? []
+        if (list.some((item) => item.id === mapped.id)) return list
+        return [mapped, ...list]
+      })
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [isAuthenticated, notificationsQueryKey, queryClient, token])
+
   const markAllReadMutation = useMutation({
-    mutationFn: () => markAllNotificationsRead(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    mutationFn: () => markAllNotificationsRead(token, tenantSlug),
+    onSuccess: () => {
+      queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, (current) =>
+        (current ?? []).map((item) => ({ ...item, read: true }))
+      )
+      setServerUnreadCount(0)
+      setCachedUnreadCount(0)
+      writeTenantUnreadCount(0)
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
+    },
     onError: (err) => onMutationError?.(err, 'all'),
   })
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => markNotificationRead(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    mutationFn: (id: string) => markNotificationRead(id, token, tenantSlug),
+    onSuccess: (_data, id) => {
+      let nextUnread = 0
+      queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, (current) => {
+        const next = (current ?? []).map((item) => (item.id === id ? { ...item, read: true } : item))
+        nextUnread = next.filter((item) => !item.read).length
+        return next
+      })
+      setServerUnreadCount(nextUnread)
+      setCachedUnreadCount(nextUnread)
+      writeTenantUnreadCount(nextUnread)
+      queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
+    },
     onError: (err) => onMutationError?.(err, 'one'),
   })
 
@@ -140,8 +186,13 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
   useEffect(() => {
     // if (!notificationsQuery.isSuccess && serverUnreadCount === null && notificationData.length === 0) return
     if (error) return
-    const liveUnread = notificationData.filter((item) => !item.read).length
-    const nextUnread = serverUnreadCount ?? liveUnread
+    if (notificationData.length === 0) {
+      setServerUnreadCount(0)
+      setCachedUnreadCount(0)
+      writeTenantUnreadCount(0)
+      return
+    }
+    const nextUnread = notificationData.filter((item) => !item.read).length
     if (!Number.isFinite(nextUnread) || nextUnread < 0) return
 
     setServerUnreadCount((prev) => (prev === nextUnread ? prev : nextUnread))
@@ -151,20 +202,17 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
 
   const unreadCount = useMemo(() => {
     if (error) return 0
-    const liveUnread = notificationData.filter((item) => !item.read).length
-    if (serverUnreadCount != null) return serverUnreadCount
-    if (notificationData && notificationData.length > 0) return liveUnread
-    return cachedUnreadCount
-  }, [cachedUnreadCount, error, notificationData, serverUnreadCount])
+    return notificationData.filter((item) => !item.read).length
+  }, [error, notificationData])
 
   const markAllRead = () => {
     if (markAllReadMutation.isPending) return
     markAllReadMutation.mutate()
   }
 
-  const markOneRead = (id: string) => {
+  const markOneRead = async (id: string) => {
     if (markReadMutation.isPending) return
-    markReadMutation.mutate(id)
+    await markReadMutation.mutateAsync(id)
   }
 
   return {

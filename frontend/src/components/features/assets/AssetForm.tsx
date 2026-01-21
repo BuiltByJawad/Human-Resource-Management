@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
+import { format } from 'date-fns'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button, DatePicker, Input } from '@/components/ui/FormComponents'
@@ -73,7 +74,7 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
         serialNumber: initialData.serialNumber,
         type: initialData.type,
         purchaseDate: initialData.purchaseDate
-          ? new Date(initialData.purchaseDate).toISOString().split('T')[0]
+          ? format(new Date(initialData.purchaseDate), 'yyyy-MM-dd')
           : '',
         purchasePrice: initialData.purchasePrice || null,
       })
@@ -179,7 +180,7 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
                         required
                         value={field.value}
                         onChange={(date) =>
-                          field.onChange(date ? date.toISOString().split('T')[0] : '')
+                          field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
                         }
                         error={errors.purchaseDate?.message}
                       />

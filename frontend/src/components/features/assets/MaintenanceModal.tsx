@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
+import { format } from 'date-fns'
 import { Dialog, Transition } from '@headlessui/react'
 import { Button, DatePicker, Input, TextArea } from '@/components/ui/FormComponents'
 import type { Resolver } from 'react-hook-form'
@@ -44,7 +45,7 @@ export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModal
     defaultValues: {
       description: '',
       cost: null,
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       performedBy: '',
     },
   })
@@ -54,7 +55,7 @@ export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModal
       reset({
         description: '',
         cost: null,
-        date: new Date().toISOString().split('T')[0],
+        date: format(new Date(), 'yyyy-MM-dd'),
         performedBy: '',
       })
     }
@@ -113,7 +114,7 @@ export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModal
                           required
                           value={field.value}
                           onChange={(date) =>
-                            field.onChange(date ? date.toISOString().split('T')[0] : '')
+                            field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
                           }
                           error={errors.date?.message}
                         />

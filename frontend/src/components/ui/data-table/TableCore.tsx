@@ -60,27 +60,30 @@ export function TableCore<T extends { id: string }>({
               </td>
             </tr>
           ) : (
-            data.map((item) => (
-              <tr
-                key={item.id}
-                className={`hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
-                onClick={() => onRowClick?.(item)}
-              >
-                {(Array.isArray(columns) ? columns : []).map((column) => {
-                  const key = column.accessorKey || column.key
-                  const value = getNestedValue(item, String(key))
-                  return (
-                    <td key={String(key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {column.cell
-                        ? column.cell(item)
-                        : column.render
-                          ? column.render(value, item)
-                          : String(value ?? '')}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))
+            data.map((item, index) => {
+              const rowKey = item.id ? String(item.id) : `row-${index}`
+              return (
+                <tr
+                  key={rowKey}
+                  className={`hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
+                  onClick={() => onRowClick?.(item)}
+                >
+                  {(Array.isArray(columns) ? columns : []).map((column) => {
+                    const key = column.accessorKey || column.key
+                    const value = getNestedValue(item, String(key))
+                    return (
+                      <td key={String(key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {column.cell
+                          ? column.cell(item)
+                          : column.render
+                            ? column.render(value, item)
+                            : String(value ?? '')}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })
           )}
         </tbody>
       </table>

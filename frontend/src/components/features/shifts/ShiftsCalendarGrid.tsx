@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import type { Shift } from '@/services/shifts/types'
 import { ClockIcon, MapPinIcon } from '@heroicons/react/24/outline'
 
@@ -16,7 +17,7 @@ export const ShiftsCalendarGrid = ({
 }: ShiftsCalendarGridProps) => (
   <div className="grid grid-cols-7 gap-2">
     {weekDays.map((day) => {
-      const dateKey = day.toISOString().split('T')[0]
+      const dateKey = format(day, 'yyyy-MM-dd')
       const dayShifts = shiftsByDay[dateKey] || []
       const isToday = new Date().toDateString() === day.toDateString()
 

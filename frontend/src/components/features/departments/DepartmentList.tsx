@@ -71,7 +71,6 @@ export function DepartmentList({ departments, onEdit, onDelete, loading }: Depar
       data={departments}
       columns={columns}
       loading={loading}
-      searchKeys={['name', 'description', 'manager.firstName', 'manager.lastName', 'parentDepartment.name']}
     />
   )
 }

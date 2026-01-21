@@ -304,9 +304,8 @@ export const useAuthStore = create<AuthState>()(
                     })
                 },
                 refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
-                    const { refreshToken, token, user, rememberMe } = get()
+                    const { token, user, rememberMe } = get()
                     try {
-                        const requestBody = refreshToken ? { rememberMe, refreshToken } : { rememberMe }
                         const tenantSlug = getClientTenantSlug()
                         const response = await fetch('/api/auth/refresh', {
                             method: 'POST',
@@ -315,7 +314,7 @@ export const useAuthStore = create<AuthState>()(
                                 ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
                             },
                             credentials: 'include',
-                            body: JSON.stringify(requestBody),
+                            body: JSON.stringify({ rememberMe }),
                         })
                         const json = await response.json()
                         if (!response.ok) {
@@ -323,7 +322,7 @@ export const useAuthStore = create<AuthState>()(
                         }
                         const payload = json?.data ?? json
                         const newAccessToken = payload?.accessToken || payload?.token || token
-                        const newRefreshToken = refreshToken
+                        const newRefreshToken = null
                         const nextUser = payload?.user
                             ? { ...(payload.user || {}), permissions: payload.permissions ?? payload.user?.permissions ?? user?.permissions ?? [] }
                             : user

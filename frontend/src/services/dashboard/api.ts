@@ -1,4 +1,4 @@
-import api from '@/app/api/api'
+import api from '@/lib/axios'
 import type { DashboardStats, RecentActivity, UpcomingEvent } from '@/services/dashboard/types'
 import { fetchUpcomingEvents as fetchAnalyticsUpcomingEvents } from '@/services/analytics/api'
 import type { LeaveRequest } from '@/types/hrm'

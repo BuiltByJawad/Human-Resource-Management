@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 
-import { ReportsPageClient } from "./ReportsPageClient"
+import ReportsPageClient from "./ReportsPageClient"
 
 type DashboardMetrics = {
   totalEmployees?: number

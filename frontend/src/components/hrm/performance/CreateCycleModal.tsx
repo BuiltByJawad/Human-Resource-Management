@@ -5,6 +5,7 @@ import { Button, Input, DatePicker } from '@/components/ui/FormComponents';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { format } from 'date-fns';
 
 export interface CreateCycleModalProps {
     isOpen: boolean;
@@ -101,7 +102,7 @@ export function CreateCycleModal({ isOpen, onClose, onSubmit, loading }: CreateC
                                                                         label="Start Date"
                                                                         required
                                                                         value={field.value}
-                                                                        onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                                                                        onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                                                                         error={errors.startDate?.message}
                                                                     />
                                                                 )}
@@ -116,7 +117,7 @@ export function CreateCycleModal({ isOpen, onClose, onSubmit, loading }: CreateC
                                                                         label="End Date"
                                                                         required
                                                                         value={field.value}
-                                                                        onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+                                                                        onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                                                                         error={errors.endDate?.message}
                                                                     />
                                                                 )}

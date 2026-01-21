@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from 'react'
+import { format } from 'date-fns'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -61,7 +62,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
         employeeNumber: employee.employeeNumber,
         departmentId: employee.department?.id || '',
         roleId: employee.role?.id || '',
-        hireDate: employee.hireDate ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
+        hireDate: employee.hireDate ? format(new Date(employee.hireDate), 'yyyy-MM-dd') : '',
         salary: employee.salary,
         status: employee.status,
       })
@@ -125,7 +126,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
               label="Hire Date"
               required
               value={field.value}
-              onChange={(date) => field.onChange(date ? date.toISOString().split('T')[0] : '')}
+              onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
               error={errors.hireDate?.message}
             />
           )}

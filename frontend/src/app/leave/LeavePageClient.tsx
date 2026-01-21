@@ -26,7 +26,7 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
   const queryClient = useQueryClient()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'history'>('all')
 
   const canManage = false
 
@@ -35,7 +35,7 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
     queryFn: () =>
 			fetchLeaveRequests(
 				{
-					status: filterStatus,
+					status: filterStatus === 'history' ? 'all' : filterStatus,
 				},
 				token ?? undefined,
 			),
@@ -99,7 +99,13 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
   const handleApprove = (id: string) => approveMutation.mutate(id)
   const handleReject = (id: string) => rejectMutation.mutate(id)
 
-  const requests = useMemo(() => leaveQuery.data || [], [leaveQuery.data])
+  const requests = useMemo(() => {
+    const data = leaveQuery.data || []
+    if (filterStatus === 'history') {
+      return data.filter((request) => request.status !== 'pending')
+    }
+    return data
+  }, [leaveQuery.data, filterStatus])
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -123,6 +129,7 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
                       options={[
                         { value: 'all', label: 'All Status' },
                         { value: 'pending', label: 'Pending' },
+                        { value: 'history', label: 'History' },
                         { value: 'approved', label: 'Approved' },
                         { value: 'rejected', label: 'Rejected' }
                       ]}

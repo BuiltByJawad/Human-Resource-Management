@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { format } from 'date-fns'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -35,7 +36,7 @@ export function useBenefitsAdmin({ initialPlans = [], initialEmployees = [] }: U
   const [enrollForm, setEnrollForm] = useState<BenefitEnrollmentPayload>({
     employeeId: '',
     benefitPlanId: '',
-    coverageStartDate: new Date().toISOString().slice(0, 10),
+    coverageStartDate: format(new Date(), 'yyyy-MM-dd'),
   })
 
   const plansQuery = useQuery<BenefitPlan[]>({

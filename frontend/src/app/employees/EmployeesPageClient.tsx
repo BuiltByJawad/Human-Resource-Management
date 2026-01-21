@@ -38,6 +38,7 @@ function EmployeesContent({
     onFilterStatusChange,
     onFilterDepartmentChange,
     onPageChange,
+    onPageSizeChange,
     onCreate,
     onEdit,
     onSubmit,
@@ -67,6 +68,7 @@ function EmployeesContent({
             loading={loading}
             pagination={pagination}
             onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
             onViewEmployee={setViewingEmployee}
             onEditEmployee={onEdit}
             onDeleteEmployee={onDeleteRequest}

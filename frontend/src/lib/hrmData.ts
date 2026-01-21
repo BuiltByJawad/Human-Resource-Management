@@ -751,8 +751,19 @@ export async function summarizePerformanceReviews(
 	payload: PerformanceSummaryRequest,
 	token?: string,
 ): Promise<PerformanceSummaryResponse> {
-	const response = await api.post('/performance/reviews/summarize', payload, withAuthConfig(token))
-	const payloadData = response.data?.data ?? response.data
+	const response = await fetch('/api/performance/reviews/summarize', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+		},
+		body: JSON.stringify(payload),
+	})
+	const json = await response.json().catch(() => ({}))
+	if (!response.ok) {
+		throw new Error((json as { error?: string; message?: string })?.error || (json as { message?: string }).message || 'Failed to summarize reviews')
+	}
+	const payloadData = (json as { data?: unknown }).data ?? json
 	return (payloadData ?? {}) as PerformanceSummaryResponse
 }
 
