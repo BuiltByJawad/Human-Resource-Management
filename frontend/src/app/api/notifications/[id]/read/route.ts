@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getBackendBaseUrl } from '@/lib/config/env'
 import { extractTenantSlug } from '@/lib/tenant'
 
-interface RouteContext {
-  params: { id: string }
-}
-
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const tenantSlug = extractTenantSlug({
     headerSlug: request.headers.get('x-tenant-slug'),
     hostname: request.headers.get('host'),
