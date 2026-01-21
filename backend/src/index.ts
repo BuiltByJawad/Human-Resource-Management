@@ -1,3 +1,4 @@
+import './module-alias';
 import { createApp } from './app';
 
 // Vercel Serverless Function Entry Point
