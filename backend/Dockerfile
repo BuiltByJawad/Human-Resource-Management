@@ -16,6 +16,7 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV production
+ENV PRISMA_SKIP_POSTINSTALL 1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 expressjs
@@ -24,7 +25,8 @@ RUN adduser --system --uid 1001 expressjs
 COPY --from=deps /app/package.json ./package.json
 # Install only production dependencies
 COPY --from=deps /app/package-lock.json ./package-lock.json
-RUN npm ci --only=production
+COPY --from=builder /app/prisma ./prisma
+RUN npm ci --only=production --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
