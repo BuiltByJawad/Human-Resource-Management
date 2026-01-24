@@ -10,7 +10,8 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { errorHandler } from '@/shared/middleware/errorHandler';
 import { logger, stream } from '@/shared/config/logger';
-import { rateLimiter } from '@/shared/middleware/security';
+import { enforceHttps, rateLimiter } from '@/shared/middleware/security';
+import { requestIdMiddleware } from '@/shared/middleware/requestId';
 import routes from './routes';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from '@/shared/config/swagger';
@@ -80,11 +81,21 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.set('trust proxy', 1);
   app.set('io', io);
 
+  app.use(requestIdMiddleware);
+
   // Security Middleware
   app.use(
     helmet({
-      // Avoid breaking Swagger UI and other embedded resources.
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
+          fontSrc: ["'self'", 'data:'],
+        },
+      },
     })
   );
   app.use(rateLimiter);
@@ -105,6 +116,7 @@ export const createApp = (): { app: Application; httpServer: any } => {
   };
 
   app.use(cors(corsOptions));
+  app.use(enforceHttps);
 
   // Handle preflight requests using the SAME config
   app.options('*', cors(corsOptions));

@@ -1,5 +1,5 @@
 import AvatarUpload from '@/components/ui/AvatarUpload'
-import { Input } from '@/components/ui/FormComponents'
+import { Input, TextArea } from '@/components/ui/FormComponents'
 import type {
   OrgSettingsErrors,
   OrgSettingsFormState,
@@ -61,6 +61,28 @@ export const BrandingSettingsSection = ({
         label="Tagline"
         value={orgSettings.tagline}
         onChange={(e) => onUpdateOrgSettings({ ...orgSettings, tagline: e.target.value })}
+      />
+      <Input
+        label="Footer Year"
+        placeholder="2026"
+        value={orgSettings.footerYear}
+        onChange={(e) => {
+          onUpdateOrgSettings({ ...orgSettings, footerYear: e.target.value })
+        }}
+      />
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <TextArea
+        label="Privacy Policy"
+        rows={6}
+        value={orgSettings.privacyPolicyText}
+        onChange={(e) => onUpdateOrgSettings({ ...orgSettings, privacyPolicyText: e.target.value })}
+      />
+      <TextArea
+        label="Terms of Service"
+        rows={6}
+        value={orgSettings.termsOfServiceText}
+        onChange={(e) => onUpdateOrgSettings({ ...orgSettings, termsOfServiceText: e.target.value })}
       />
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -12,6 +12,7 @@ import {
   uploadBrandLogo,
 } from '../../controllers/orgController';
 import { authenticate } from '../../shared/middleware/auth';
+import { adminIpAllowlist, adminRateLimiter } from '../../shared/middleware/security';
 import { resolveTenant } from '../../shared/middleware/tenant';
 import { uploadBranding } from '../../shared/middleware/uploadMiddleware';
 
@@ -29,6 +30,8 @@ router.get('/branding/public', resolveTenant, getPublicBranding);
 
 // Protected routes
 router.use(authenticate);
+router.use(adminIpAllowlist);
+router.use(adminRateLimiter);
 
 router.get('/settings', getSettings);
 router.put('/settings', updateSettings);

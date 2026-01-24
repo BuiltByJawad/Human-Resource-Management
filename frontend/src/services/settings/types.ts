@@ -5,6 +5,9 @@ export interface OrgSettingsPayload {
   companyAddress?: string | null
   logoUrl?: string | null
   faviconUrl?: string | null
+  footerYear?: number | null
+  privacyPolicyText?: string | null
+  termsOfServiceText?: string | null
 }
 
 export interface OrgSettingsUpdateResponse {
@@ -17,6 +20,9 @@ export interface OrgSettingsFormState {
   tagline: string
   companyName: string
   companyAddress: string
+  footerYear: string
+  privacyPolicyText: string
+  termsOfServiceText: string
 }
 
 export type OrgSettingsErrorFields = 'siteName' | 'companyName' | 'companyAddress'

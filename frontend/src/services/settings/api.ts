@@ -1,12 +1,11 @@
 import api from '@/lib/axios'
 import type {
   ChangePasswordPayload,
-  OrgSettingsFormState,
   OrgSettingsPayload,
   OrgSettingsUpdateResponse,
 } from '@/services/settings/types'
 
-export const updateOrgSettings = async (payload: OrgSettingsFormState): Promise<OrgSettingsPayload> => {
+export const updateOrgSettings = async (payload: OrgSettingsPayload): Promise<OrgSettingsPayload> => {
   const response = await api.put<OrgSettingsUpdateResponse>('/org/settings', payload)
   return response.data?.data ?? payload
 }

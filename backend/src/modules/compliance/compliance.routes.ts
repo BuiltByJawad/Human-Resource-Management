@@ -33,6 +33,7 @@ router.patch('/rules/:id/toggle', checkPermission('compliance', 'manage'), legac
 router.get('/logs', legacyComplianceController.getLogs);
 router.post('/run', checkPermission('compliance', 'manage'), legacyComplianceController.runComplianceCheck);
 
+
 // CRUD for compliance records
 router.get('/', complianceController.getAll);
 router.get('/:id', complianceController.getById);

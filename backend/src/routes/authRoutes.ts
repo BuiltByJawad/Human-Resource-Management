@@ -3,7 +3,8 @@ import { login, register, refreshToken, getProfile, uploadAvatar, changePassword
 import { protect, checkPermission } from '@/shared/middleware/auth'
 import { validateRequest } from '@/shared/middleware/validation'
 import { loginSchema, registerSchema, changePasswordSchema, updateProfileSchema, inviteUserSchema, completeInviteSchema, passwordResetRequestSchema, resetPasswordSchema, refreshTokenSchema } from '@/validators'
-import { authRateLimiter } from '@/shared/middleware/security'
+import { adminRateLimiter, authRateLimiter } from '@/shared/middleware/security'
+
 import { upload } from '@/shared/middleware/uploadMiddleware'
 import { logout } from '@/modules/auth/auth.controller'
 
@@ -12,11 +13,13 @@ const router = Router()
 router.post('/register', authRateLimiter, validateRequest(registerSchema), register)
 router.post('/login', authRateLimiter, validateRequest(loginSchema), login)
 router.post('/refresh-token', authRateLimiter, validateRequest(refreshTokenSchema), refreshToken)
-router.get('/profile', protect, getProfile)
+router.get('/profile', protect, adminRateLimiter, getProfile)
+
 router.post('/logout', protect, logout)
 router.put('/avatar', protect, upload.single('avatar'), uploadAvatar)
-router.put('/change-password', protect, validateRequest(changePasswordSchema), changePassword)
-router.put('/profile', protect, validateRequest(updateProfileSchema), updateProfile)
+router.put('/change-password', protect, adminRateLimiter, validateRequest(changePasswordSchema), changePassword)
+
+router.put('/profile', protect, adminRateLimiter, validateRequest(updateProfileSchema), updateProfile)
 
 router.post('/invite', protect, checkPermission('roles', 'assign'), validateRequest(inviteUserSchema), inviteUser)
 router.post('/complete-invite', authRateLimiter, validateRequest(completeInviteSchema), completeInvite)

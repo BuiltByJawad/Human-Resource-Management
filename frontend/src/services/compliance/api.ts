@@ -1,4 +1,8 @@
-import type { ComplianceLog, ComplianceRule, ComplianceRunResult } from '@/services/compliance/types'
+import type {
+  ComplianceLog,
+  ComplianceRule,
+  ComplianceRunResult,
+} from '@/services/compliance/types'
 import {
   createComplianceRule as createComplianceRuleLegacy,
   fetchComplianceLogs as fetchComplianceLogsLegacy,
@@ -18,3 +22,4 @@ export const toggleComplianceRule = (ruleId: string, token?: string): Promise<Co
   toggleComplianceRuleLegacy(ruleId, token)
 
 export const runComplianceCheck = (token?: string): Promise<ComplianceRunResult | null> => runComplianceCheckLegacy(token)
+

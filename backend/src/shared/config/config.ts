@@ -18,6 +18,8 @@ const envVarsSchema = Joi.object()
     JWT_REFRESH_SECRET: Joi.string().required().description('JWT refresh secret key'),
     JWT_ACCESS_EXPIRATION_MINUTES: Joi.number().default(30).description('Minutes after which access tokens expire'),
     JWT_REFRESH_EXPIRATION_DAYS: Joi.number().default(30).description('Days after which refresh tokens expire'),
+    JWT_MAX_SESSION_DAYS: Joi.number().default(30).description('Maximum session duration in days'),
+    ADMIN_IP_ALLOWLIST: Joi.string().allow('').description('Comma-separated IP allowlist for admin routes'),
     ENCRYPTION_KEY: Joi.string().required().description('Encryption key'),
     MAX_FILE_SIZE: Joi.number().default(5 * 1024 * 1024).description('Maximum file size in bytes'),
     UPLOAD_PATH: Joi.string().default('uploads').description('File upload directory'),
@@ -58,11 +60,15 @@ const config = {
     refreshSecret: envVars.JWT_REFRESH_SECRET,
     accessExpirationMinutes: envVars.JWT_ACCESS_EXPIRATION_MINUTES,
     refreshExpirationDays: envVars.JWT_REFRESH_EXPIRATION_DAYS,
+    maxSessionDays: envVars.JWT_MAX_SESSION_DAYS,
     cookieOptions: {
       httpOnly: true,
       secure: envVars.NODE_ENV === 'production',
       sameSite: 'lax',
     },
+  },
+  admin: {
+    ipAllowlist: envVars.ADMIN_IP_ALLOWLIST,
   },
   encryptionKey: envVars.ENCRYPTION_KEY,
   fileUpload: {

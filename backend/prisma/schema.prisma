@@ -191,6 +191,9 @@ model CompanySettings {
   companyAddress   String   @default("123 Business Road, Tech City")
   logoUrl          String?
   faviconUrl       String?
+  footerYear       Int?
+  privacyPolicyText String? @db.Text
+  termsOfServiceText String? @db.Text
   loginHeroTitle   String?  @default("Empower your people")
   loginHeroSubtitle String? @default("A modern HR workspace your teams will love")
   loginAccentColor String?  @default("#2563eb")

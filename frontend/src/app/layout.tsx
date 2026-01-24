@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { FaviconManager } from "@/components/ui/FaviconManager";
@@ -35,6 +36,7 @@ interface BrandingData {
   tagline: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  footerYear?: number | null;
 }
 
 function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
@@ -83,10 +85,11 @@ async function fetchBranding(): Promise<BrandingData> {
 
     return {
       siteName: data?.siteName || "",
-      shortName: data?.shortName || "HR",
+      shortName: "HR",
       tagline: data?.tagline || "",
       logoUrl: normalizeAssetUrl(rawLogoUrl, apiBase),
       faviconUrl: normalizeAssetUrl(rawFaviconUrl, apiBase),
+      footerYear: typeof data?.footerYear === 'number' ? data.footerYear : null,
     };
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
@@ -98,6 +101,7 @@ async function fetchBranding(): Promise<BrandingData> {
       tagline: "",
       logoUrl: null,
       faviconUrl: null,
+      footerYear: null,
     };
   }
 }
@@ -131,6 +135,8 @@ export default async function RootLayout({
   const branding = await fetchBranding();
   const auth = await getServerAuthContext();
   const faviconHref = branding.faviconUrl ?? DEFAULT_FAVICON;
+  const footerYear = branding.footerYear || new Date().getFullYear();
+  const footerSiteName = branding.siteName || DEFAULT_TITLE;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -161,8 +167,21 @@ export default async function RootLayout({
             <FaviconManager />
             <ToastProvider>
               <AuthBootstrapProvider auth={auth}>
-                <div className="min-h-screen">
-                  {children}
+                <div className="min-h-screen flex flex-col">
+                  <div className="flex-1">{children}</div>
+                  <footer className="border-t border-slate-200 bg-white/90 px-6 py-6 text-sm text-slate-500">
+                    <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4">
+                      <span>© {footerYear} {footerSiteName}</span>
+                      <div className="flex items-center gap-4 text-slate-600">
+                        <Link href="/privacy" className="font-medium text-slate-900 hover:text-slate-700">
+                          Privacy Policy
+                        </Link>
+                        <Link href="/terms" className="font-medium text-slate-900 hover:text-slate-700">
+                          Terms of Service
+                        </Link>
+                      </div>
+                    </div>
+                  </footer>
                   <PostLoginPrefetcher />
                   <AuthTransitionOverlay />
                 </div>

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as roleController from './role.controller';
 import { authenticate, checkPermission } from '../../shared/middleware/auth';
+import { adminIpAllowlist, adminRateLimiter } from '../../shared/middleware/security';
 
 /**
  * @swagger
@@ -12,6 +13,8 @@ import { authenticate, checkPermission } from '../../shared/middleware/auth';
 const router = Router();
 
 router.use(authenticate);
+router.use(adminIpAllowlist);
+router.use(adminRateLimiter);
 
 /**
  * Get all available permissions

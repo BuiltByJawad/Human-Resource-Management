@@ -143,6 +143,8 @@ npm run test:e2e          # Run end-to-end tests
 
 The API documentation is available at `http://localhost:5000/api-docs` when running the backend server.
 
+For API versioning details, see [`docs/API_VERSIONING.md`](docs/API_VERSIONING.md).
+
 ### Key Endpoints
 - `POST /api/auth/login` - User authentication
 - `POST /api/auth/invite` - Generate an invite link for a new or existing employee (email + role)
@@ -306,7 +308,7 @@ BACKEND_URL=http://localhost:5000
 
 ## 📄 License
 
-This project is licensed under the ISC License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 

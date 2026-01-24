@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { createClient } from 'redis';
 import * as fs from 'fs';
 import * as os from 'os';
+import net from 'net';
 
 const prisma = new PrismaClient();
 
@@ -14,6 +15,7 @@ export interface HealthStatus {
         redis: CheckResult;
         disk: CheckResult;
         memory: CheckResult;
+        external: CheckResult;
     };
 }
 
@@ -21,7 +23,7 @@ export interface CheckResult {
     status: 'pass' | 'fail' | 'warn';
     message?: string;
     responseTime?: number;
-    details?: Record<string, any>;
+    details?: Record<string, string | number | boolean>;
 }
 
 // Cache for health check results (5 seconds TTL)
@@ -55,6 +57,66 @@ export async function checkDatabase(): Promise<CheckResult> {
             status: 'fail',
             message: `Database connection failed: ${error.message}`,
             responseTime: Date.now() - startTime,
+        };
+    }
+}
+
+const checkTcpConnection = (host: string, port: number, timeoutMs: number): Promise<number> =>
+    new Promise((resolve, reject) => {
+        const start = Date.now();
+        const socket = net.createConnection({ host, port });
+
+        const cleanup = () => {
+            socket.removeAllListeners();
+            socket.destroy();
+        };
+
+        socket.setTimeout(timeoutMs);
+
+        socket.on('connect', () => {
+            const elapsed = Date.now() - start;
+            cleanup();
+            resolve(elapsed);
+        });
+
+        socket.on('timeout', () => {
+            cleanup();
+            reject(new Error('Connection timeout'));
+        });
+
+        socket.on('error', (error) => {
+            cleanup();
+            reject(error);
+        });
+    });
+
+export async function checkExternalDependencies(): Promise<CheckResult> {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = Number(process.env.SMTP_PORT || 0);
+
+    if (!smtpHost || !smtpPort) {
+        return {
+            status: 'warn',
+            message: 'SMTP not configured; skipping external dependency check',
+        };
+    }
+
+    try {
+        const responseTime = await checkTcpConnection(smtpHost, smtpPort, 2000);
+        return {
+            status: 'pass',
+            message: 'SMTP connectivity check passed',
+            responseTime,
+            details: {
+                host: smtpHost,
+                port: smtpPort,
+            },
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'SMTP connectivity check failed';
+        return {
+            status: 'fail',
+            message: `SMTP connectivity failed: ${message}`,
         };
     }
 }
@@ -199,9 +261,11 @@ export async function aggregateHealth(): Promise<HealthStatus> {
             checkRedis(),
             checkDiskSpace(),
             checkMemory(),
+            checkExternalDependencies(),
         ]),
         new Promise<CheckResult[]>((resolve) =>
             setTimeout(() => resolve([
+                { status: 'fail', message: 'Health check timeout' },
                 { status: 'fail', message: 'Health check timeout' },
                 { status: 'fail', message: 'Health check timeout' },
                 { status: 'fail', message: 'Health check timeout' },
@@ -210,7 +274,7 @@ export async function aggregateHealth(): Promise<HealthStatus> {
         ),
     ]);
 
-    const [database, redis, disk, memory] = checks;
+    const [database, redis, disk, memory, external] = checks;
 
     // Determine overall status
     let overallStatus: 'healthy' | 'unhealthy' | 'degraded' = 'healthy';
@@ -223,7 +287,9 @@ export async function aggregateHealth(): Promise<HealthStatus> {
         disk.status === 'warn' ||
         disk.status === 'fail' ||
         memory.status === 'warn' ||
-        memory.status === 'fail'
+        memory.status === 'fail' ||
+        external.status === 'warn' ||
+        external.status === 'fail'
     ) {
         overallStatus = 'degraded';
     }
@@ -237,6 +303,7 @@ export async function aggregateHealth(): Promise<HealthStatus> {
             redis,
             disk,
             memory,
+            external,
         },
     };
 

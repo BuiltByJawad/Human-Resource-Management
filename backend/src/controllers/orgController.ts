@@ -332,6 +332,7 @@ export const getPublicBranding = asyncHandler(async (req: Request, res: Response
       companyAddress: settings.companyAddress,
       logoUrl: settings.logoUrl,
       faviconUrl: settings.faviconUrl,
+      footerYear: settings.footerYear,
       loginHeroTitle: settings.loginHeroTitle,
       loginHeroSubtitle: settings.loginHeroSubtitle,
       loginAccentColor: settings.loginAccentColor,
@@ -341,13 +342,46 @@ export const getPublicBranding = asyncHandler(async (req: Request, res: Response
   })
 })
 
+export const getPublicPolicies = asyncHandler(async (req: Request, res: Response) => {
+  const tenantReq = req as TenantRequest
+  const organizationId = tenantReq.tenant?.id ?? null
+
+  let settings = null as Awaited<ReturnType<typeof prisma.companySettings.findFirst>>
+
+  if (organizationId) {
+    settings = await prisma.companySettings.findFirst({
+      where: { organizationId },
+    })
+  } else {
+    settings = await prisma.companySettings.findFirst({
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
+
+  res.json({
+    success: true,
+    data: {
+      privacyPolicyText: settings?.privacyPolicyText ?? null,
+      termsOfServiceText: settings?.termsOfServiceText ?? null,
+    }
+  })
+})
+
 // Update organization settings
 export const updateSettings = asyncHandler(async (req: AuthRequest, res: Response) => {
   const normalizedHighlights = normalizeHighlights(req.body.loginHighlights)
+  const actorUserId = req.user?.id
 
   let settings = await prisma.companySettings.findFirst({
     where: { organizationId: req.user?.organizationId ?? null },
   })
+
+  const previousPolicies = settings
+    ? {
+        privacyPolicyText: settings.privacyPolicyText ?? null,
+        termsOfServiceText: settings.termsOfServiceText ?? null,
+      }
+    : null
 
   if (settings) {
     settings = await prisma.companySettings.update({
@@ -357,6 +391,9 @@ export const updateSettings = asyncHandler(async (req: AuthRequest, res: Respons
         tagline: req.body.tagline,
         companyName: req.body.companyName,
         companyAddress: req.body.companyAddress,
+        footerYear: req.body.footerYear,
+        privacyPolicyText: req.body.privacyPolicyText ?? null,
+        termsOfServiceText: req.body.termsOfServiceText ?? null,
         loginHeroTitle: req.body.loginHeroTitle,
         loginHeroSubtitle: req.body.loginHeroSubtitle,
         loginAccentColor: req.body.loginAccentColor || null,
@@ -372,6 +409,9 @@ export const updateSettings = asyncHandler(async (req: AuthRequest, res: Respons
         tagline: req.body.tagline,
         companyName: req.body.companyName,
         companyAddress: req.body.companyAddress,
+        footerYear: req.body.footerYear,
+        privacyPolicyText: req.body.privacyPolicyText ?? null,
+        termsOfServiceText: req.body.termsOfServiceText ?? null,
         loginHeroTitle: req.body.loginHeroTitle,
         loginHeroSubtitle: req.body.loginHeroSubtitle,
         loginAccentColor: req.body.loginAccentColor || null,

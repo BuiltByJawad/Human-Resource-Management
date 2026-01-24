@@ -8,6 +8,7 @@ export interface BrandingData {
     tagline: string;
     logoUrl: string | null;
     faviconUrl: string | null;
+    footerYear?: number | null;
 }
 
 const BrandingContext = createContext<BrandingData | null>(null)

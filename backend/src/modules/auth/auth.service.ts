@@ -496,6 +496,16 @@ export class AuthService {
         const tokenUserId: string | undefined = typeof payload?.userId === 'string' ? payload.userId : undefined;
         const tokenJti: string | undefined = typeof payload?.jti === 'string' ? payload.jti : undefined;
         const tokenOrgId: string | undefined = typeof payload?.organizationId === 'string' ? payload.organizationId : undefined;
+        const tokenIssuedAt: number | undefined = typeof payload?.iat === 'number' ? payload.iat : undefined;
+
+        const maxSessionDays =
+            typeof config.jwt.maxSessionDays === 'number' && Number.isFinite(config.jwt.maxSessionDays)
+                ? config.jwt.maxSessionDays
+                : 30;
+        const maxSessionSeconds = Math.max(1, Math.floor(maxSessionDays * 24 * 60 * 60));
+        if (tokenIssuedAt && Date.now() / 1000 - tokenIssuedAt > maxSessionSeconds) {
+            throw new UnauthorizedError('Session expired');
+        }
 
         const redisOk = await ensureRedisConnected();
         if (redisOk) {
