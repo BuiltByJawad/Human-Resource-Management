@@ -1,16 +1,14 @@
 import { Request, Response, NextFunction } from 'express'
 import { prisma } from '@/shared/config/database'
 import { NotFoundError, BadRequestError, ForbiddenError } from '@/shared/utils/errors'
-import { requireRequestOrganizationId } from '@/shared/utils/tenant'
 
 export const getAssets = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { status, type, search } = req.query
 
-        const where: any = { organizationId }
+        const where: any = {}
         if (status) where.status = status
-        if (type) where.type = type
+        if (type) where.category = type
         if (search) {
             where.OR = [
                 { name: { contains: String(search), mode: 'insensitive' } },
@@ -46,24 +44,21 @@ export const getAssets = async (req: Request, res: Response, next: NextFunction)
 
 export const createAsset = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
-        const { name, serialNumber, type, purchaseDate, purchasePrice, vendor, description } = req.body
+        const { name, serialNumber, type, purchaseDate, purchasePrice, vendor } = req.body
 
-        const existingAsset = await prisma.asset.findFirst({ where: { organizationId, serialNumber } })
+        const existingAsset = await prisma.asset.findFirst({ where: { serialNumber } })
         if (existingAsset) {
             throw new BadRequestError('Asset with this serial number already exists')
         }
 
         const asset = await prisma.asset.create({
             data: {
-                organizationId,
                 name,
                 serialNumber,
-                type,
+                category: type,
                 purchaseDate: new Date(purchaseDate),
                 purchasePrice: purchasePrice ? Number(purchasePrice) : null,
                 vendor,
-                description,
                 status: 'available'
             }
         })
@@ -76,19 +71,18 @@ export const createAsset = async (req: Request, res: Response, next: NextFunctio
 
 export const updateAsset = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { id } = req.params
         const data = req.body
 
         if (data.purchaseDate) data.purchaseDate = new Date(data.purchaseDate)
         if (data.purchasePrice) data.purchasePrice = Number(data.purchasePrice)
 
-        const result = await prisma.asset.updateMany({ where: { id, organizationId }, data })
+        const result = await prisma.asset.updateMany({ where: { id }, data })
         if (!result.count) {
             throw new NotFoundError('Asset not found')
         }
 
-        const asset = await prisma.asset.findFirst({ where: { id, organizationId } })
+        const asset = await prisma.asset.findFirst({ where: { id } })
 
         res.json({ success: true, data: asset })
     } catch (error) {
@@ -98,7 +92,6 @@ export const updateAsset = async (req: Request, res: Response, next: NextFunctio
 
 export const getEmployeeAssets = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { employeeId } = req.params
 
         const authReq: any = req as any
@@ -115,14 +108,13 @@ export const getEmployeeAssets = async (req: Request, res: Response, next: NextF
             }
         }
 
-        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId, organizationId } })
+        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId } })
         if (!employeeExists) {
             throw new NotFoundError('Employee not found')
         }
 
         const assets = await prisma.asset.findMany({
             where: {
-                organizationId,
                 assignments: {
                     some: {
                         employeeId,
@@ -156,10 +148,9 @@ export const getEmployeeAssets = async (req: Request, res: Response, next: NextF
 
 export const deleteAsset = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { id } = req.params
 
-        const asset = await prisma.asset.findFirst({ where: { id, organizationId } })
+        const asset = await prisma.asset.findFirst({ where: { id } })
         if (!asset) throw new NotFoundError('Asset not found')
 
         const activeAssignment = await prisma.assetAssignment.findFirst({
@@ -170,7 +161,7 @@ export const deleteAsset = async (req: Request, res: Response, next: NextFunctio
             throw new BadRequestError('Cannot delete asset that is assigned. Please return it first.')
         }
 
-        await prisma.asset.deleteMany({ where: { id, organizationId } })
+        await prisma.asset.deleteMany({ where: { id } })
         res.json({ success: true, message: 'Asset deleted successfully' })
     } catch (error) {
         next(error)
@@ -179,15 +170,14 @@ export const deleteAsset = async (req: Request, res: Response, next: NextFunctio
 
 export const assignAsset = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { id } = req.params
         const { employeeId, notes } = req.body
 
-        const asset = await prisma.asset.findFirst({ where: { id, organizationId } })
+        const asset = await prisma.asset.findFirst({ where: { id } })
         if (!asset) throw new NotFoundError('Asset not found')
         if (asset.status !== 'available') throw new BadRequestError('Asset is not available for assignment')
 
-        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId, organizationId } })
+        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId } })
         if (!employeeExists) {
             throw new NotFoundError('Employee not found')
         }
@@ -203,7 +193,7 @@ export const assignAsset = async (req: Request, res: Response, next: NextFunctio
             })
 
             const assetUpdateResult = await prisma.asset.updateMany({
-                where: { id, organizationId },
+                where: { id },
                 data: { status: 'assigned' }
             })
             if (!assetUpdateResult.count) {
@@ -221,10 +211,9 @@ export const assignAsset = async (req: Request, res: Response, next: NextFunctio
 
 export const returnAsset = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { id } = req.params // Asset ID
 
-        const asset = await prisma.asset.findFirst({ where: { id, organizationId } })
+        const asset = await prisma.asset.findFirst({ where: { id } })
         if (!asset) throw new NotFoundError('Asset not found')
 
         const activeAssignment = await prisma.assetAssignment.findFirst({
@@ -240,7 +229,7 @@ export const returnAsset = async (req: Request, res: Response, next: NextFunctio
             })
 
             const assetUpdateResult = await prisma.asset.updateMany({
-                where: { id, organizationId },
+                where: { id },
                 data: { status: 'available' }
             })
             if (!assetUpdateResult.count) {
@@ -258,11 +247,10 @@ export const returnAsset = async (req: Request, res: Response, next: NextFunctio
 
 export const addMaintenanceLog = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { id } = req.params
         const { description, cost, date, performedBy } = req.body
 
-        const asset = await prisma.asset.findFirst({ where: { id, organizationId } })
+        const asset = await prisma.asset.findFirst({ where: { id } })
         if (!asset) throw new NotFoundError('Asset not found')
 
         const log = await prisma.maintenanceLog.create({
@@ -283,11 +271,10 @@ export const addMaintenanceLog = async (req: Request, res: Response, next: NextF
 
 export const getAssetDetails = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any)
         const { id } = req.params
 
         const asset = await prisma.asset.findFirst({
-            where: { id, organizationId },
+            where: { id },
             include: {
                 assignments: {
                     include: {

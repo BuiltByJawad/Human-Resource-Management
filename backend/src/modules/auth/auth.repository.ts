@@ -20,23 +20,6 @@ export class AuthRepository {
         });
     }
 
-    async findUserByEmailAndOrganization(email: string, organizationId: string) {
-        return prisma.user.findFirst({
-            where: { email, organizationId },
-            include: {
-                role: {
-                    include: {
-                        permissions: {
-                            include: {
-                                permission: true,
-                            },
-                        },
-                    },
-                },
-                employee: true,
-            },
-        });
-    }
 
     async findUserById(id: string) {
         return prisma.user.findUnique({
@@ -144,16 +127,6 @@ export class AuthRepository {
         });
     }
 
-    async findEmployeeByEmailAndOrganization(email: string, organizationId: string) {
-        return prisma.employee.findUnique({
-            where: {
-                organizationId_email: {
-                    organizationId,
-                    email,
-                },
-            },
-        });
-    }
 
     async updateEmployeeUserId(email: string, userId: string) {
         return prisma.employee.updateMany({
@@ -162,15 +135,6 @@ export class AuthRepository {
         });
     }
 
-    async updateEmployeeUserIdScoped(email: string, organizationId: string, userId: string) {
-        return prisma.employee.updateMany({
-            where: {
-                organizationId,
-                email,
-            },
-            data: { userId },
-        });
-    }
 
     async upsertEmployee(userId: string, data: any) {
         return prisma.employee.upsert({

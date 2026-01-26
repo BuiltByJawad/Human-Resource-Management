@@ -2,7 +2,6 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '@/shared/middleware/errorHandler'
 import { prisma } from '@/shared/config/database'
 import { BadRequestError, NotFoundError, ConflictError } from '@/shared/utils/errors'
-import { requireRequestOrganizationId } from '@/shared/utils/tenant'
 
 // @desc    Create a new department
 // @route   POST /api/departments
@@ -10,10 +9,8 @@ import { requireRequestOrganizationId } from '@/shared/utils/tenant'
 export const createDepartment = asyncHandler(async (req: Request, res: Response) => {
     const { name, description, managerId, parentDepartmentId } = req.body
 
-    const organizationId = requireRequestOrganizationId(req as any)
-
     const existingDepartment = await prisma.department.findFirst({
-        where: { name, organizationId } as any,
+        where: { name } as any,
     })
 
     if (existingDepartment) {
@@ -22,7 +19,7 @@ export const createDepartment = asyncHandler(async (req: Request, res: Response)
 
     // Verify manager if provided
     if (managerId) {
-        const manager = await prisma.employee.findFirst({ where: { id: managerId, organizationId } as any })
+        const manager = await prisma.employee.findFirst({ where: { id: managerId } as any })
         if (!manager) {
             throw new NotFoundError('Manager (Employee) not found')
         }
@@ -30,7 +27,7 @@ export const createDepartment = asyncHandler(async (req: Request, res: Response)
 
     // Verify parent department if provided
     if (parentDepartmentId) {
-        const parent = await prisma.department.findFirst({ where: { id: parentDepartmentId, organizationId } as any })
+        const parent = await prisma.department.findFirst({ where: { id: parentDepartmentId } as any })
         if (!parent) {
             throw new NotFoundError('Parent department not found')
         }
@@ -42,7 +39,6 @@ export const createDepartment = asyncHandler(async (req: Request, res: Response)
             description,
             managerId,
             parentDepartmentId,
-            organizationId,
         },
         include: {
             manager: {
@@ -65,9 +61,7 @@ export const createDepartment = asyncHandler(async (req: Request, res: Response)
 // @route   GET /api/departments
 // @access  Private
 export const getDepartments = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any)
     const departments = await prisma.department.findMany({
-        where: { organizationId } as any,
         include: {
             manager: {
                 select: { id: true, firstName: true, lastName: true, email: true }
@@ -94,10 +88,8 @@ export const getDepartments = asyncHandler(async (req: Request, res: Response) =
 export const getDepartmentById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
 
-    const organizationId = requireRequestOrganizationId(req as any)
-
     const department = await prisma.department.findFirst({
-        where: { id, organizationId } as any,
+        where: { id } as any,
         include: {
             manager: {
                 select: { id: true, firstName: true, lastName: true, email: true }
@@ -132,9 +124,7 @@ export const updateDepartment = asyncHandler(async (req: Request, res: Response)
     const { id } = req.params
     const { name, description, managerId, parentDepartmentId } = req.body
 
-    const organizationId = requireRequestOrganizationId(req as any)
-
-    const department = await prisma.department.findFirst({ where: { id, organizationId } as any })
+    const department = await prisma.department.findFirst({ where: { id } as any })
 
     if (!department) {
         throw new NotFoundError('Department not found')
@@ -142,7 +132,7 @@ export const updateDepartment = asyncHandler(async (req: Request, res: Response)
 
     // Check name uniqueness if changing
     if (name && name !== department.name) {
-        const existingName = await prisma.department.findFirst({ where: { name, organizationId } as any })
+        const existingName = await prisma.department.findFirst({ where: { name } as any })
         if (existingName) {
             throw new ConflictError('Department with this name already exists')
         }
@@ -154,7 +144,7 @@ export const updateDepartment = asyncHandler(async (req: Request, res: Response)
     }
 
     const updated = await prisma.department.updateMany({
-        where: { id, organizationId } as any,
+        where: { id } as any,
         data: {
             name,
             description,
@@ -168,7 +158,7 @@ export const updateDepartment = asyncHandler(async (req: Request, res: Response)
     }
 
     const updatedDepartment = await prisma.department.findFirst({
-        where: { id, organizationId } as any,
+        where: { id } as any,
         include: {
             manager: {
                 select: { id: true, firstName: true, lastName: true, email: true }
@@ -192,10 +182,8 @@ export const updateDepartment = asyncHandler(async (req: Request, res: Response)
 export const deleteDepartment = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
 
-    const organizationId = requireRequestOrganizationId(req as any)
-
     const department = await prisma.department.findFirst({
-        where: { id, organizationId } as any,
+        where: { id } as any,
         include: {
             _count: {
                 select: { employees: true, subDepartments: true }
@@ -215,7 +203,7 @@ export const deleteDepartment = asyncHandler(async (req: Request, res: Response)
         throw new BadRequestError('Cannot delete department with sub-departments. Delete or reassign them first.')
     }
 
-    await prisma.department.deleteMany({ where: { id, organizationId } as any })
+    await prisma.department.deleteMany({ where: { id } as any })
 
     res.json({
         success: true,

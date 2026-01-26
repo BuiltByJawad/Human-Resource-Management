@@ -1,5 +1,4 @@
 import { headers } from 'next/headers'
-import { extractTenantSlug } from '@/lib/tenant'
 import type { LoginBranding } from '@/services/login/types'
 import { buildHighlights, deriveHeroTitle, FALLBACK_BRANDING } from '@/services/login/branding'
 
@@ -19,18 +18,9 @@ export async function fetchLoginBranding(): Promise<LoginBranding> {
     (process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '') : null) ||
     'http://localhost:5000'
 
-  const headerList = await headers()
-  const tenantSlug = extractTenantSlug({
-    headerSlug: headerList.get('x-tenant-slug'),
-    hostname: headerList.get('host'),
-  })
-
   try {
     const response = await fetch(`${apiBase}/api/org/branding/public`, {
       cache: 'no-store',
-      headers: {
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
-      },
     })
 
     if (!response.ok) {

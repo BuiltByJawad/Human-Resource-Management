@@ -6,14 +6,10 @@ export class LeaveRepository {
         skip: number;
         take: number;
         where?: Prisma.LeaveRequestWhereInput;
-    }, organizationId: string) {
-        const scopedWhere: Prisma.LeaveRequestWhereInput = params.where
-            ? { AND: [params.where, { employee: { organizationId } }] }
-            : { employee: { organizationId } };
-
+    }) {
         return prisma.leaveRequest.findMany({
             ...params,
-            where: scopedWhere,
+            where: params.where,
             include: {
                 employee: {
                     select: {
@@ -35,17 +31,13 @@ export class LeaveRepository {
         });
     }
 
-    async count(where: Prisma.LeaveRequestWhereInput | undefined, organizationId: string) {
-        const scopedWhere: Prisma.LeaveRequestWhereInput = where
-            ? { AND: [where, { employee: { organizationId } }] }
-            : { employee: { organizationId } };
-
-        return prisma.leaveRequest.count({ where: scopedWhere });
+    async count(where: Prisma.LeaveRequestWhereInput | undefined) {
+        return prisma.leaveRequest.count({ where });
     }
 
-    async findById(id: string, organizationId: string) {
+    async findById(id: string) {
         return prisma.leaveRequest.findFirst({
-            where: { id, employee: { organizationId } },
+            where: { id },
             include: {
                 employee: {
                     select: {
@@ -82,9 +74,9 @@ export class LeaveRepository {
         });
     }
 
-    async update(id: string, data: Prisma.LeaveRequestUpdateInput, organizationId: string) {
+    async update(id: string, data: Prisma.LeaveRequestUpdateInput) {
         const existing = await prisma.leaveRequest.findFirst({
-            where: { id, employee: { organizationId } },
+            where: { id },
             select: { id: true },
         });
 
@@ -115,23 +107,23 @@ export class LeaveRepository {
         });
     }
 
-    async delete(id: string, organizationId: string) {
+    async delete(id: string) {
         const deleted = await prisma.leaveRequest.deleteMany({
-            where: { id, employee: { organizationId } },
+            where: { id },
         });
         return deleted.count;
     }
 
-    async findByEmployee(employeeId: string, organizationId: string) {
+    async findByEmployee(employeeId: string) {
         return prisma.leaveRequest.findMany({
-            where: { employeeId, employee: { organizationId } },
+            where: { employeeId },
             orderBy: { createdAt: 'desc' },
         });
     }
 
-    async getLeaveRequestsByStatus(status: string, organizationId: string) {
+    async getLeaveRequestsByStatus(status: string) {
         return prisma.leaveRequest.findMany({
-            where: { status: status as any, employee: { organizationId } },
+            where: { status: status as any },
             include: {
                 employee: { select: { firstName: true, lastName: true, email: true } },
                 approver: { select: { firstName: true, lastName: true } },

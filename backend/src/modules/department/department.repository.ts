@@ -2,9 +2,8 @@ import { prisma } from '../../shared/config/database';
 import { Prisma } from '@prisma/client';
 
 export class DepartmentRepository {
-    async findAll(organizationId: string) {
+    async findAll() {
         return prisma.department.findMany({
-            where: { organizationId },
             include: {
                 manager: {
                     select: {
@@ -31,9 +30,9 @@ export class DepartmentRepository {
         });
     }
 
-    async findById(id: string, organizationId: string) {
+    async findById(id: string) {
         return prisma.department.findFirst({
-            where: { id, organizationId },
+            where: { id },
             include: {
                 employees: {
                     select: {
@@ -51,33 +50,22 @@ export class DepartmentRepository {
         });
     }
 
-    async findByName(name: string, organizationId: string) {
+    async findByName(name: string) {
         return prisma.department.findUnique({
-            where: {
-                organizationId_name: {
-                    organizationId,
-                    name,
-                },
-            },
+            where: { name },
         });
     }
 
-    async create(data: Prisma.DepartmentCreateInput, organizationId: string) {
+    async create(data: Prisma.DepartmentCreateInput) {
         return prisma.department.create({
             data: {
                 // Spread caller-provided fields (name, description, manager, parentDepartment, ...)
                 ...(data as any),
-                // Always set the owning organization via relation connect. Prisma's
-                // DepartmentCreateInput does not accept the scalar `organizationId`
-                // directly here.
-                organization: {
-                    connect: { id: organizationId },
-                },
             },
         });
     }
 
-    async update(id: string, data: Prisma.DepartmentUpdateInput, organizationId: string) {
+    async update(id: string, data: Prisma.DepartmentUpdateInput) {
         // Existence and organization ownership are validated in the service layer.
         // Use `update` here so relational fields (manager, parentDepartment) are supported.
         return prisma.department.update({
@@ -108,13 +96,13 @@ export class DepartmentRepository {
         });
     }
 
-    async delete(id: string, organizationId: string) {
-        const result = await prisma.department.deleteMany({ where: { id, organizationId } });
+    async delete(id: string) {
+        const result = await prisma.department.deleteMany({ where: { id } });
         return result.count;
     }
 
-    async count(organizationId: string) {
-        return prisma.department.count({ where: { organizationId } });
+    async count() {
+        return prisma.department.count({});
     }
 }
 

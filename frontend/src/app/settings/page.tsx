@@ -1,11 +1,9 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { headers } from 'next/headers'
 
 import { SettingsPageClient } from "./SettingsPageClient"
 import type { OrgSettingsPayload } from "@/services/settings/types"
-import { extractTenantSlug } from '@/lib/tenant'
 
 type OrgSettingsApiResponse = {
   success?: boolean
@@ -24,16 +22,10 @@ async function fetchWithToken<T = any>(path: string, token: string | null): Prom
   if (!token) return null
   try {
     const base = buildApiBase()
-    const headerList = await headers()
-    const tenantSlug = extractTenantSlug({
-      headerSlug: headerList.get('x-tenant-slug'),
-      hostname: headerList.get('host'),
-    })
     const response = await fetch(`${base}${path}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       },
       cache: "no-store",
     })

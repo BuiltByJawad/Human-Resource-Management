@@ -133,7 +133,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     }
   })
 
-  const tokens = generateTokens(user.id, user.email, user.role.name, user.organizationId)
+  const tokens = generateTokens(user.id, user.email, user.role.name)
   const { accessToken, refreshToken } = tokens
 
   const redisOk = await ensureRedisConnected()
@@ -159,7 +159,6 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role.name,
-        organizationId: user.organizationId,
       }
     }
   })
@@ -534,7 +533,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     await clearLoginFailures(failKey, blockKey)
   }
 
-  const tokens = generateTokens(user.id, user.email, user.role.name, user.organizationId)
+  const tokens = generateTokens(user.id, user.email, user.role.name)
   const { accessToken, refreshToken } = tokens
 
   if (redisOk) {
@@ -568,7 +567,6 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         lastName: user.lastName,
         role: user.role.name,
         avatarUrl: user.avatarUrl,
-        organizationId: user.organizationId,
         employee: user.employee  // Include employee data for profile form
       },
       permissions

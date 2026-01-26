@@ -58,22 +58,22 @@ const normalizePayrollConfig = (value: unknown): PayrollConfig => {
 };
 
 export class PayrollService {
-    async getPayrollConfig(organizationId: string): Promise<PayrollConfig> {
-        const org = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { settings: true },
-        });
-        const root = toSettingsObject(org?.settings);
-        return normalizePayrollConfig(root.payroll);
+    async getPayrollConfig(): Promise<PayrollConfig> {
+        const settings = (await prisma.companySettings.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { payrollConfig: true },
+        })) as { payrollConfig?: Prisma.InputJsonValue | null } | null;
+        const root = toSettingsObject(settings?.payrollConfig);
+        return normalizePayrollConfig(root);
     }
 
-    async getOverride(employeeId: string, payPeriod: string, organizationId: string): Promise<PayrollConfig | null> {
+    async getOverride(employeeId: string, payPeriod: string): Promise<PayrollConfig | null> {
         const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
         if (!periodRegex.test(payPeriod)) {
             throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
         }
 
-        const record = await payrollRepository.findOverride(employeeId, payPeriod, organizationId);
+        const record = await payrollRepository.findOverride(employeeId, payPeriod);
         if (!record) return null;
         return normalizePayrollConfig(record.config);
     }
@@ -82,7 +82,7 @@ export class PayrollService {
         employeeId: string,
         payPeriod: string,
         config: PayrollConfig,
-        organizationId: string
+        
     ): Promise<PayrollConfig> {
         const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
         if (!periodRegex.test(payPeriod)) {
@@ -90,7 +90,7 @@ export class PayrollService {
         }
 
         const employeeExists = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { id: true },
         });
         if (!employeeExists) {
@@ -106,49 +106,51 @@ export class PayrollService {
         return normalizePayrollConfig(saved.config);
     }
 
-    async deleteOverride(employeeId: string, payPeriod: string, organizationId: string): Promise<boolean> {
+    async deleteOverride(employeeId: string, payPeriod: string): Promise<boolean> {
         const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
         if (!periodRegex.test(payPeriod)) {
             throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
         }
-        const deletedCount = await payrollRepository.deleteOverride(employeeId, payPeriod, organizationId);
+        const deletedCount = await payrollRepository.deleteOverride(employeeId, payPeriod);
         return deletedCount > 0;
     }
 
-    async updatePayrollConfig(config: PayrollConfig, organizationId: string): Promise<PayrollConfig> {
-        const org = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { settings: true },
+    async updatePayrollConfig(config: PayrollConfig): Promise<PayrollConfig> {
+        const settings = await prisma.companySettings.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
         });
 
-        const root = toSettingsObject(org?.settings);
-        const nextSettings: Record<string, unknown> = {
-            ...root,
-            payroll: config,
-        };
+        if (!settings) {
+            const created = (await prisma.companySettings.create({
+                data: { payrollConfig: config as unknown as Prisma.InputJsonValue },
+                select: { payrollConfig: true },
+            })) as { payrollConfig?: Prisma.InputJsonValue | null };
+            return normalizePayrollConfig(toSettingsObject(created.payrollConfig));
+        }
 
-        const updated = await prisma.organization.update({
-            where: { id: organizationId },
-            data: { settings: nextSettings as unknown as Prisma.InputJsonValue },
-            select: { settings: true },
-        });
+        const updated = (await prisma.companySettings.update({
+            where: { id: settings.id },
+            data: { payrollConfig: config as unknown as Prisma.InputJsonValue },
+            select: { payrollConfig: true },
+        })) as { payrollConfig?: Prisma.InputJsonValue | null };
 
-        const updatedRoot = toSettingsObject(updated.settings);
-        return normalizePayrollConfig(updatedRoot.payroll);
+        const updatedRoot = toSettingsObject(updated.payrollConfig);
+        return normalizePayrollConfig(updatedRoot);
     }
-    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+
+    private async resolveEmployeeUserId(employeeId: string): Promise<string | null> {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { userId: true },
         });
         return employee?.userId ?? null;
     }
 
-    private async resolvePayrollAdminUserIds(organizationId: string): Promise<string[]> {
+    private async resolvePayrollAdminUserIds(): Promise<string[]> {
         const users = await prisma.user.findMany({
             where: {
                 status: 'active',
-                organizationId,
                 role: {
                     permissions: {
                         some: {
@@ -169,7 +171,7 @@ export class PayrollService {
     /**
      * Get all payroll records with pagination
      */
-    async getAll(query: PayrollQueryDto, organizationId: string) {
+    async getAll(query: PayrollQueryDto) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
@@ -189,8 +191,8 @@ export class PayrollService {
         }
 
         const [records, total] = await Promise.all([
-            payrollRepository.findAll({ where, skip, take: limit, organizationId }),
-            payrollRepository.count(organizationId, where),
+            payrollRepository.findAll({ where, skip, take: limit }),
+            payrollRepository.count(where),
         ]);
 
         return {
@@ -207,8 +209,8 @@ export class PayrollService {
     /**
      * Get payroll record by ID
      */
-    async getById(id: string, organizationId: string) {
-        const record = await payrollRepository.findById(id, organizationId);
+    async getById(id: string) {
+        const record = await payrollRepository.findById(id);
 
         if (!record) {
             throw new NotFoundError('Payroll record not found');
@@ -220,7 +222,7 @@ export class PayrollService {
     /**
      * Generate payroll for a period
      */
-    async generatePayroll(data: GeneratePayrollDto, organizationId: string) {
+    async generatePayroll(data: GeneratePayrollDto) {
         // Validate pay period format (YYYY-MM)
         const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
         if (!periodRegex.test(data.payPeriod)) {
@@ -230,7 +232,6 @@ export class PayrollService {
         // Get active employees with attendance for the period
         const employees = await payrollRepository.getActiveEmployeesWithAttendance(
             data.payPeriod,
-            organizationId,
             data.employeeIds
         );
 
@@ -238,10 +239,10 @@ export class PayrollService {
             throw new BadRequestError('No active employees found for payroll generation');
         }
 
-        const payrollConfig = await this.getPayrollConfig(organizationId);
+        const payrollConfig = await this.getPayrollConfig();
 
         const employeeIds = employees.map((e) => e.id);
-        const overrides = await payrollRepository.findOverridesForEmployees(data.payPeriod, employeeIds, organizationId);
+        const overrides = await payrollRepository.findOverridesForEmployees(data.payPeriod, employeeIds);
         const overrideByEmployeeId = new Map<string, PayrollConfig>();
         for (const o of overrides) {
             overrideByEmployeeId.set(o.employeeId, normalizePayrollConfig(o.config));
@@ -265,7 +266,7 @@ export class PayrollService {
             payrolls.push(payroll);
         }
 
-        const payrollAdminIds = await this.resolvePayrollAdminUserIds(organizationId);
+        const payrollAdminIds = await this.resolvePayrollAdminUserIds();
         await Promise.all(
             Array.from(new Set(payrollAdminIds)).map((userId) =>
                 notificationService.create({
@@ -337,8 +338,8 @@ export class PayrollService {
     /**
      * Update payroll status
      */
-    async updateStatus(id: string, data: UpdatePayrollStatusDto, organizationId: string, actorUserId?: string) {
-        const existing = await this.getById(id, organizationId); // Verify exists
+    async updateStatus(id: string, data: UpdatePayrollStatusDto, actorUserId?: string) {
+        const existing = await this.getById(id); // Verify exists
 
         const nextStatus = data?.status;
         const currentStatus = existing.status;
@@ -373,23 +374,19 @@ export class PayrollService {
             paidAt = parsed;
         }
 
-        const record = await payrollRepository.updateStatusScoped(
-            id,
-            {
-                status: data.status,
-                paidAt,
-                paymentMethod: typeof data.paymentMethod === 'string' ? data.paymentMethod : undefined,
-                paymentReference: typeof data.paymentReference === 'string' ? data.paymentReference : undefined,
-                paidByUserId: data.status === 'paid' ? actorUserId : undefined,
-            },
-            organizationId,
-        );
+        const record = await payrollRepository.updateStatus(id, {
+            status: data.status,
+            paidAt,
+            paymentMethod: typeof data.paymentMethod === 'string' ? data.paymentMethod : undefined,
+            paymentReference: typeof data.paymentReference === 'string' ? data.paymentReference : undefined,
+            paidByUserId: data.status === 'paid' ? actorUserId : undefined,
+        });
         if (!record) {
             throw new NotFoundError('Payroll record not found');
         }
 
         if (data.status === 'paid') {
-            const employeeUserId = await this.resolveEmployeeUserId(existing.employeeId, organizationId);
+            const employeeUserId = await this.resolveEmployeeUserId(existing.employeeId);
             if (employeeUserId) {
                 await notificationService.create({
                     userId: employeeUserId,
@@ -407,14 +404,14 @@ export class PayrollService {
     /**
      * Get employee payslips
      */
-    async getEmployeePayslips(employeeId: string, organizationId: string) {
-        const records = await payrollRepository.findByEmployee(employeeId, organizationId);
+    async getEmployeePayslips(employeeId: string) {
+        const records = await payrollRepository.findByEmployee(employeeId);
 
         return records;
     }
 
-    async exportEmployeePayslipsCsv(employeeId: string, organizationId: string): Promise<{ filename: string; csv: string }> {
-        const records = await payrollRepository.findByEmployeeForExport(employeeId, organizationId);
+    async exportEmployeePayslipsCsv(employeeId: string): Promise<{ filename: string; csv: string }> {
+        const records = await payrollRepository.findByEmployeeForExport(employeeId);
 
         const escapeCsv = (value: string): string => {
             const needsQuotes = /[",\n\r]/.test(value);
@@ -467,10 +464,9 @@ export class PayrollService {
     }
 
     async exportPayslipPdf(
-        recordId: string,
-        organizationId: string
+        recordId: string
     ): Promise<{ filename: string; pdf: Buffer; employeeId: string }> {
-        const record = await this.getById(recordId, organizationId);
+        const record = await this.getById(recordId);
 
         const employeeName = `${record.employee?.firstName ?? ''} ${record.employee?.lastName ?? ''}`.trim();
         const employeeNumber = record.employee?.employeeNumber ?? '';
@@ -545,15 +541,14 @@ export class PayrollService {
     }
 
     async exportPayrollPeriodCsv(
-        payPeriod: string,
-        organizationId: string
+        payPeriod: string
     ): Promise<{ filename: string; csv: string }> {
         const periodRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
         if (!periodRegex.test(payPeriod)) {
             throw new BadRequestError('Invalid pay period format. Use YYYY-MM (e.g., 2024-01)');
         }
 
-        const records = await payrollRepository.findByPeriodForExport(payPeriod, organizationId);
+        const records = await payrollRepository.findByPeriodForExport(payPeriod);
 
         const escapeCsv = (value: string): string => {
             const needsQuotes = /[",\n\r]/.test(value);
@@ -608,8 +603,8 @@ export class PayrollService {
     /**
      * Get payroll summary for a period
      */
-    async getPeriodSummary(payPeriod: string, organizationId: string) {
-        const records = await payrollRepository.findByPeriod(payPeriod, organizationId);
+    async getPeriodSummary(payPeriod: string) {
+        const records = await payrollRepository.findByPeriod(payPeriod);
 
         const summary = {
             totalEmployees: records.length,

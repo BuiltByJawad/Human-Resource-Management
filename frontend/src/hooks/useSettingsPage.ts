@@ -70,7 +70,7 @@ interface UseSettingsPageOptions {
 
 export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) => {
   const { showToast } = useToast()
-  const { updateOrg, logoUrl, faviconUrl, setLoaded } = useOrgStore()
+  const { updateOrg, setLoaded } = useOrgStore()
 
   const normalizedInitialOrg = useMemo(
     () => ({
@@ -246,8 +246,6 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
   )
 
   return {
-    logoUrl,
-    faviconUrl,
     orgSettings,
     setOrgSettings,
     orgErrors,

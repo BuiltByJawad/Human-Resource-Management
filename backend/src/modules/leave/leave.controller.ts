@@ -3,7 +3,6 @@ import { leaveService } from './leave.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
 import { BadRequestError, ForbiddenError } from '../../shared/utils/errors';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 import { createAuditLog } from '../../shared/utils/audit';
 import { AuthRequest } from '../../shared/middleware/auth';
 
@@ -28,8 +27,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
         }
     }
 
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const result = await leaveService.getAll(query as unknown as any, organizationId);
+    const result = await leaveService.getAll(query as unknown as any);
 
     res.json({
         success: true,
@@ -50,8 +48,7 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
         permissions.includes('leave_requests.manage') ||
         permissions.includes('leave_policies.manage');
 
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const leaveRequest = await leaveService.getById(req.params.id, organizationId);
+    const leaveRequest = await leaveService.getById(req.params.id);
     if (!canViewAll) {
         const employeeId = authReq.user?.employeeId;
         if (!employeeId || leaveRequest.employeeId !== employeeId) {
@@ -74,8 +71,7 @@ export const create = asyncHandler(async (req: AuthRequest, res: Response) => {
     if (!employeeId) {
         throw new BadRequestError('Employee profile is required to request leave');
     }
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const leaveRequest = await leaveService.create(employeeId, req.body, organizationId);
+    const leaveRequest = await leaveService.create(employeeId, req.body);
 
     const actorUserId = authReq.user?.id;
     if (actorUserId) {
@@ -108,15 +104,14 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
     const canManage = permissions.includes('leave_requests.manage') || permissions.includes('leave_policies.manage');
     const employeeId = authReq.user?.employeeId;
 
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const existing = await leaveService.getById(req.params.id, organizationId);
+    const existing = await leaveService.getById(req.params.id);
     if (!canManage) {
         if (!employeeId || existing.employeeId !== employeeId) {
             throw new ForbiddenError('You can only update your own leave requests');
         }
     }
 
-    const leaveRequest = await leaveService.update(req.params.id, req.body, organizationId);
+    const leaveRequest = await leaveService.update(req.params.id, req.body);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -154,8 +149,7 @@ export const approve = asyncHandler(async (req: AuthRequest, res: Response) => {
     if (!approverId) {
         throw new BadRequestError('Employee profile is required to approve leave');
     }
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const leaveRequest = await leaveService.approve(req.params.id, approverId, req.body, organizationId);
+    const leaveRequest = await leaveService.approve(req.params.id, approverId, req.body);
 
     const actorUserId = authReq.user?.id;
     if (actorUserId) {
@@ -192,8 +186,7 @@ export const reject = asyncHandler(async (req: AuthRequest, res: Response) => {
     if (!approverId) {
         throw new BadRequestError('Employee profile is required to reject leave');
     }
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const leaveRequest = await leaveService.reject(req.params.id, approverId, req.body, organizationId);
+    const leaveRequest = await leaveService.reject(req.params.id, approverId, req.body);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -230,15 +223,14 @@ export const cancel = asyncHandler(async (req: AuthRequest, res: Response) => {
     const canManage = permissions.includes('leave_requests.manage') || permissions.includes('leave_policies.manage');
     const employeeId = authReq.user?.employeeId;
 
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const existing = await leaveService.getById(req.params.id, organizationId);
+    const existing = await leaveService.getById(req.params.id);
     if (!canManage) {
         if (!employeeId || existing.employeeId !== employeeId) {
             throw new ForbiddenError('You can only cancel your own leave requests');
         }
     }
 
-    const leaveRequest = await leaveService.cancel(req.params.id, existing.employeeId, organizationId);
+    const leaveRequest = await leaveService.cancel(req.params.id, existing.employeeId);
 
     const actorUserId = authReq.user?.id;
     if (actorUserId) {
@@ -270,8 +262,7 @@ export const getBalance = asyncHandler(async (req: AuthRequest, res: Response) =
     if (!employeeId) {
         throw new BadRequestError('Employee ID is required');
     }
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const balance = await leaveService.getLeaveBalance(employeeId, organizationId);
+    const balance = await leaveService.getLeaveBalance(employeeId);
 
     res.json({
         success: true,

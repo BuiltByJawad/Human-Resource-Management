@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 
 interface OrgState {
   siteName: string
@@ -21,10 +20,7 @@ interface OrgStore extends OrgState {
 
 const ORG_STORAGE_KEY = 'org-config'
 
-const resolveTenantKey = (baseKey: string) => {
-  if (typeof window === 'undefined') return baseKey
-  return buildTenantStorageKey(baseKey, getClientTenantSlug())
-}
+const resolveTenantKey = (baseKey: string) => baseKey
 
 const DEFAULTS: OrgState = {
   siteName: '',
@@ -56,15 +52,7 @@ const orgPersistStorage = {
       const value = window.localStorage.getItem(tenantKey)
       if (value) return value
 
-      const tenantSlug = getClientTenantSlug()
-      if (!tenantSlug && tenantKey !== name) {
-        const legacy = window.localStorage.getItem(name)
-        if (legacy) {
-          window.localStorage.setItem(tenantKey, legacy)
-          window.localStorage.removeItem(name)
-          return legacy
-        }
-      }
+      return null
     } catch {
     }
     return null
@@ -83,12 +71,9 @@ const orgPersistStorage = {
     } catch {
     }
 
-    const tenantSlug = getClientTenantSlug()
-    if (!tenantSlug) {
-      try {
-        window.localStorage.removeItem(name)
-      } catch {
-      }
+    try {
+      window.localStorage.removeItem(name)
+    } catch {
     }
   },
 }

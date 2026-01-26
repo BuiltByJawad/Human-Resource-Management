@@ -3,14 +3,12 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '../../shared/middleware/errorHandler'
 import { onboardingService } from './onboarding.service'
 import { BadRequestError, ForbiddenError } from '../../shared/utils/errors'
-import { requireRequestOrganizationId } from '../../shared/utils/tenant'
 
 const parseDate = (value?: any) => (value ? new Date(value) : undefined)
 
 export const startProcess = asyncHandler(async (req: Request, res: Response) => {
   const employeeId = req.params.employeeId
-  const organizationId = requireRequestOrganizationId(req as any)
-  const process = await onboardingService.startProcess(employeeId, organizationId, (req as any).user?.id, {
+  const process = await onboardingService.startProcess(employeeId, (req as any).user?.id, {
     startDate: parseDate(req.body.startDate),
     dueDate: parseDate(req.body.dueDate)
   })
@@ -26,7 +24,6 @@ export const getProcess = asyncHandler(async (req: Request, res: Response) => {
 
   if (!employeeId) throw new BadRequestError('Employee ID required')
 
-  const organizationId = requireRequestOrganizationId(req as any)
   const isPrivileged = privilegedRoles.includes(role || '')
 
   if (!isPrivileged) {
@@ -36,7 +33,7 @@ export const getProcess = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  const process = await onboardingService.getProcess(employeeId, organizationId)
+  const process = await onboardingService.getProcess(employeeId)
   res.json({ success: true, data: process })
 })
 
@@ -44,8 +41,7 @@ export const createTask = asyncHandler(async (req: Request, res: Response) => {
   const employeeId = req.params.employeeId
   const { title, description, assigneeUserId, dueDate } = req.body
   if (!title) throw new Error('Title is required')
-  const organizationId = requireRequestOrganizationId(req as any)
-  const task = await onboardingService.createTask(employeeId, organizationId, {
+  const task = await onboardingService.createTask(employeeId, {
     title,
     description,
     assigneeUserId,
@@ -56,8 +52,7 @@ export const createTask = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateTask = asyncHandler(async (req: Request, res: Response) => {
   const taskId = req.params.taskId
-  const organizationId = requireRequestOrganizationId(req as any)
-  const updated = await onboardingService.updateTask(taskId, organizationId, req.body)
+  const updated = await onboardingService.updateTask(taskId, req.body)
   res.json({ success: true, data: updated })
 })
 
@@ -65,7 +60,6 @@ export const completeTask = asyncHandler(async (req: Request, res: Response) => 
   const taskId = req.params.taskId
   const userId = (req as any).user?.id
   if (!userId) throw new BadRequestError('User not authenticated')
-  const organizationId = requireRequestOrganizationId(req as any)
-  const updated = await onboardingService.completeTask(taskId, organizationId, userId)
+  const updated = await onboardingService.completeTask(taskId, userId)
   res.json({ success: true, data: updated })
 })

@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 
 import { useAuthStore } from "@/store/useAuthStore"
+import { useOrgStore } from "@/store/useOrgStore"
 import { PERMISSIONS } from "@/constants/permissions"
 import DashboardShell from "@/components/ui/DashboardShell"
 import { useSettingsPage } from "@/hooks/useSettingsPage"
@@ -13,6 +14,7 @@ import { SettingsActionCard } from "@/components/features/settings/SettingsActio
 import { BrandingSettingsSection } from "@/components/features/settings/BrandingSettingsSection"
 import { SecuritySection } from "@/components/features/settings/SecuritySection"
 import { PasswordChangeModal } from "@/components/features/settings/PasswordChangeModal"
+import { PolicyHistorySection } from "@/components/features/settings/PolicyHistorySection"
 
 interface SettingsPageClientProps {
   initialOrgSettings: OrgSettingsPayload
@@ -21,9 +23,8 @@ interface SettingsPageClientProps {
 export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientProps) {
   const router = useRouter()
   const { hasPermission } = useAuthStore()
+  const { logoUrl, faviconUrl } = useOrgStore()
   const {
-    logoUrl,
-    faviconUrl,
     orgSettings,
     setOrgSettings,
     orgErrors,
@@ -49,6 +50,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
   const adminSections = useMemo(
     () => [
       {
+        key: 'notifications',
         permission: PERMISSIONS.MANAGE_NOTIFICATIONS,
         title: "Notifications",
         description: "Manage how your organization receives system notifications.",
@@ -66,6 +68,14 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         ),
       },
       {
+        key: 'policy-history',
+        permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
+        title: "Policy Change History",
+        description: "Review recent privacy policy and terms updates.",
+        content: <PolicyHistorySection />,
+      },
+      {
+        key: 'roles-permissions',
         permission: PERMISSIONS.MANAGE_ROLES,
         title: "Roles & Permissions",
         description: "Create roles, assign permissions, and control access across the organization.",
@@ -73,6 +83,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         actionLabel: "Manage roles",
       },
       {
+        key: 'payroll-config',
         permission: PERMISSIONS.CONFIGURE_PAYROLL,
         title: "Payroll Configuration",
         description: "Define pay cycles, tax rules, and payroll policies.",
@@ -80,6 +91,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         actionLabel: "Go to payroll settings",
       },
       {
+        key: 'compliance',
         permission: PERMISSIONS.MANAGE_COMPLIANCE,
         title: "Compliance & Policies",
         description: "Set up compliance rules and audit your HR policies.",
@@ -87,6 +99,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         actionLabel: "Manage compliance",
       },
       {
+        key: 'branding',
         permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
         title: "Organization Branding",
         description: "Configure the name, logo, and public identity of your HR workspace.",
@@ -154,7 +167,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
             {adminSections
               .filter((section) => hasPermission(section.permission))
               .map((section) => (
-                <div key={section.permission} className="bg-white shadow rounded-lg p-6 border border-gray-100">
+                <div key={section.key} className="bg-white shadow rounded-lg p-6 border border-gray-100">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900">{section.title}</h2>

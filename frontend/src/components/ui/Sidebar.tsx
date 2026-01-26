@@ -33,7 +33,6 @@ import { useAuthStore } from '@/store/useAuthStore'
 import { useOrgStore } from '@/store/useOrgStore'
 import { PERMISSIONS, type Permission } from '@/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
-import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 
 type NavIcon = typeof HomeIcon
 
@@ -208,10 +207,9 @@ export default function Sidebar() {
       }
     }
 
-    const tenantKey = buildTenantStorageKey('auth-storage', getClientTenantSlug())
-    const local = parseCachedUser(window.localStorage.getItem(tenantKey))
+    const local = parseCachedUser(window.localStorage.getItem('auth-storage'))
     if (local) return local
-    const session = parseCachedUser(window.sessionStorage.getItem(tenantKey))
+    const session = parseCachedUser(window.sessionStorage.getItem('auth-storage'))
     if (session) return session
     return parseCachedUser(window.localStorage.getItem('auth-storage'))
   }, [])

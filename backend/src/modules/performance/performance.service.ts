@@ -4,12 +4,12 @@ import { CreateReviewDto, CreateCycleDto, PerformanceQueryDto } from './dto';
 import { PAGINATION } from '../../shared/constants';
 
 export class PerformanceService {
-    async getAllReviews(organizationId: string, query: PerformanceQueryDto) {
+    async getAllReviews(query: PerformanceQueryDto) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
 
-        const where: any = { organizationId };
+        const where: any = {};
         const restrictReviewerId = (query as any).__restrictReviewerId;
         if (restrictReviewerId && query.employeeId) {
             where.OR = [
@@ -30,24 +30,24 @@ export class PerformanceService {
         return { reviews, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
     }
 
-    async getReviewById(organizationId: string, id: string) {
-        const review = await performanceRepository.findReviewById(organizationId, id);
+    async getReviewById(id: string) {
+        const review = await performanceRepository.findReviewById(id);
         if (!review) throw new NotFoundError('Review not found');
         return review;
     }
 
-    async createReview(organizationId: string, data: CreateReviewDto, reviewerEmployeeId: string) {
-        const employee = await performanceRepository.findEmployeeById(organizationId, data.employeeId);
+    async createReview(data: CreateReviewDto, reviewerEmployeeId: string) {
+        const employee = await performanceRepository.findEmployeeById(data.employeeId);
         if (!employee) {
             throw new NotFoundError('Employee not found');
         }
 
-        const reviewer = await performanceRepository.findEmployeeById(organizationId, reviewerEmployeeId);
+        const reviewer = await performanceRepository.findEmployeeById(reviewerEmployeeId);
         if (!reviewer) {
             throw new NotFoundError('Reviewer not found');
         }
 
-        const cycle = await performanceRepository.findCycleById(organizationId, data.cycleId);
+        const cycle = await performanceRepository.findCycleById(data.cycleId);
         if (!cycle) {
             throw new NotFoundError('Cycle not found');
         }
@@ -57,7 +57,6 @@ export class PerformanceService {
         }
 
         return performanceRepository.createReview({
-            organizationId,
             employeeId: employee.id,
             reviewerId: reviewer.id,
             cycleId: cycle.id,
@@ -68,13 +67,12 @@ export class PerformanceService {
         });
     }
 
-    async getCycles(organizationId: string) {
-        return performanceRepository.findAllCycles(organizationId);
+    async getCycles() {
+        return performanceRepository.findAllCycles();
     }
 
-    async createCycle(organizationId: string, data: CreateCycleDto) {
+    async createCycle(data: CreateCycleDto) {
         return performanceRepository.createCycle({
-            organizationId,
             title: data.title,
             startDate: new Date(data.startDate),
             endDate: new Date(data.endDate),

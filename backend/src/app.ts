@@ -41,7 +41,6 @@ export const createApp = (): { app: Application; httpServer: any } => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
         userId?: string;
-        organizationId?: string | null;
       };
 
       if (!decoded?.userId) {
@@ -53,17 +52,7 @@ export const createApp = (): { app: Application; httpServer: any } => {
         return next(new Error('Unauthorized'));
       }
 
-      const tokenOrgId = decoded.organizationId ?? null;
-      const userOrgId = (user as any)?.organizationId ?? null;
-      if (userOrgId && tokenOrgId !== userOrgId) {
-        return next(new Error('Unauthorized'));
-      }
-      if (!userOrgId && tokenOrgId) {
-        return next(new Error('Unauthorized'));
-      }
-
       socket.data.userId = user.id;
-      socket.data.organizationId = userOrgId;
       return next();
     } catch {
       return next(new Error('Unauthorized'));
@@ -112,7 +101,7 @@ export const createApp = (): { app: Application; httpServer: any } => {
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Tenant-Slug'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   };
 
   app.use(cors(corsOptions));

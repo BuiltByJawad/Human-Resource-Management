@@ -2,7 +2,7 @@ import { prisma } from '../../shared/config/database';
 import { Prisma } from '@prisma/client';
 
 export class RoleRepository {
-    async findAll(organizationId: string) {
+    async findAll() {
         return prisma.role.findMany({
             include: {
                 permissions: {
@@ -11,19 +11,14 @@ export class RoleRepository {
                     },
                 },
                 _count: {
-                    select: {
-                        users: {
-                            where: { organizationId },
-                        },
-                        permissions: true,
-                    },
+                    select: { users: true, permissions: true },
                 },
             },
             orderBy: { name: 'asc' },
         });
     }
 
-    async findById(id: string, organizationId: string) {
+    async findById(id: string) {
         return prisma.role.findUnique({
             where: { id },
             include: {
@@ -33,7 +28,6 @@ export class RoleRepository {
                     },
                 },
                 users: {
-                    where: { organizationId },
                     select: {
                         id: true,
                         email: true,
@@ -46,12 +40,7 @@ export class RoleRepository {
                     },
                 },
                 _count: {
-                    select: {
-                        users: {
-                            where: { organizationId },
-                        },
-                        permissions: true,
-                    },
+                    select: { users: true, permissions: true },
                 },
             },
         });
@@ -120,9 +109,9 @@ export class RoleRepository {
         });
     }
 
-    async assignToUser(userId: string, roleId: string, organizationId: string) {
+    async assignToUser(userId: string, roleId: string) {
         const updated = await prisma.user.updateMany({
-            where: { id: userId, organizationId },
+            where: { id: userId },
             data: {
                 roleId,
             },
@@ -135,9 +124,9 @@ export class RoleRepository {
         return prisma.user.findUnique({ where: { id: userId } });
     }
 
-    async getUsersByRole(roleId: string, organizationId: string) {
+    async getUsersByRole(roleId: string) {
         return prisma.user.findMany({
-            where: { roleId, organizationId },
+            where: { roleId },
             include: {
                 employee: {
                     select: {

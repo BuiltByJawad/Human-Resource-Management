@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { headers } from 'next/headers'
-import { extractTenantSlug } from '@/lib/tenant'
 import { getBackendBaseUrl } from '@/lib/config/env'
 
 const sections = [
@@ -64,18 +62,10 @@ type PublicPoliciesResponse = {
 
 async function fetchPolicyText(): Promise<string | null> {
   const apiBase = getBackendBaseUrl()
-  const headerList = await headers()
-  const tenantSlug = extractTenantSlug({
-    headerSlug: headerList.get('x-tenant-slug'),
-    hostname: headerList.get('host'),
-  })
 
   try {
     const response = await fetch(`${apiBase}/api/org/policies/public`, {
       cache: 'no-store',
-      headers: {
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
-      },
     })
     if (!response.ok) return null
     const payload = (await response.json().catch(() => null)) as PublicPoliciesResponse | null

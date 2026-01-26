@@ -3,6 +3,7 @@ import type {
   ChangePasswordPayload,
   OrgSettingsPayload,
   OrgSettingsUpdateResponse,
+  PolicyHistoryEntry,
 } from '@/services/settings/types'
 
 export const updateOrgSettings = async (payload: OrgSettingsPayload): Promise<OrgSettingsPayload> => {
@@ -42,4 +43,9 @@ export const uploadOrgFavicon = async (file: File): Promise<string | null> => {
 
 export const changePassword = async (payload: ChangePasswordPayload): Promise<void> => {
   await api.post('/auth/password/change', payload)
+}
+
+export const fetchPolicyHistory = async (): Promise<PolicyHistoryEntry[]> => {
+  const response = await api.get<{ success?: boolean; data?: PolicyHistoryEntry[] }>('/org/policies/history')
+  return response.data?.data ?? []
 }

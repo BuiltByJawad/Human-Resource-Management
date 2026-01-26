@@ -7,31 +7,27 @@ export class ExpenseRepository {
         return prisma.expenseClaim.create({ data });
     }
 
-    async findById(id: string, organizationId: string): Promise<ExpenseClaim | null> {
+    async findById(id: string): Promise<ExpenseClaim | null> {
         return prisma.expenseClaim.findUnique({
             where: { id },
             include: {
                 employee: {
-                    select: { id: true, firstName: true, lastName: true, department: { select: { name: true } }, organizationId: true }
+                    select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } }
                 }
             }
-        }).then((claim) => {
-            if (!claim) return null;
-            if ((claim as any).employee?.organizationId !== organizationId) return null;
-            return claim;
         });
     }
 
-    async findByEmployee(employeeId: string, organizationId: string): Promise<ExpenseClaim[]> {
+    async findByEmployee(employeeId: string): Promise<ExpenseClaim[]> {
         return prisma.expenseClaim.findMany({
-            where: { employeeId, employee: { organizationId } },
+            where: { employeeId },
             orderBy: { date: 'desc' }
         });
     }
 
-    async findAllPending(organizationId: string): Promise<ExpenseClaim[]> {
+    async findAllPending(): Promise<ExpenseClaim[]> {
         return prisma.expenseClaim.findMany({
-            where: { status: 'pending', employee: { organizationId } },
+            where: { status: 'pending' },
             include: {
                 employee: {
                     select: { id: true, firstName: true, lastName: true, department: { select: { name: true } } }
@@ -41,9 +37,9 @@ export class ExpenseRepository {
         });
     }
 
-    async updateStatus(id: string, data: any, organizationId: string): Promise<ExpenseClaim | null> {
+    async updateStatus(id: string, data: any): Promise<ExpenseClaim | null> {
         const updated = await prisma.expenseClaim.updateMany({
-            where: { id, employee: { organizationId } },
+            where: { id },
             data,
         });
 

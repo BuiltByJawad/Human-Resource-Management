@@ -42,3 +42,20 @@ export interface ChangePasswordPayload {
 export interface ChangePasswordFormValues extends ChangePasswordPayload {
   confirmPassword: string
 }
+
+export interface PolicyHistoryUser {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  role?: { name?: string | null } | null
+}
+
+export interface PolicyHistoryEntry {
+  id: string
+  action: string
+  createdAt: string
+  user: PolicyHistoryUser
+  oldValues?: Record<string, unknown> | null
+  newValues?: Record<string, unknown> | null
+}

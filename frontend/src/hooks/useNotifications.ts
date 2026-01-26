@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { io, type Socket } from 'socket.io-client'
-import { getClientTenantSlug } from '@/lib/tenant'
 import { getBackendBaseUrl } from '@/lib/config/env'
 import { readTenantUnreadCount, writeTenantUnreadCount } from '@/lib/utils/notificationStorage'
 import { mapNotificationPayload } from '@/lib/utils/notifications'
@@ -73,16 +72,15 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
   const [cachedUnreadCount, setCachedUnreadCount] = useState<number>(() => readTenantUnreadCount())
   const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const tenantSlug = typeof window !== 'undefined' ? getClientTenantSlug() ?? null : null
   const queryClient = useQueryClient()
-  const notificationsQueryKey = useMemo(() => ['notifications', token, tenantSlug], [token, tenantSlug])
+  const notificationsQueryKey = useMemo(() => ['notifications', token], [token])
 
   const notificationsQuery = useQuery<NotificationItem[]>({
     queryKey: notificationsQueryKey,
     enabled: Boolean(token) || isAuthenticated || hasInitialAuth,
     queryFn: async (): Promise<NotificationItem[]> => {
       try {
-        const response = await fetchNotifications(token, tenantSlug)
+        const response = await fetchNotifications(token)
         const payload = (response && typeof response === 'object' ? response : {}) as NotificationsResponse
         const root = (payload as { data?: unknown }).data ?? payload
 
@@ -151,7 +149,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
   }, [isAuthenticated, notificationsQueryKey, queryClient, token])
 
   const markAllReadMutation = useMutation({
-    mutationFn: () => markAllNotificationsRead(token, tenantSlug),
+    mutationFn: () => markAllNotificationsRead(token),
     onSuccess: () => {
       queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, (current) =>
         (current ?? []).map((item) => ({ ...item, read: true }))
@@ -165,7 +163,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
   })
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => markNotificationRead(id, token, tenantSlug),
+    mutationFn: (id: string) => markNotificationRead(id, token),
     onSuccess: (_data, id) => {
       let nextUnread = 0
       queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, (current) => {

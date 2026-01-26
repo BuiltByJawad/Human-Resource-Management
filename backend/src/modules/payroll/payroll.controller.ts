@@ -3,7 +3,6 @@ import { payrollService } from './payroll.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
 import { ForbiddenError, BadRequestError } from '../../shared/utils/errors';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 import { createAuditLog } from '../../shared/utils/audit';
 import { AuthRequest } from '../../shared/middleware/auth';
 
@@ -11,8 +10,7 @@ import { AuthRequest } from '../../shared/middleware/auth';
  * Get all payroll records
  */
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const result = await payrollService.getAll(req.query, organizationId);
+    const result = await payrollService.getAll(req.query);
 
     res.json({
         success: true,
@@ -25,8 +23,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
  * Get payroll record by ID
  */
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const record = await payrollService.getById(req.params.id, organizationId);
+    const record = await payrollService.getById(req.params.id);
 
     res.json({
         success: true,
@@ -39,8 +36,7 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
  */
 export const generate = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const result = await payrollService.generatePayroll(req.body, organizationId);
+    const result = await payrollService.generatePayroll(req.body);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -70,8 +66,7 @@ export const generate = asyncHandler(async (req: Request, res: Response) => {
  */
 export const updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const record = await payrollService.updateStatus(req.params.id, req.body, organizationId, authReq.user?.id);
+    const record = await payrollService.updateStatus(req.params.id, req.body, authReq.user?.id);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -101,7 +96,6 @@ export const updateStatus = asyncHandler(async (req: Request, res: Response) => 
  * Get employee payslips
  */
 export const getEmployeePayslips = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const permissions: string[] = Array.isArray(req.user?.permissions) ? req.user.permissions : [];
     const canViewAll = permissions.includes('payroll.view');
 
@@ -117,7 +111,7 @@ export const getEmployeePayslips = asyncHandler(async (req: AuthRequest, res: Re
         throw new ForbiddenError('You can only view your own payslips');
     }
 
-    const records = await payrollService.getEmployeePayslips(employeeId, organizationId);
+    const records = await payrollService.getEmployeePayslips(employeeId);
 
     res.json({
         success: true,
@@ -126,7 +120,6 @@ export const getEmployeePayslips = asyncHandler(async (req: AuthRequest, res: Re
 });
 
 export const exportPayslipsCsv = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const permissions: string[] = Array.isArray(req.user?.permissions) ? req.user.permissions : [];
     const canViewAll = permissions.includes('payroll.view');
 
@@ -142,7 +135,7 @@ export const exportPayslipsCsv = asyncHandler(async (req: AuthRequest, res: Resp
         throw new ForbiddenError('You can only export your own payslips');
     }
 
-    const { filename, csv } = await payrollService.exportEmployeePayslipsCsv(employeeId, organizationId);
+    const { filename, csv } = await payrollService.exportEmployeePayslipsCsv(employeeId);
 
     const actorUserId = req.user?.id;
     if (actorUserId) {
@@ -161,10 +154,9 @@ export const exportPayslipsCsv = asyncHandler(async (req: AuthRequest, res: Resp
 });
 
 export const getOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const { employeeId, payPeriod } = req.params;
 
-    const override = await payrollService.getOverride(employeeId, payPeriod, organizationId);
+    const override = await payrollService.getOverride(employeeId, payPeriod);
 
     res.json({
         success: true,
@@ -173,10 +165,9 @@ export const getOverride = asyncHandler(async (req: AuthRequest, res: Response) 
 });
 
 export const upsertOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const { employeeId, payPeriod } = req.params;
 
-    const updated = await payrollService.upsertOverride(employeeId, payPeriod, req.body, organizationId);
+    const updated = await payrollService.upsertOverride(employeeId, payPeriod, req.body);
 
     const actorUserId = req.user?.id;
     if (actorUserId) {
@@ -197,10 +188,9 @@ export const upsertOverride = asyncHandler(async (req: AuthRequest, res: Respons
 });
 
 export const deleteOverride = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const { employeeId, payPeriod } = req.params;
 
-    const removed = await payrollService.deleteOverride(employeeId, payPeriod, organizationId);
+    const removed = await payrollService.deleteOverride(employeeId, payPeriod);
 
     const actorUserId = req.user?.id;
     if (actorUserId) {
@@ -221,7 +211,6 @@ export const deleteOverride = asyncHandler(async (req: AuthRequest, res: Respons
 });
 
 export const exportPayslipPdf = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const permissions: string[] = Array.isArray(req.user?.permissions) ? req.user.permissions : [];
     const canViewAll = permissions.includes('payroll.view');
 
@@ -231,7 +220,7 @@ export const exportPayslipPdf = asyncHandler(async (req: AuthRequest, res: Respo
     }
 
     const selfEmployeeId = req.user?.employeeId;
-    const { filename, pdf, employeeId } = await payrollService.exportPayslipPdf(recordId, organizationId);
+    const { filename, pdf, employeeId } = await payrollService.exportPayslipPdf(recordId);
 
     if (!canViewAll && selfEmployeeId && employeeId !== selfEmployeeId) {
         throw new ForbiddenError('You can only export your own payslip');
@@ -257,8 +246,7 @@ export const exportPayslipPdf = asyncHandler(async (req: AuthRequest, res: Respo
  * Get payroll summary for a period
  */
 export const getPeriodSummary = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const summary = await payrollService.getPeriodSummary(req.params.payPeriod, organizationId);
+    const summary = await payrollService.getPeriodSummary(req.params.payPeriod);
 
     res.json({
         success: true,
@@ -267,8 +255,7 @@ export const getPeriodSummary = asyncHandler(async (req: Request, res: Response)
 });
 
 export const getConfig = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const config = await payrollService.getPayrollConfig(organizationId);
+    const config = await payrollService.getPayrollConfig();
 
     res.json({
         success: true,
@@ -278,16 +265,14 @@ export const getConfig = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateConfig = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-
-    const updated = await payrollService.updatePayrollConfig(req.body, organizationId);
+    const updated = await payrollService.updatePayrollConfig(req.body);
 
     const actorUserId = authReq.user?.id;
     if (actorUserId) {
         await createAuditLog({
             userId: actorUserId,
             action: 'payroll.update_config',
-            resourceId: organizationId,
+            resourceId: 'company-settings',
             newValues: { payroll: updated },
             req,
         });
@@ -301,14 +286,13 @@ export const updateConfig = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const exportPeriodCsv = asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
     const payPeriod = req.params.payPeriod;
 
     if (!payPeriod) {
         throw new BadRequestError('Pay period is required');
     }
 
-    const { filename, csv } = await payrollService.exportPayrollPeriodCsv(payPeriod, organizationId);
+    const { filename, csv } = await payrollService.exportPayrollPeriodCsv(payPeriod);
 
     const actorUserId = req.user?.id;
     if (actorUserId) {

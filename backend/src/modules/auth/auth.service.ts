@@ -60,12 +60,10 @@ export class AuthService {
      * Register a new user
      */
     async register(data: RegisterDto): Promise<AuthResponse> {
-        const { email, password, firstName, lastName, organizationId } = data;
+        const { email, password, firstName, lastName } = data;
 
         // Check if user exists
-        const existingUser = organizationId
-            ? await authRepository.findUserByEmailAndOrganization(email, organizationId)
-            : await authRepository.findUserByEmail(email);
+        const existingUser = await authRepository.findUserByEmail(email);
         if (existingUser) {
             throw new BadRequestError('Email already in use');
         }
@@ -87,19 +85,13 @@ export class AuthService {
             firstName,
             lastName,
             role: { connect: { id: defaultRole.id } },
-            ...(organizationId ? { organization: { connect: { id: organizationId } } } : {}),
             status: 'active',
         });
 
         const redisOk = await ensureRedisConnected();
 
         // Generate tokens
-        const tokens = generateTokens(
-            user.id,
-            user.email,
-            user.role.name,
-            (user as any)?.organizationId
-        );
+        const tokens = generateTokens(user.id, user.email, user.role.name);
 
         if (redisOk) {
             await storeRefreshJti(user.id, tokens.refreshTokenJti);
@@ -131,12 +123,6 @@ export class AuthService {
     async inviteUser(data: InviteUserDto, invitedBy: string): Promise<{ inviteId: string; inviteLink: string }> {
         const { email, roleId, expiresInHours = 72 } = data;
 
-        const inviter = await authRepository.findUserById(invitedBy);
-        const organizationId = inviter?.organizationId;
-        if (!organizationId) {
-            throw new BadRequestError('Inviter organization not found');
-        }
-
         // Validate role exists
         const role = await authRepository.findRoleById(roleId);
         if (!role) {
@@ -144,10 +130,10 @@ export class AuthService {
         }
 
         // Check for existing employee
-        const employeeForEmail = await authRepository.findEmployeeByEmailAndOrganization(email, organizationId);
+        const employeeForEmail = await authRepository.findEmployeeByEmail(email);
 
         // Check for existing user
-        let user = await authRepository.findUserByEmailAndOrganization(email, organizationId);
+        let user = await authRepository.findUserByEmail(email);
 
         if (user && user.verified) {
             throw new BadRequestError('User is already active and verified');
@@ -162,7 +148,6 @@ export class AuthService {
                 email,
                 password: hashedRandomPassword,
                 role: { connect: { id: roleId } },
-                organization: { connect: { id: organizationId } },
                 status: 'active',
                 verified: false,
                 firstName: employeeForEmail?.firstName ?? null,
@@ -208,14 +193,14 @@ export class AuthService {
 
         // Link employee to user
         if (employeeForEmail && user) {
-            await authRepository.updateEmployeeUserIdScoped(email, organizationId, user.id);
+            await authRepository.updateEmployeeUserId(email, user.id);
         }
 
         // Generate invite link
         const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/accept-invite?token=${token}`;
 
         const settings = await prisma.companySettings.findFirst({
-            where: { organizationId: organizationId ?? null },
+            orderBy: { updatedAt: 'desc' },
             select: { siteName: true },
         });
         const siteName = settings?.siteName || 'NovaHR';
@@ -336,7 +321,6 @@ export class AuthService {
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/reset-password?token=${token}`;
 
         const settings = await prisma.companySettings.findFirst({
-            where: { organizationId: user.organizationId ?? null },
             select: { siteName: true },
         });
         const siteName = settings?.siteName || 'NovaHR';
@@ -406,11 +390,9 @@ export class AuthService {
      * Login user
      */
     async login(data: LoginDto): Promise<AuthResponse> {
-        const { email, password, organizationId } = data;
+        const { email, password } = data;
 
-        const user = organizationId
-            ? await authRepository.findUserByEmailAndOrganization(email, organizationId)
-            : await authRepository.findUserByEmail(email);
+        const user = await authRepository.findUserByEmail(email);
 
         if (!user || user.status !== 'active') {
             throw new UnauthorizedError('Invalid credentials or inactive account');
@@ -431,12 +413,7 @@ export class AuthService {
         const redisOk = await ensureRedisConnected();
 
         // Generate tokens
-        const tokens = generateTokens(
-            user.id,
-            user.email,
-            user.role.name,
-            (user as any)?.organizationId
-        );
+        const tokens = generateTokens(user.id, user.email, user.role.name);
 
         if (redisOk) {
             await storeRefreshJti(user.id, tokens.refreshTokenJti);
@@ -495,7 +472,6 @@ export class AuthService {
 
         const tokenUserId: string | undefined = typeof payload?.userId === 'string' ? payload.userId : undefined;
         const tokenJti: string | undefined = typeof payload?.jti === 'string' ? payload.jti : undefined;
-        const tokenOrgId: string | undefined = typeof payload?.organizationId === 'string' ? payload.organizationId : undefined;
         const tokenIssuedAt: number | undefined = typeof payload?.iat === 'number' ? payload.iat : undefined;
 
         const maxSessionDays =
@@ -528,20 +504,8 @@ export class AuthService {
             throw new UnauthorizedError('User not found or inactive');
         }
 
-        const userOrgId = (user as any)?.organizationId as string | null | undefined;
-        if (userOrgId) {
-            if (!tokenOrgId) {
-                throw new UnauthorizedError('Invalid refresh token (missing organization)');
-            }
-            if (tokenOrgId !== userOrgId) {
-                throw new UnauthorizedError('Invalid refresh token (organization mismatch)');
-            }
-        } else if (tokenOrgId) {
-            throw new UnauthorizedError('Invalid refresh token (user not assigned to organization)');
-        }
-
         // Generate new tokens
-        const tokens = generateTokens(user.id, user.email, user.role!.name, (user as any)?.organizationId);
+        const tokens = generateTokens(user.id, user.email, user.role!.name);
 
         if (redisOk) {
             await storeRefreshJti(user.id, tokens.refreshTokenJti);

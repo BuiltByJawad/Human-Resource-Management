@@ -7,8 +7,6 @@ import { FaviconManager } from "@/components/ui/FaviconManager";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { AuthTransitionOverlay } from "@/components/ui/AuthTransitionOverlay";
 import { PostLoginPrefetcher } from "@/components/providers/PostLoginPrefetcher";
-import { headers } from 'next/headers'
-import { extractTenantSlug } from '@/lib/tenant'
 import { StoreHydrator } from "@/components/providers/StoreHydrator";
 import { BrandingProvider } from "@/components/providers/BrandingProvider";
 import { getServerAuthContext } from '@/lib/auth/serverAuth'
@@ -53,17 +51,8 @@ function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
 async function fetchBranding(): Promise<BrandingData> {
   const apiBase = getBackendBaseUrl()
 
-  const headerList = await headers()
-  const tenantSlug = extractTenantSlug({
-    headerSlug: headerList.get('x-tenant-slug'),
-    hostname: headerList.get('host'),
-  })
-
   try {
     const response = await fetch(`${apiBase}/api/org/branding/public`, {
-      headers: {
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
-      },
       cache: 'no-store',
     });
 
@@ -169,14 +158,15 @@ export default async function RootLayout({
               <AuthBootstrapProvider auth={auth}>
                 <div className="min-h-screen flex flex-col">
                   <div className="flex-1">{children}</div>
-                  <footer className="border-t border-slate-200 bg-white/90 px-6 py-6 text-sm text-slate-500">
-                    <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4">
-                      <span>© {footerYear} {footerSiteName}</span>
-                      <div className="flex items-center gap-4 text-slate-600">
-                        <Link href="/privacy" className="font-medium text-slate-900 hover:text-slate-700">
+                  <footer className="border-t border-slate-200/80 bg-white/80 px-6 py-4 text-xs text-slate-500 md:ml-64 md:w-[calc(100%-16rem)] md:pl-6 [.sidebar-collapsed_&]:md:ml-20 [.sidebar-collapsed_&]:md:w-[calc(100%-5rem)]">
+                    <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
+                      <span className="tracking-tight text-slate-500">© {footerYear} {footerSiteName}</span>
+                      <div className="flex items-center gap-3 text-[11px]">
+                        <Link href="/privacy" className="text-slate-400 hover:text-slate-500 transition-colors">
                           Privacy Policy
                         </Link>
-                        <Link href="/terms" className="font-medium text-slate-900 hover:text-slate-700">
+                        <span className="text-slate-300">•</span>
+                        <Link href="/terms" className="text-slate-400 hover:text-slate-500 transition-colors">
                           Terms of Service
                         </Link>
                       </div>

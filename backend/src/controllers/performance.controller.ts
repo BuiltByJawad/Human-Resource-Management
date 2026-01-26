@@ -1,16 +1,13 @@
 import { Request, Response } from 'express';
 import { prisma } from '../shared/config/database';
-import { requireRequestOrganizationId } from '../shared/utils/tenant';
 
 // --- Review Cycles ---
 
 export const createReviewCycle = async (req: Request, res: Response) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any);
         const { title, startDate, endDate } = req.body;
         const cycle = await prisma.reviewCycle.create({
             data: {
-                organizationId,
                 title,
                 startDate: new Date(startDate),
                 endDate: new Date(endDate),
@@ -26,9 +23,7 @@ export const createReviewCycle = async (req: Request, res: Response) => {
 
 export const getReviewCycles = async (req: Request, res: Response) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any);
         const cycles = await prisma.reviewCycle.findMany({
-            where: { organizationId },
             orderBy: { createdAt: 'desc' }
         });
         res.json(cycles);
@@ -41,18 +36,17 @@ export const getReviewCycles = async (req: Request, res: Response) => {
 
 export const createReview = async (req: Request, res: Response) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any);
         const { employeeId, reviewerId, cycleId, type, ratings, comments } = req.body;
         const userId = (req as any).user?.id;
 
-        const cycle = await prisma.reviewCycle.findFirst({ where: { id: cycleId, organizationId } });
+        const cycle = await prisma.reviewCycle.findFirst({ where: { id: cycleId } });
         if (!cycle) {
             return res.status(400).json({ error: 'Invalid review cycle' });
         }
 
         // Resolve Reviewer's Employee ID
         const reviewerUser = await prisma.user.findFirst({
-            where: { id: userId, organizationId },
+            where: { id: userId },
             include: { employee: true }
         });
 
@@ -65,7 +59,7 @@ export const createReview = async (req: Request, res: Response) => {
         let actualEmployeeId = actualReviewerId; // Default to self
         if (employeeId && employeeId !== userId) {
             const subjectUser = await prisma.user.findFirst({
-                where: { id: employeeId, organizationId },
+                where: { id: employeeId },
                 include: { employee: true }
             });
             if (!subjectUser?.employee) {
@@ -77,7 +71,6 @@ export const createReview = async (req: Request, res: Response) => {
         // Check if review already exists
         const existing = await prisma.performanceReview.findFirst({
             where: {
-                organizationId,
                 employeeId: actualEmployeeId,
                 reviewerId: actualReviewerId,
                 cycleId
@@ -90,7 +83,6 @@ export const createReview = async (req: Request, res: Response) => {
 
         const review = await prisma.performanceReview.create({
             data: {
-                organizationId,
                 employeeId: actualEmployeeId,
                 reviewerId: actualReviewerId,
                 cycleId,
@@ -110,18 +102,17 @@ export const createReview = async (req: Request, res: Response) => {
 
 export const getEmployeeReviews = async (req: Request, res: Response) => {
     try {
-        const organizationId = requireRequestOrganizationId(req as any);
         const { employeeId } = req.params;
 
         // Try to find employee by userId first (since frontend sends user.id)
         const employee = await prisma.employee.findFirst({
-            where: { userId: employeeId, organizationId }
+            where: { userId: employeeId }
         });
 
         const targetEmployeeId = employee ? employee.id : employeeId;
 
         const reviews = await prisma.performanceReview.findMany({
-            where: { employeeId: targetEmployeeId, organizationId },
+            where: { employeeId: targetEmployeeId },
             include: {
                 reviewer: {
                     select: { firstName: true, lastName: true }

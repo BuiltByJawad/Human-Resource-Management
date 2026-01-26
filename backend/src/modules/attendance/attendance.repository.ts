@@ -15,13 +15,10 @@ export class AttendanceRepository {
         return prisma.attendance.count({ where });
     }
 
-    async findById(id: string, organizationId: string) {
+    async findById(id: string) {
         return prisma.attendance.findFirst({
             where: {
                 id,
-                employee: {
-                    organizationId,
-                },
             },
             include: { employee: true },
         });
@@ -31,13 +28,10 @@ export class AttendanceRepository {
         return prisma.attendance.create({ data });
     }
 
-    async update(id: string, organizationId: string, data: any) {
+    async update(id: string, data: any) {
         const result = await prisma.attendance.updateMany({
             where: {
                 id,
-                employee: {
-                    organizationId,
-                },
             },
             data,
         });
@@ -49,15 +43,12 @@ export class AttendanceRepository {
         return prisma.attendance.findFirst({
             where: {
                 id,
-                employee: {
-                    organizationId,
-                },
             },
             include: { employee: true },
         });
     }
 
-    async findTodayRecord(employeeId: string, organizationId: string) {
+    async findTodayRecord(employeeId: string) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
@@ -66,9 +57,6 @@ export class AttendanceRepository {
         return prisma.attendance.findFirst({
             where: {
                 employeeId,
-                employee: {
-                    organizationId,
-                },
                 checkIn: { gte: today, lt: tomorrow },
             },
         });

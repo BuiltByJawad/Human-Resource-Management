@@ -4,14 +4,12 @@ import { asyncHandler } from '../../shared/middleware/errorHandler';
 import { offboardingService } from './offboarding.service';
 import { initiateOffboardingSchema, updateOffboardingTaskSchema } from './dto';
 import { BadRequestError, ForbiddenError } from '../../shared/utils/errors';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const initiateOffboarding = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = initiateOffboardingSchema.validate(req.body);
     if (error) throw new Error(error.details[0].message);
 
-    const organizationId = requireRequestOrganizationId(req as any);
-    const process = await offboardingService.initiateOffboarding(value, organizationId);
+    const process = await offboardingService.initiateOffboarding(value);
     res.status(201).json({ success: true, data: process });
 });
 
@@ -30,14 +28,12 @@ export const getOffboarding = asyncHandler(async (req: Request, res: Response) =
         throw new ForbiddenError('You can only view your own offboarding process');
     }
 
-    const organizationId = requireRequestOrganizationId(req as any);
-    const process = await offboardingService.getEmployeeOffboarding(employeeId, organizationId);
+    const process = await offboardingService.getEmployeeOffboarding(employeeId);
     res.json({ success: true, data: process });
 });
 
 export const getAllOffboarding = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const processes = await offboardingService.getAllProcesses(organizationId);
+    const processes = await offboardingService.getAllProcesses();
     res.json({ success: true, data: processes });
 });
 
@@ -46,12 +42,10 @@ export const updateTask = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = updateOffboardingTaskSchema.validate(req.body);
     if (error) throw new Error(error.details[0].message);
 
-    const organizationId = requireRequestOrganizationId(req as any);
-
     const updated = await offboardingService.updateTask(taskId, {
         ...value,
         completedBy: (req as any).user?.id || 'system',
-    }, organizationId);
+    });
 
     res.json({ success: true, data: updated });
 });

@@ -6,32 +6,32 @@ import { prisma } from '../../shared/config/database';
 import { notificationService } from '../notification/notification.service';
 
 export class ExpenseService {
-    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+    private async resolveEmployeeUserId(employeeId: string): Promise<string | null> {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { userId: true },
         });
         return employee?.userId ?? null;
     }
 
-    private async resolveApproverUserIds(employeeId: string, organizationId: string): Promise<string[]> {
+    private async resolveApproverUserIds(employeeId: string): Promise<string[]> {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
-            select: {
-                manager: {
-                    select: { userId: true },
-                },
-            },
+            where: { id: employeeId },
+            select: { managerId: true },
         });
 
-        const managerUserId = employee?.manager?.userId ?? null;
-        if (managerUserId) {
-            return [managerUserId];
+        if (employee?.managerId) {
+            const manager = await prisma.employee.findFirst({
+                where: { id: employee.managerId },
+                select: { userId: true },
+            });
+            if (manager?.userId) {
+                return [manager.userId];
+            }
         }
 
         const approvers = await prisma.user.findMany({
             where: {
-                organizationId,
                 status: 'active',
                 role: {
                     permissions: {
@@ -51,9 +51,9 @@ export class ExpenseService {
         return approvers.map((u) => u.id);
     }
 
-    async submitClaim(data: CreateExpenseDto, organizationId: string) {
+    async submitClaim(data: CreateExpenseDto) {
         const employee = await prisma.employee.findFirst({
-            where: { id: data.employeeId, organizationId },
+            where: { id: data.employeeId },
             select: { firstName: true, lastName: true },
         });
 
@@ -69,7 +69,7 @@ export class ExpenseService {
 
         const employeeName = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim() || 'Employee';
 
-        const approverUserIds = await this.resolveApproverUserIds(claim.employeeId, organizationId);
+        const approverUserIds = await this.resolveApproverUserIds(claim.employeeId);
         await Promise.all(
             approverUserIds.map((userId) =>
                 notificationService.create({
@@ -85,16 +85,16 @@ export class ExpenseService {
         return claim;
     }
 
-    async getMyExpenses(employeeId: string, organizationId: string) {
-        return expenseRepository.findByEmployee(employeeId, organizationId);
+    async getMyExpenses(employeeId: string) {
+        return expenseRepository.findByEmployee(employeeId);
     }
 
-    async getPendingClaims(organizationId: string) {
-        return expenseRepository.findAllPending(organizationId);
+    async getPendingClaims() {
+        return expenseRepository.findAllPending();
     }
 
-    async updateStatus(id: string, data: UpdateExpenseStatusDto, organizationId: string) {
-        const claim = await expenseRepository.findById(id, organizationId);
+    async updateStatus(id: string, data: UpdateExpenseStatusDto) {
+        const claim = await expenseRepository.findById(id);
         if (!claim) {
             throw new NotFoundError('Expense claim not found');
         }
@@ -103,13 +103,13 @@ export class ExpenseService {
             status: data.status,
             rejectionReason: data.status === 'rejected' ? data.rejectionReason : null,
             approvedBy: data.approvedBy
-        }, organizationId);
+        });
 
         if (!updated) {
             throw new NotFoundError('Expense claim not found');
         }
 
-        const employeeUserId = await this.resolveEmployeeUserId(claim.employeeId, organizationId);
+        const employeeUserId = await this.resolveEmployeeUserId(claim.employeeId);
         if (employeeUserId) {
             const titleByStatus: Record<string, string> = {
                 approved: 'Expense claim approved',

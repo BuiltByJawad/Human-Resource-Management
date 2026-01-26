@@ -1,22 +1,18 @@
 import { Request, Response } from 'express';
 import { analyticsService } from './analytics.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const metrics = await analyticsService.getDashboardMetrics(organizationId, req.query);
+    const metrics = await analyticsService.getDashboardMetrics(req.query as any);
     res.json({ success: true, data: metrics });
 });
 
 export const getDepartmentStats = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const stats = await analyticsService.getDepartmentStats(organizationId);
+    const stats = await analyticsService.getDepartmentStats();
     res.json({ success: true, data: stats });
 });
 
 export const getUpcomingEvents = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const events = await analyticsService.getUpcomingEvents(organizationId, req.query as any);
+    const events = await analyticsService.getUpcomingEvents(req.query as any);
     res.json({ success: true, data: events });
 });

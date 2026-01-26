@@ -6,19 +6,18 @@ import { prisma } from '../../shared/config/database';
 import { notificationService } from '../notification/notification.service';
 
 export class OffboardingService {
-    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+    private async resolveEmployeeUserId(employeeId: string): Promise<string | null> {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { userId: true },
         });
         return employee?.userId ?? null;
     }
 
-    private async resolveUsersByRoleNames(roleNames: string[], organizationId: string): Promise<string[]> {
+    private async resolveUsersByRoleNames(roleNames: string[]): Promise<string[]> {
         if (!roleNames.length) return [];
         const users = await prisma.user.findMany({
             where: {
-                organizationId,
                 status: 'active',
                 role: {
                     name: { in: roleNames },
@@ -30,10 +29,9 @@ export class OffboardingService {
         return users.map((u) => u.id);
     }
 
-    private async resolveUsersWithPermission(resource: string, action: string, organizationId: string): Promise<string[]> {
+    private async resolveUsersWithPermission(resource: string, action: string): Promise<string[]> {
         const users = await prisma.user.findMany({
             where: {
-                organizationId,
                 status: 'active',
                 role: {
                     permissions: {
@@ -49,11 +47,11 @@ export class OffboardingService {
         return users.map((u) => u.id);
     }
 
-    async initiateOffboarding(data: InitiateOffboardingDto, organizationId: string) {
+    async initiateOffboarding(data: InitiateOffboardingDto) {
         const { employeeId, exitDate, reason, notes } = data;
 
         const employeeInTenant = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { id: true },
         });
         if (!employeeInTenant) {
@@ -61,7 +59,7 @@ export class OffboardingService {
         }
 
         // Check if already offboarding
-        const existing = await offboardingRepository.getProcessByEmployeeId(employeeId, organizationId);
+        const existing = await offboardingRepository.getProcessByEmployeeId(employeeId);
         if (existing) {
             throw new BadRequestError('Offboarding process already initiated for this employee');
         }
@@ -94,15 +92,15 @@ export class OffboardingService {
 
         await offboardingRepository.createTasks(tasksData);
 
-        const employeeUserId = await this.resolveEmployeeUserId(employeeId, organizationId);
+        const employeeUserId = await this.resolveEmployeeUserId(employeeId);
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { firstName: true, lastName: true },
         });
         const employeeName = `${employee?.firstName ?? ''} ${employee?.lastName ?? ''}`.trim() || 'Employee';
 
-        const hrUserIds = await this.resolveUsersWithPermission('offboarding', 'manage', organizationId);
-        const itUserIds = await this.resolveUsersByRoleNames(['IT Admin', 'IT'], organizationId);
+        const hrUserIds = await this.resolveUsersWithPermission('offboarding', 'manage');
+        const itUserIds = await this.resolveUsersByRoleNames(['IT Admin', 'IT']);
 
         const uniqueRecipients = (ids: string[]) => Array.from(new Set(ids.filter(Boolean)));
 
@@ -143,30 +141,30 @@ export class OffboardingService {
             );
         }
 
-        return offboardingRepository.getProcessById(process.id, organizationId);
+        return offboardingRepository.getProcessById(process.id);
     }
 
-    async getEmployeeOffboarding(employeeId: string, organizationId: string) {
-        const process = await offboardingRepository.getProcessByEmployeeId(employeeId, organizationId);
+    async getEmployeeOffboarding(employeeId: string) {
+        const process = await offboardingRepository.getProcessByEmployeeId(employeeId);
         if (!process) {
             throw new NotFoundError('Offboarding process not found');
         }
         return process;
     }
 
-    async updateTask(taskId: string, data: UpdateOffboardingTaskDto, organizationId: string) {
+    async updateTask(taskId: string, data: UpdateOffboardingTaskDto) {
         const updatedTask = await offboardingRepository.updateTask(taskId, {
             status: data.status,
             completedAt: data.status === 'completed' ? new Date() : null,
             completedBy: data.completedBy,
-        }, organizationId);
+        });
 
         if (!updatedTask) {
             throw new NotFoundError('Offboarding task not found');
         }
 
         // Check if all tasks completed to update process status
-        const process = await offboardingRepository.getProcessById(updatedTask.processId, organizationId);
+        const process = await offboardingRepository.getProcessById(updatedTask.processId);
         if (process) {
             const tasks = (process as any).tasks || []; // Relation might not be loaded if using basic findUnique unless included
             // Actually repo getProcessById includes tasks.
@@ -180,13 +178,13 @@ export class OffboardingService {
             const allCompleted = allTasks.every((t: any) => t.status === 'completed' || t.status === 'skipped');
 
             if (allCompleted) {
-                await offboardingRepository.updateProcess(process.id, { status: 'completed' }, organizationId);
+                await offboardingRepository.updateProcess(process.id, { status: 'completed' });
             } else if (process.status === 'pending') {
-                await offboardingRepository.updateProcess(process.id, { status: 'in_progress' }, organizationId);
+                await offboardingRepository.updateProcess(process.id, { status: 'in_progress' });
             }
 
             if (data.status === 'completed') {
-                const hrUserIds = await this.resolveUsersWithPermission('offboarding', 'manage', organizationId);
+                const hrUserIds = await this.resolveUsersWithPermission('offboarding', 'manage');
                 await Promise.all(
                     Array.from(new Set(hrUserIds)).map((userId) =>
                         notificationService.create({
@@ -201,9 +199,8 @@ export class OffboardingService {
             }
 
             if (allCompleted) {
-                const fullProcess = await offboardingRepository.getProcessByEmployeeId((process as any).employeeId, organizationId);
                 const employeeId = (process as any).employeeId as string;
-                const employeeUserId = await this.resolveEmployeeUserId(employeeId, organizationId);
+                const employeeUserId = await this.resolveEmployeeUserId(employeeId);
                 if (employeeUserId) {
                     await notificationService.create({
                         userId: employeeUserId,
@@ -219,8 +216,8 @@ export class OffboardingService {
         return updatedTask;
     }
 
-    async getAllProcesses(organizationId: string) {
-        return offboardingRepository.getAllProcesses(organizationId);
+    async getAllProcesses() {
+        return offboardingRepository.getAllProcesses();
     }
 }
 

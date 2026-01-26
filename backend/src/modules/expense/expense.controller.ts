@@ -4,7 +4,6 @@ import { asyncHandler } from '../../shared/middleware/errorHandler';
 import { expenseService } from './expense.service';
 import { createExpenseSchema, updateExpenseStatusSchema } from './dto';
 import { BadRequestError, ForbiddenError } from '../../shared/utils/errors';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const submitClaim = asyncHandler(async (req: Request, res: Response) => {
     const { error, value } = createExpenseSchema.validate(req.body);
@@ -14,12 +13,10 @@ export const submitClaim = asyncHandler(async (req: Request, res: Response) => {
     const employeeId = authReq?.user?.employeeId;
     if (!employeeId) throw new BadRequestError('Employee ID required');
 
-    const organizationId = requireRequestOrganizationId(req as any);
-
     const claim = await expenseService.submitClaim({
         ...(value as any),
         employeeId,
-    }, organizationId);
+    });
     res.status(201).json({ success: true, data: claim });
 });
 
@@ -40,8 +37,7 @@ export const getMyExpenses = asyncHandler(async (req: Request, res: Response) =>
         throw new ForbiddenError('You can only view your own expense claims');
     }
 
-    const organizationId = requireRequestOrganizationId(req as any);
-    const claims = await expenseService.getMyExpenses(employeeId, organizationId);
+    const claims = await expenseService.getMyExpenses(employeeId);
     res.json({ success: true, data: claims });
 });
 
@@ -53,8 +49,7 @@ export const getPendingClaims = asyncHandler(async (req: Request, res: Response)
         throw new ForbiddenError('Missing permission: expenses.approve');
     }
 
-    const organizationId = requireRequestOrganizationId(req as any);
-    const claims = await expenseService.getPendingClaims(organizationId);
+    const claims = await expenseService.getPendingClaims();
     res.json({ success: true, data: claims });
 });
 
@@ -70,11 +65,9 @@ export const updateStatus = asyncHandler(async (req: Request, res: Response) => 
         throw new ForbiddenError('Missing permission: expenses.approve');
     }
 
-    const organizationId = requireRequestOrganizationId(req as any);
-
     const updated = await expenseService.updateStatus(claimId, {
         ...value,
         approvedBy: (req as any).user?.id
-    }, organizationId);
+    });
     res.json({ success: true, data: updated });
 });

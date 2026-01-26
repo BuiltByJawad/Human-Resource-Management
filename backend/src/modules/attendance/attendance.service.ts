@@ -5,12 +5,12 @@ import { PAGINATION } from '../../shared/constants';
 import { prisma } from '../../shared/config/database';
 
 export class AttendanceService {
-    async getAll(organizationId: string, query: AttendanceQueryDto) {
+    async getAll(query: AttendanceQueryDto) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
 
-        const where: any = { employee: { organizationId } };
+        const where: any = {};
         if (query.employeeId) where.employeeId = query.employeeId;
         if (query.startDate || query.endDate) {
             where.checkIn = {};
@@ -26,14 +26,14 @@ export class AttendanceService {
         return { records, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
     }
 
-    async checkIn(organizationId: string, employeeId: string, data: CheckInDto) {
-        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId, organizationId } });
+    async checkIn(employeeId: string, data: CheckInDto) {
+        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId } });
         if (!employeeExists) {
             throw new NotFoundError('Employee not found');
         }
 
         // Check if already checked in today
-        const todayRecord = await attendanceRepository.findTodayRecord(employeeId, organizationId);
+        const todayRecord = await attendanceRepository.findTodayRecord(employeeId);
         if (todayRecord) {
             throw new BadRequestError('Already checked in today');
         }
@@ -48,8 +48,8 @@ export class AttendanceService {
         });
     }
 
-    async checkOut(organizationId: string, employeeId: string, data: CheckOutDto) {
-        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId, organizationId } });
+    async checkOut(employeeId: string, data: CheckOutDto) {
+        const employeeExists = await prisma.employee.findFirst({ where: { id: employeeId } });
         if (!employeeExists) {
             throw new NotFoundError('Employee not found');
         }
@@ -67,7 +67,7 @@ export class AttendanceService {
         const workHours =
             (checkOutTime.getTime() - new Date(todayRecord.checkIn).getTime()) / (1000 * 60 * 60);
 
-        const updated = await attendanceRepository.update(todayRecord.id, organizationId, {
+        const updated = await attendanceRepository.update(todayRecord.id, {
             checkOut: checkOutTime,
             checkOutLatitude: data.latitude,
             checkOutLongitude: data.longitude,

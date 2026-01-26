@@ -2,21 +2,16 @@ import { prisma } from '../../shared/config/database';
 import { Prisma } from '@prisma/client';
 
 export class EmployeeRepository {
-    private buildWhereWithOrg(organizationId: string, where?: Prisma.EmployeeWhereInput) {
-        return { ...(where ?? {}), organizationId } as Prisma.EmployeeWhereInput;
-    }
-
     async findAll(params: {
         skip: number;
         take: number;
-        organizationId: string;
         where?: Prisma.EmployeeWhereInput;
         orderBy?: Prisma.EmployeeOrderByWithRelationInput;
     }) {
-        const { organizationId, where, ...rest } = params;
+        const { where, ...rest } = params;
         return prisma.employee.findMany({
             ...rest,
-            where: this.buildWhereWithOrg(organizationId, where),
+            where: { ...(where ?? {}) },
             include: {
                 department: {
                     select: { id: true, name: true },
@@ -31,13 +26,13 @@ export class EmployeeRepository {
         });
     }
 
-    async count(organizationId: string, where?: Prisma.EmployeeWhereInput) {
-        return prisma.employee.count({ where: this.buildWhereWithOrg(organizationId, where) });
+    async count(where?: Prisma.EmployeeWhereInput) {
+        return prisma.employee.count({ where: { ...(where ?? {}) } });
     }
 
-    async findById(id: string, organizationId: string) {
+    async findById(id: string) {
         return prisma.employee.findFirst({
-            where: { id, organizationId },
+            where: { id },
             include: {
                 department: true,
                 role: true,
@@ -54,22 +49,16 @@ export class EmployeeRepository {
         });
     }
 
-    async findByEmail(email: string, organizationId: string) {
+    async findByEmail(email: string) {
         return prisma.employee.findUnique({
-            where: {
-                organizationId_email: {
-                    organizationId,
-                    email,
-                },
-            },
+            where: { email },
         });
     }
 
-    async create(data: Prisma.EmployeeCreateInput, organizationId: string) {
+    async create(data: Prisma.EmployeeCreateInput) {
         return prisma.employee.create({
             data: {
-                ...(data as any),
-                organizationId,
+                ...data,
             },
             include: {
                 department: {
@@ -85,7 +74,7 @@ export class EmployeeRepository {
         });
     }
 
-    async update(id: string, data: Prisma.EmployeeUpdateInput, organizationId: string) {
+    async update(id: string, data: Prisma.EmployeeUpdateInput) {
         // Organization ownership is already validated in the service via getById,
         // so we can safely update by primary key here to allow relational updates.
         return prisma.employee.update({
@@ -105,23 +94,23 @@ export class EmployeeRepository {
         });
     }
 
-    async delete(id: string, organizationId: string) {
+    async delete(id: string) {
         const result = await prisma.employee.deleteMany({
-            where: { id, organizationId },
+            where: { id },
         });
 
         return result.count;
     }
 
-    async getEmployeeCount(organizationId: string) {
-        return prisma.employee.count({ where: { organizationId } });
+    async getEmployeeCount() {
+        return prisma.employee.count({});
     }
 
-    async deleteWithUser(employeeId: string, userId: string | null, organizationId: string) {
+    async deleteWithUser(employeeId: string, userId: string | null) {
         return prisma.$transaction(async (tx) => {
             // Delete employee first
             const deleted = await tx.employee.deleteMany({
-                where: { id: employeeId, organizationId },
+                where: { id: employeeId },
             });
 
             if (!deleted.count) {

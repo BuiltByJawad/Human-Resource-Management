@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { extractTenantSlug } from '@/lib/tenant'
 import { getBackendBaseUrl } from '@/lib/config/env'
 
 export async function POST(request: NextRequest) {
@@ -25,18 +24,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const tenantSlug = extractTenantSlug({
-      headerSlug: request.headers.get('x-tenant-slug'),
-      hostname: request.headers.get('host'),
-    })
-    
     const backendBaseUrl = getBackendBaseUrl()
 
     const response = await fetch(`${backendBaseUrl}/api/auth/refresh-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       },
       body: JSON.stringify({ refreshToken }),
     })
