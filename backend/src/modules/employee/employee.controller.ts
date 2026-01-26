@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { employeeService } from './employee.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 import { createAuditLog } from '../../shared/utils/audit';
 import { AuthRequest } from '../../shared/middleware/auth';
 
@@ -10,8 +9,7 @@ import { AuthRequest } from '../../shared/middleware/auth';
  * Get all employees with pagination and filters
  */
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const result = await employeeService.getAll(req.query, organizationId);
+    const result = await employeeService.getAll(req.query, '');
 
     res.json({
         status: 'success',
@@ -23,8 +21,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
  * Get employee by ID
  */
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const employee = await employeeService.getById(req.params.id, organizationId);
+    const employee = await employeeService.getById(req.params.id, '');
 
     res.json({
         status: 'success',
@@ -36,8 +33,7 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
  * Create new employee
  */
 export const create = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const employee = await employeeService.create(req.body, organizationId);
+    const employee = await employeeService.create(req.body, '');
 
     const authReq = req as unknown as AuthRequest;
     const actorUserId = authReq.user?.id;
@@ -71,8 +67,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
  * Update employee
  */
 export const update = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const employee = await employeeService.update(req.params.id, req.body, organizationId);
+    const employee = await employeeService.update(req.params.id, req.body, '');
 
     const authReq = req as unknown as AuthRequest;
     const actorUserId = authReq.user?.id;
@@ -101,8 +96,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
  * Delete employee
  */
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    await employeeService.delete(req.params.id, organizationId);
+    await employeeService.delete(req.params.id, '');
 
     const authReq = req as unknown as AuthRequest;
     const actorUserId = authReq.user?.id;

@@ -4,7 +4,7 @@ import { CreateLeaveRequestDto, UpdateLeaveRequestDto, LeaveQueryDto, ApproveLea
 import { PAGINATION } from '../../shared/constants';
 import { prisma } from '../../shared/config/database';
 import { notificationService } from '../notification/notification.service';
-import { LeaveType } from '@prisma/client';
+import { LeaveType, Prisma } from '@prisma/client';
 import {
     calculateBusinessDays,
     calculateLeaveBalances,
@@ -14,29 +14,26 @@ import {
 } from './utils/leavePolicyCalculator';
 
 export class LeaveService {
-    private async getLeavePolicySettings(organizationId: string): Promise<LeavePolicySettings> {
-        const org = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { settings: true },
-        });
-        return getLeavePolicySettingsFromJson(org?.settings);
+    private async getLeavePolicySettings(): Promise<LeavePolicySettings> {
+        const settings = (await prisma.companySettings.findFirst({
+            orderBy: { createdAt: 'desc' },
+        })) as { leavePolicy?: Prisma.InputJsonValue | null } | null;
+        return getLeavePolicySettingsFromJson(settings?.leavePolicy);
     }
 
     private async assertNoOverlappingLeave(params: {
         employeeId: string;
-        organizationId: string;
         startDate: Date;
         endDate: Date;
         excludeLeaveRequestId?: string;
     }): Promise<void> {
-        const { employeeId, organizationId, startDate, endDate, excludeLeaveRequestId } = params;
+        const { employeeId, startDate, endDate, excludeLeaveRequestId } = params;
 
         const overlap = await prisma.leaveRequest.findFirst({
             where: {
                 employeeId,
                 status: { in: ['pending', 'approved'] },
                 ...(excludeLeaveRequestId ? { id: { not: excludeLeaveRequestId } } : {}),
-                employee: { organizationId },
                 AND: [
                     { startDate: { lte: endDate } },
                     { endDate: { gte: startDate } },
@@ -53,12 +50,11 @@ export class LeaveService {
     private async isApproverAllowed(params: {
         employeeId: string;
         approverEmployeeId: string;
-        organizationId: string;
     }): Promise<boolean> {
-        const { employeeId, approverEmployeeId, organizationId } = params;
+        const { employeeId, approverEmployeeId } = params;
 
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { managerId: true },
         });
 
@@ -69,7 +65,7 @@ export class LeaveService {
 
         // Fallback: any employee whose linked user has leave approval permission
         const approver = await prisma.employee.findFirst({
-            where: { id: approverEmployeeId, organizationId },
+            where: { id: approverEmployeeId },
             select: {
                 id: true,
                 user: {
@@ -97,7 +93,7 @@ export class LeaveService {
         return permissions.includes('leave_requests.approve');
     }
 
-    private async getLeaveUsage(employeeId: string, organizationId: string, asOf: Date): Promise<LeaveUsageSummary> {
+    private async getLeaveUsage(employeeId: string, asOf: Date): Promise<LeaveUsageSummary> {
         const year = asOf.getFullYear();
         const startOfYear = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
         const endOfYear = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
@@ -113,7 +109,6 @@ export class LeaveService {
                     employeeId,
                     status: 'approved',
                     startDate: { gte: startOfYear, lte: endOfYear },
-                    employee: { organizationId },
                 },
                 _sum: { daysRequested: true },
             }),
@@ -123,7 +118,6 @@ export class LeaveService {
                     employeeId,
                     status: 'approved',
                     startDate: { gte: prevStart, lte: prevEnd },
-                    employee: { organizationId },
                 },
                 _sum: { daysRequested: true },
             }),
@@ -147,9 +141,9 @@ export class LeaveService {
         };
     }
 
-    private async resolveApproverUserIds(employeeId: string, organizationId: string): Promise<string[]> {
+    private async resolveApproverUserIds(employeeId: string): Promise<string[]> {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: {
                 managerId: true,
                 manager: {
@@ -167,7 +161,6 @@ export class LeaveService {
 
         const approvers = await prisma.user.findMany({
             where: {
-                organizationId,
                 status: 'active',
                 role: {
                     permissions: {
@@ -187,9 +180,9 @@ export class LeaveService {
         return approvers.map((u) => u.id);
     }
 
-    private async resolveEmployeeUserId(employeeId: string, organizationId: string): Promise<string | null> {
+    private async resolveEmployeeUserId(employeeId: string): Promise<string | null> {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { userId: true },
         });
         return employee?.userId ?? null;
@@ -198,7 +191,7 @@ export class LeaveService {
     /**
      * Get all leave requests with pagination and filters
      */
-    async getAll(query: LeaveQueryDto, organizationId: string) {
+    async getAll(query: LeaveQueryDto) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
@@ -239,8 +232,8 @@ export class LeaveService {
         }
 
         const [leaveRequests, total] = await Promise.all([
-            leaveRepository.findAll({ where, skip, take: limit }, organizationId),
-            leaveRepository.count(where, organizationId),
+            leaveRepository.findAll({ where, skip, take: limit }),
+            leaveRepository.count(where),
         ]);
 
         return {
@@ -257,8 +250,8 @@ export class LeaveService {
     /**
      * Get leave request by ID
      */
-    async getById(id: string, organizationId: string) {
-        const leaveRequest = await leaveRepository.findById(id, organizationId);
+    async getById(id: string) {
+        const leaveRequest = await leaveRepository.findById(id);
 
         if (!leaveRequest) {
             throw new NotFoundError('Leave request not found');
@@ -270,7 +263,7 @@ export class LeaveService {
     /**
      * Create new leave request
      */
-    async create(employeeId: string, data: CreateLeaveRequestDto, organizationId: string) {
+    async create(employeeId: string, data: CreateLeaveRequestDto) {
         const startDate = new Date(data.startDate);
         const endDate = new Date(data.endDate);
 
@@ -279,7 +272,7 @@ export class LeaveService {
             throw new BadRequestError('Start date must be before end date');
         }
 
-        const settings = await this.getLeavePolicySettings(organizationId);
+        const settings = await this.getLeavePolicySettings();
         const holidays = settings.calendar?.holidays ? new Set(settings.calendar.holidays) : undefined;
 
         // Calculate days requested
@@ -287,7 +280,6 @@ export class LeaveService {
 
         await this.assertNoOverlappingLeave({
             employeeId,
-            organizationId,
             startDate,
             endDate,
         });
@@ -295,11 +287,11 @@ export class LeaveService {
         const leaveType = (data.leaveType as LeaveType | string) as LeaveType;
         if (leaveType !== LeaveType.unpaid) {
             const employeeForProration = await prisma.employee.findFirst({
-                where: { id: employeeId, organizationId },
+                where: { id: employeeId },
                 select: { hireDate: true },
             });
             const [usage] = await Promise.all([
-                this.getLeaveUsage(employeeId, organizationId, startDate),
+                this.getLeaveUsage(employeeId, startDate),
             ]);
             const balances = calculateLeaveBalances({
                 asOf: startDate,
@@ -320,7 +312,7 @@ export class LeaveService {
         // }
 
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { id: true },
         });
         if (!employee) {
@@ -340,7 +332,7 @@ export class LeaveService {
             },
         });
 
-        const approverUserIds = await this.resolveApproverUserIds(employeeId, organizationId);
+        const approverUserIds = await this.resolveApproverUserIds(employeeId);
         const employeeName = `${leaveRequest.employee.firstName} ${leaveRequest.employee.lastName}`.trim();
         await Promise.all(
             approverUserIds.map((userId) =>
@@ -360,8 +352,8 @@ export class LeaveService {
     /**
      * Update leave request (only if pending)
      */
-    async update(id: string, data: UpdateLeaveRequestDto, organizationId: string) {
-        const leaveRequest = await this.getById(id, organizationId);
+    async update(id: string, data: UpdateLeaveRequestDto) {
+        const leaveRequest = await this.getById(id);
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Cannot update leave request that has been processed');
@@ -384,13 +376,12 @@ export class LeaveService {
             if (data.startDate) updateData.startDate = startDate;
             if (data.endDate) updateData.endDate = endDate;
 
-            const settings = await this.getLeavePolicySettings(organizationId);
+            const settings = await this.getLeavePolicySettings();
             const holidays = settings.calendar?.holidays ? new Set(settings.calendar.holidays) : undefined;
             updateData.daysRequested = calculateBusinessDays(startDate, endDate, holidays);
 
             await this.assertNoOverlappingLeave({
                 employeeId: leaveRequest.employeeId,
-                organizationId,
                 startDate,
                 endDate,
                 excludeLeaveRequestId: leaveRequest.id,
@@ -399,10 +390,10 @@ export class LeaveService {
             const nextLeaveType = ((data.leaveType ?? leaveRequest.leaveType) as unknown) as LeaveType;
             if (nextLeaveType !== LeaveType.unpaid) {
                 const employeeForProration = await prisma.employee.findFirst({
-                    where: { id: leaveRequest.employeeId, organizationId },
+                    where: { id: leaveRequest.employeeId },
                     select: { hireDate: true },
                 });
-                const usage = await this.getLeaveUsage(leaveRequest.employeeId, organizationId, startDate);
+                const usage = await this.getLeaveUsage(leaveRequest.employeeId, startDate);
                 const balances = calculateLeaveBalances({
                     asOf: startDate,
                     settings,
@@ -416,7 +407,7 @@ export class LeaveService {
             }
         }
 
-        const updated = await leaveRepository.update(id, updateData, organizationId);
+        const updated = await leaveRepository.update(id, updateData);
         if (!updated) {
             throw new NotFoundError('Leave request not found');
         }
@@ -426,8 +417,8 @@ export class LeaveService {
     /**
      * Approve leave request
      */
-    async approve(id: string, approverId: string, data: ApproveLeaveDto | undefined, organizationId: string) {
-        const leaveRequest = await this.getById(id, organizationId);
+    async approve(id: string, approverId: string, data: ApproveLeaveDto | undefined) {
+        const leaveRequest = await this.getById(id);
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Leave request has already been processed');
@@ -436,7 +427,6 @@ export class LeaveService {
         const isAllowed = await this.isApproverAllowed({
             employeeId: leaveRequest.employeeId,
             approverEmployeeId: approverId,
-            organizationId,
         });
         if (!isAllowed) {
             throw new BadRequestError('You are not allowed to approve this leave request');
@@ -447,14 +437,13 @@ export class LeaveService {
             approver: {
                 connect: { id: approverId },
             },
-
-        }, organizationId);
+        });
 
         if (!updated) {
             throw new NotFoundError('Leave request not found');
         }
 
-        const employeeUserId = await this.resolveEmployeeUserId(updated.employeeId, organizationId);
+        const employeeUserId = await this.resolveEmployeeUserId(updated.employeeId);
         if (employeeUserId) {
             await notificationService.create({
                 userId: employeeUserId,
@@ -472,8 +461,8 @@ export class LeaveService {
     /**
      * Reject leave request
      */
-    async reject(id: string, approverId: string, data: RejectLeaveDto, organizationId: string) {
-        const leaveRequest = await this.getById(id, organizationId);
+    async reject(id: string, approverId: string, data: RejectLeaveDto) {
+        const leaveRequest = await this.getById(id);
 
         if (leaveRequest.status !== 'pending') {
             throw new BadRequestError('Leave request has already been processed');
@@ -482,7 +471,6 @@ export class LeaveService {
         const isAllowed = await this.isApproverAllowed({
             employeeId: leaveRequest.employeeId,
             approverEmployeeId: approverId,
-            organizationId,
         });
         if (!isAllowed) {
             throw new BadRequestError('You are not allowed to reject this leave request');
@@ -493,14 +481,14 @@ export class LeaveService {
             approver: {
                 connect: { id: approverId },
             },
-
-        }, organizationId);
+        });
 
         if (!updated) {
             throw new NotFoundError('Leave request not found');
         }
 
-        const employeeUserId = await this.resolveEmployeeUserId(updated.employeeId, organizationId);
+        const employeeUserId = await this.resolveEmployeeUserId(updated.employeeId);
+
         if (employeeUserId) {
             await notificationService.create({
                 userId: employeeUserId,
@@ -517,8 +505,8 @@ export class LeaveService {
     /**
      * Cancel leave request
      */
-    async cancel(id: string, employeeId: string, organizationId: string) {
-        const leaveRequest = await this.getById(id, organizationId);
+    async cancel(id: string, employeeId: string) {
+        const leaveRequest = await this.getById(id);
 
         // Verify ownership
         if (leaveRequest.employeeId !== employeeId) {
@@ -539,7 +527,7 @@ export class LeaveService {
 
         const cancelled = await leaveRepository.update(id, {
             status: 'cancelled' as any,
-        }, organizationId);
+        });
 
         if (!cancelled) {
             throw new NotFoundError('Leave request not found');
@@ -550,9 +538,9 @@ export class LeaveService {
     /**
      * Get leave balance for employee (simplified)
      */
-    async getLeaveBalance(employeeId: string, organizationId: string, leaveType?: string) {
+    async getLeaveBalance(employeeId: string, leaveType?: string) {
         const employee = await prisma.employee.findFirst({
-            where: { id: employeeId, organizationId },
+            where: { id: employeeId },
             select: { id: true, hireDate: true },
         });
         if (!employee) {
@@ -560,8 +548,8 @@ export class LeaveService {
         }
 
         const asOf = new Date();
-        const settings = await this.getLeavePolicySettings(organizationId);
-        const usage = await this.getLeaveUsage(employeeId, organizationId, asOf);
+        const settings = await this.getLeavePolicySettings();
+        const usage = await this.getLeaveUsage(employeeId, asOf);
         const balances = calculateLeaveBalances({
             asOf,
             settings,

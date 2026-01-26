@@ -110,6 +110,9 @@ export const orgSettingsSchema = Joi.object({
   tagline: Joi.string().max(150).allow('', null),
   companyName: Joi.string().max(150).allow('', null),
   companyAddress: Joi.string().max(300).allow('', null),
+  footerYear: Joi.number().integer().min(1970).max(9999).allow(null),
+  privacyPolicyText: Joi.string().allow('', null),
+  termsOfServiceText: Joi.string().allow('', null),
 
   loginHeroTitle: Joi.string().max(120).allow('', null),
   loginHeroSubtitle: Joi.string().max(200).allow('', null),

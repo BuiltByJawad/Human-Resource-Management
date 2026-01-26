@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBackendBaseUrl } from '@/lib/config/env'
-import { extractTenantSlug } from '@/lib/tenant'
 
 export async function GET(request: NextRequest) {
-  const tenantSlug = extractTenantSlug({
-    headerSlug: request.headers.get('x-tenant-slug'),
-    hostname: request.headers.get('host'),
-  })
-
   const accessTokenFromCookie = request.cookies.get('accessToken')?.value
   const authHeader = request.headers.get('authorization')
   const accessTokenFromHeader = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : undefined
@@ -18,7 +12,6 @@ export async function GET(request: NextRequest) {
   const res = await fetch(`${backendBaseUrl}/api/notifications`, {
     method: 'GET',
     headers: {
-      ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       'Cache-Control': 'no-store',
       Pragma: 'no-cache',

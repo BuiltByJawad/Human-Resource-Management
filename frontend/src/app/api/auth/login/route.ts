@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { extractTenantSlug } from '@/lib/tenant'
 import { getBackendBaseUrl } from '@/lib/config/env'
 
 const parseJsonSafely = (text: string): unknown | null => {
@@ -43,11 +42,6 @@ export async function POST(request: NextRequest) {
     const { email, password, rememberMe } = await request.json()
     const shouldRemember = rememberMe === true
 
-    const tenantSlug = extractTenantSlug({
-      headerSlug: request.headers.get('x-tenant-slug'),
-      hostname: request.headers.get('host'),
-    })
-    
     const backendBaseUrl = getBackendBaseUrl()
 
     let response: Response
@@ -56,7 +50,6 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
         },
         body: JSON.stringify({ email, password }),
       })

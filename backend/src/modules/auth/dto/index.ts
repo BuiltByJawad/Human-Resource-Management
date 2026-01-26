@@ -1,7 +1,6 @@
 export interface LoginDto {
     email: string;
     password: string;
-    organizationId?: string;
 }
 
 export interface RegisterDto {
@@ -9,7 +8,6 @@ export interface RegisterDto {
     password: string;
     firstName: string;
     lastName: string;
-    organizationId?: string;
 }
 
 export interface InviteUserDto {

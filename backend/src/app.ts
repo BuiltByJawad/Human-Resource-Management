@@ -10,7 +10,8 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { errorHandler } from '@/shared/middleware/errorHandler';
 import { logger, stream } from '@/shared/config/logger';
-import { rateLimiter } from '@/shared/middleware/security';
+import { enforceHttps, rateLimiter } from '@/shared/middleware/security';
+import { requestIdMiddleware } from '@/shared/middleware/requestId';
 import routes from './routes';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from '@/shared/config/swagger';
@@ -40,7 +41,6 @@ export const createApp = (): { app: Application; httpServer: any } => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
         userId?: string;
-        organizationId?: string | null;
       };
 
       if (!decoded?.userId) {
@@ -52,17 +52,7 @@ export const createApp = (): { app: Application; httpServer: any } => {
         return next(new Error('Unauthorized'));
       }
 
-      const tokenOrgId = decoded.organizationId ?? null;
-      const userOrgId = (user as any)?.organizationId ?? null;
-      if (userOrgId && tokenOrgId !== userOrgId) {
-        return next(new Error('Unauthorized'));
-      }
-      if (!userOrgId && tokenOrgId) {
-        return next(new Error('Unauthorized'));
-      }
-
       socket.data.userId = user.id;
-      socket.data.organizationId = userOrgId;
       return next();
     } catch {
       return next(new Error('Unauthorized'));
@@ -80,11 +70,21 @@ export const createApp = (): { app: Application; httpServer: any } => {
   app.set('trust proxy', 1);
   app.set('io', io);
 
+  app.use(requestIdMiddleware);
+
   // Security Middleware
   app.use(
     helmet({
-      // Avoid breaking Swagger UI and other embedded resources.
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
+          fontSrc: ["'self'", 'data:'],
+        },
+      },
     })
   );
   app.use(rateLimiter);
@@ -101,10 +101,11 @@ export const createApp = (): { app: Application; httpServer: any } => {
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Tenant-Slug'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   };
 
   app.use(cors(corsOptions));
+  app.use(enforceHttps);
 
   // Handle preflight requests using the SAME config
   app.options('*', cors(corsOptions));

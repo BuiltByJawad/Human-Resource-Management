@@ -4,8 +4,8 @@ import { UpdateProfileDto, UploadDocumentDto, EmergencyContactDto, DirectoryQuer
 import { PAGINATION } from '../../shared/constants';
 
 export class PortalService {
-    async getProfile(userId: string, organizationId: string) {
-        const employee = await portalRepository.getEmployeeProfile(userId, organizationId);
+    async getProfile(userId: string) {
+        const employee = await portalRepository.getEmployeeProfile(userId);
 
         if (!employee) {
             throw new NotFoundError('Employee profile not found');
@@ -14,8 +14,8 @@ export class PortalService {
         return employee;
     }
 
-    async updateProfile(userId: string, organizationId: string, data: UpdateProfileDto) {
-        const employee = await this.getProfile(userId, organizationId);
+    async updateProfile(userId: string, data: UpdateProfileDto) {
+        const employee = await this.getProfile(userId);
 
         const updateData: any = {};
         if (data.firstName) updateData.firstName = data.firstName;
@@ -27,26 +27,26 @@ export class PortalService {
         if (data.state) updateData.state = data.state;
         if (data.zipCode) updateData.zipCode = data.zipCode;
 
-        return portalRepository.updateProfile(employee.id, organizationId, updateData);
+        return portalRepository.updateProfile(employee.id, updateData);
     }
 
-    async getPaystubs(userId: string, organizationId: string) {
-        const employee = await this.getProfile(userId, organizationId);
-        return portalRepository.getPaystubs(employee.id, organizationId);
+    async getPaystubs(userId: string) {
+        const employee = await this.getProfile(userId);
+        return portalRepository.getPaystubs(employee.id);
     }
 
-    async getTimeOffRequests(userId: string, organizationId: string) {
-        const employee = await this.getProfile(userId, organizationId);
-        return portalRepository.getTimeOffRequests(employee.id, organizationId);
+    async getTimeOffRequests(userId: string) {
+        const employee = await this.getProfile(userId);
+        return portalRepository.getTimeOffRequests(employee.id);
     }
 
-    async getDocuments(userId: string, organizationId: string) {
-        const employee = await this.getProfile(userId, organizationId);
+    async getDocuments(userId: string) {
+        const employee = await this.getProfile(userId);
         return portalRepository.getDocuments(employee.id);
     }
 
-    async uploadDocument(userId: string, organizationId: string, data: UploadDocumentDto) {
-        const employee = await this.getProfile(userId, organizationId);
+    async uploadDocument(userId: string, data: UploadDocumentDto) {
+        const employee = await this.getProfile(userId);
 
         return portalRepository.uploadDocument(employee.id, {
             type: data.type,
@@ -55,13 +55,13 @@ export class PortalService {
         });
     }
 
-    async getEmergencyContacts(userId: string, organizationId: string) {
-        const employee = await this.getProfile(userId, organizationId);
+    async getEmergencyContacts(userId: string) {
+        const employee = await this.getProfile(userId);
         return portalRepository.getEmergencyContacts(employee.id);
     }
 
-    async addEmergencyContact(userId: string, organizationId: string, data: EmergencyContactDto) {
-        const employee = await this.getProfile(userId, organizationId);
+    async addEmergencyContact(userId: string, data: EmergencyContactDto) {
+        const employee = await this.getProfile(userId);
 
         // If this is primary, unset others
         if (data.isPrimary) {
@@ -76,8 +76,8 @@ export class PortalService {
         return portalRepository.addEmergencyContact(employee.id, data);
     }
 
-    async updateEmergencyContact(contactId: string, userId: string, organizationId: string, data: Partial<EmergencyContactDto>) {
-        const employee = await this.getProfile(userId, organizationId);
+    async updateEmergencyContact(contactId: string, userId: string, data: Partial<EmergencyContactDto>) {
+        const employee = await this.getProfile(userId);
 
         // Verify contact belongs to this employee
         const contacts = await portalRepository.getEmergencyContacts(employee.id) as any[];
@@ -99,8 +99,8 @@ export class PortalService {
         return portalRepository.updateEmergencyContact(contactId, data);
     }
 
-    async deleteEmergencyContact(contactId: string, userId: string, organizationId: string) {
-        const employee = await this.getProfile(userId, organizationId);
+    async deleteEmergencyContact(contactId: string, userId: string) {
+        const employee = await this.getProfile(userId);
 
         // Verify contact belongs to this employee
         const contacts = await portalRepository.getEmergencyContacts(employee.id) as any[];
@@ -113,7 +113,7 @@ export class PortalService {
         await portalRepository.deleteEmergencyContact(contactId);
     }
 
-    async getDirectory(query: DirectoryQueryDto, organizationId: string) {
+    async getDirectory(query: DirectoryQueryDto) {
         const page = query.page || PAGINATION.DEFAULT_PAGE;
         const limit = Math.min(query.limit || PAGINATION.DEFAULT_LIMIT, PAGINATION.MAX_LIMIT);
         const skip = (page - 1) * limit;
@@ -133,8 +133,8 @@ export class PortalService {
         }
 
         const [employees, total] = await Promise.all([
-            portalRepository.getDirectory({ where, skip, take: limit }, organizationId),
-            portalRepository.countDirectory(where, organizationId),
+            portalRepository.getDirectory({ where, skip, take: limit }),
+            portalRepository.countDirectory(where),
         ]);
 
         return {

@@ -78,6 +78,7 @@ const logRequest = (req: Request, res: Response, next: Function) => {
     body: req.body,
     query: req.query,
     params: req.params,
+    requestId: (req as Request & { requestId?: string }).requestId,
   });
   next();
 };

@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 
@@ -40,10 +39,9 @@ export function useDisplayUser() {
 
   const cachedUser = useMemo(() => {
     if (typeof window === 'undefined') return null
-    const tenantKey = buildTenantStorageKey('auth-storage', getClientTenantSlug())
-    const local = parseCachedUser(window.localStorage.getItem(tenantKey))
+    const local = parseCachedUser(window.localStorage.getItem('auth-storage'))
     if (local) return local
-    const session = parseCachedUser(window.sessionStorage.getItem(tenantKey))
+    const session = parseCachedUser(window.sessionStorage.getItem('auth-storage'))
     if (session) return session
     return parseCachedUser(window.localStorage.getItem('auth-storage'))
   }, [])

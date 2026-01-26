@@ -42,7 +42,7 @@ export const comparePassword = async (
   return bcrypt.compare(password, hashedPassword)
 }
 
-export const generateTokens = (userId: string, email: string, role: string, organizationId?: string | null): GeneratedTokens => {
+export const generateTokens = (userId: string, email: string, role: string): GeneratedTokens => {
   const accessExpirationMinutes =
     typeof config.jwt.accessExpirationMinutes === 'number' && Number.isFinite(config.jwt.accessExpirationMinutes)
       ? config.jwt.accessExpirationMinutes
@@ -55,13 +55,13 @@ export const generateTokens = (userId: string, email: string, role: string, orga
   const refreshTokenJti = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex')
 
   const accessToken = jwt.sign(
-    { userId, email, role, organizationId: organizationId || undefined },
+    { userId, email, role },
     process.env.JWT_SECRET!,
     { expiresIn: `${accessExpirationMinutes}m` }
   )
   
   const refreshToken = jwt.sign(
-    { userId, organizationId: organizationId || undefined, jti: refreshTokenJti },
+    { userId, jti: refreshTokenJti },
     process.env.JWT_REFRESH_SECRET!,
     { expiresIn: `${refreshExpirationDays}d` }
   )

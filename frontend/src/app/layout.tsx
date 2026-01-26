@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { FaviconManager } from "@/components/ui/FaviconManager";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { AuthTransitionOverlay } from "@/components/ui/AuthTransitionOverlay";
 import { PostLoginPrefetcher } from "@/components/providers/PostLoginPrefetcher";
-import { headers } from 'next/headers'
-import { extractTenantSlug } from '@/lib/tenant'
 import { StoreHydrator } from "@/components/providers/StoreHydrator";
 import { BrandingProvider } from "@/components/providers/BrandingProvider";
 import { getServerAuthContext } from '@/lib/auth/serverAuth'
@@ -35,6 +34,7 @@ interface BrandingData {
   tagline: string;
   logoUrl: string | null;
   faviconUrl: string | null;
+  footerYear?: number | null;
 }
 
 function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
@@ -51,17 +51,8 @@ function normalizeAssetUrl(url: unknown, apiBase: string): string | null {
 async function fetchBranding(): Promise<BrandingData> {
   const apiBase = getBackendBaseUrl()
 
-  const headerList = await headers()
-  const tenantSlug = extractTenantSlug({
-    headerSlug: headerList.get('x-tenant-slug'),
-    hostname: headerList.get('host'),
-  })
-
   try {
     const response = await fetch(`${apiBase}/api/org/branding/public`, {
-      headers: {
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
-      },
       cache: 'no-store',
     });
 
@@ -83,10 +74,11 @@ async function fetchBranding(): Promise<BrandingData> {
 
     return {
       siteName: data?.siteName || "",
-      shortName: data?.shortName || "HR",
+      shortName: "HR",
       tagline: data?.tagline || "",
       logoUrl: normalizeAssetUrl(rawLogoUrl, apiBase),
       faviconUrl: normalizeAssetUrl(rawFaviconUrl, apiBase),
+      footerYear: typeof data?.footerYear === 'number' ? data.footerYear : null,
     };
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
@@ -98,6 +90,7 @@ async function fetchBranding(): Promise<BrandingData> {
       tagline: "",
       logoUrl: null,
       faviconUrl: null,
+      footerYear: null,
     };
   }
 }
@@ -131,6 +124,8 @@ export default async function RootLayout({
   const branding = await fetchBranding();
   const auth = await getServerAuthContext();
   const faviconHref = branding.faviconUrl ?? DEFAULT_FAVICON;
+  const footerYear = branding.footerYear || new Date().getFullYear();
+  const footerSiteName = branding.siteName || DEFAULT_TITLE;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -161,8 +156,22 @@ export default async function RootLayout({
             <FaviconManager />
             <ToastProvider>
               <AuthBootstrapProvider auth={auth}>
-                <div className="min-h-screen">
-                  {children}
+                <div className="min-h-screen flex flex-col">
+                  <div className="flex-1">{children}</div>
+                  <footer className="border-t border-slate-200/80 bg-white/80 px-6 py-4 text-xs text-slate-500 md:ml-64 md:w-[calc(100%-16rem)] md:pl-6 [.sidebar-collapsed_&]:md:ml-20 [.sidebar-collapsed_&]:md:w-[calc(100%-5rem)]">
+                    <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
+                      <span className="tracking-tight text-slate-500">© {footerYear} {footerSiteName}</span>
+                      <div className="flex items-center gap-3 text-[11px]">
+                        <Link href="/privacy" className="text-slate-400 hover:text-slate-500 transition-colors">
+                          Privacy Policy
+                        </Link>
+                        <span className="text-slate-300">•</span>
+                        <Link href="/terms" className="text-slate-400 hover:text-slate-500 transition-colors">
+                          Terms of Service
+                        </Link>
+                      </div>
+                    </div>
+                  </footer>
                   <PostLoginPrefetcher />
                   <AuthTransitionOverlay />
                 </div>

@@ -114,7 +114,6 @@ model User {
   firstName    String?
   lastName     String?
   avatarUrl    String?
-  organizationId String?
   roleId       String
   departmentId String?
   status       UserStatus @default(active)
@@ -123,7 +122,6 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  organization            Organization?         @relation(fields: [organizationId], references: [id])
   role                    Role                 @relation(fields: [roleId], references: [id])
   department              Department?          @relation(fields: [departmentId], references: [id])
   auditLogs               AuditLog[]
@@ -140,7 +138,6 @@ model User {
   scheduledReportRecipients ScheduledReportRecipient[]
 
   @@index([email])
-  @@index([organizationId])
   @@index([roleId])
   @@index([departmentId])
 }
@@ -184,13 +181,17 @@ model RolePermission {
 
 model CompanySettings {
   id               String   @id @default(uuid())
-  organizationId   String?
   siteName         String   @default("NovaHR")
   tagline          String   @default("Workspace")
   companyName      String   @default("NovaHR Company")
   companyAddress   String   @default("123 Business Road, Tech City")
   logoUrl          String?
   faviconUrl       String?
+  footerYear       Int?
+  privacyPolicyText String? @db.Text
+  termsOfServiceText String? @db.Text
+  leavePolicy      Json?
+  payrollConfig    Json?
   loginHeroTitle   String?  @default("Empower your people")
   loginHeroSubtitle String? @default("A modern HR workspace your teams will love")
   loginAccentColor String?  @default("#2563eb")
@@ -201,10 +202,6 @@ model CompanySettings {
   maxClockInRadius Int      @default(200)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
-  organization     Organization? @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId])
 }
 
 model UserInvite {
@@ -257,11 +254,9 @@ model Department {
   description        String?
   managerId          String?
   parentDepartmentId String?
-  organizationId     String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  organization     Organization? @relation(fields: [organizationId], references: [id])
   manager          Employee?    @relation("DepartmentManager", fields: [managerId], references: [id])
   parentDepartment Department?  @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
   subDepartments   Department[] @relation("DepartmentHierarchy")
@@ -271,8 +266,7 @@ model Department {
 
   @@index([managerId])
   @@index([parentDepartmentId])
-  @@index([organizationId])
-  @@unique([organizationId, name], name: "organizationId_name")
+  @@unique([name])
 }
 
 // --- Existing Modules (Updated relations) ---
@@ -290,7 +284,6 @@ model Employee {
   gender           Gender?
   maritalStatus    MaritalStatus?
   emergencyContact Json? // { name: string, relationship: string, phone: string }
-  organizationId   String?
   departmentId     String?
   roleId           String? // Optional: Can inherit from User or be specific
   managerId        String?
@@ -300,7 +293,6 @@ model Employee {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  organization        Organization?        @relation(fields: [organizationId], references: [id])
   user                 User?               @relation(fields: [userId], references: [id])
   department           Department?         @relation(fields: [departmentId], references: [id])
   role                 Role?               @relation(fields: [roleId], references: [id])
@@ -330,12 +322,11 @@ model Employee {
   training             EmployeeTraining[]
   goals                PerformanceGoal[]
 
-  @@index([organizationId])
   @@index([departmentId])
   @@index([managerId])
   @@index([userId])
-  @@unique([organizationId, email], name: "organizationId_email")
-  @@unique([organizationId, employeeNumber], name: "organizationId_employeeNumber")
+  @@unique([email])
+  @@unique([employeeNumber])
 }
 
 //--- removed duplicate onboarding definitions (canonical models defined above) ---
@@ -425,7 +416,6 @@ model PayrollOverride {
 
 model ScheduledReport {
   id             String                 @id @default(uuid())
-  organizationId String
   name           String
   type           ReportType
   format         ReportFormat
@@ -438,12 +428,10 @@ model ScheduledReport {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy    User         @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
   recipients   ScheduledReportRecipient[]
   runs         ScheduledReportRun[]
 
-  @@index([organizationId])
   @@index([isEnabled])
   @@index([nextRunAt])
 }
@@ -475,27 +463,6 @@ model ScheduledReportRun {
 
   @@index([scheduledReportId])
   @@index([status])
-}
-
-model Organization {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String?  @unique
-  description String?
-  settings    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  users          User[]
-  scheduledReports ScheduledReport[]
-  companySettings CompanySettings?
-  departments    Department[]
-  employees      Employee[]
-  companyDocuments CompanyDocument[]
-  complianceRules ComplianceRule[]
-  assets          Asset[]
-  reviewCycles    ReviewCycle[]
-  performanceReviews PerformanceReview[]
 }
 
 // Employee Portal Models
@@ -547,15 +514,11 @@ model ComplianceRule {
   type        String // e.g., "max_hours_per_week", "min_rest_period"
   threshold   Int // e.g., 48 (hours), 11 (hours)
   isActive    Boolean  @default(true)
-  organizationId String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   logs ComplianceLog[]
-  organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@index([organizationId])
-  @@unique([organizationId, name], name: "organizationId_name")
+  @@unique([name])
 }
 
 model ComplianceLog {
@@ -630,28 +593,22 @@ model Applicant {
 }
 
 model Asset {
-  id            String    @id @default(uuid())
-  name          String
-  description   String?
-  serialNumber  String
-  type          String // Laptop, Monitor, License, etc.
-  status        String    @default("available") // available, assigned, maintenance, retired
-  purchaseDate  DateTime
+  id           String   @id @default(uuid())
+  name         String
+  serialNumber String
+  category     String
+  status       String
+  purchaseDate DateTime?
   purchasePrice Decimal?  @db.Decimal(10, 2)
   vendor        String?
   warrantyEnd   DateTime?
-  organizationId String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   assignments AssetAssignment[]
   maintenance MaintenanceLog[]
-
-  organization Organization @relation(fields: [organizationId], references: [id])
-
-  @@index([organizationId])
-  @@unique([organizationId, serialNumber], name: "organizationId_serialNumber")
+  @@unique([serialNumber])
 }
 
 model AssetAssignment {
@@ -686,22 +643,17 @@ model MaintenanceLog {
 model ReviewCycle {
   id        String   @id @default(uuid())
   title     String // e.g., "Q1 2024 Performance Review"
-  organizationId String
   startDate DateTime
   endDate   DateTime
   status    String   @default("active") // active, closed, archived
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
   reviews PerformanceReview[]
-
-  @@index([organizationId])
 }
 
 model PerformanceReview {
   id         String       @id @default(uuid())
-  organizationId String
   employeeId String
   reviewerId String
   cycleId    String
@@ -712,12 +664,10 @@ model PerformanceReview {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
   employee Employee    @relation(fields: [employeeId], references: [id])
   reviewer Employee    @relation("PerformanceReviewer", fields: [reviewerId], references: [id])
   cycle    ReviewCycle @relation(fields: [cycleId], references: [id])
 
-  @@index([organizationId])
   @@index([employeeId])
   @@index([reviewerId])
   @@index([cycleId])
@@ -900,13 +850,8 @@ model CompanyDocument {
   type        String // "PDF", "DOCX", etc.
   isVisible   Boolean  @default(true)
   uploadedBy  String // Admin User ID
-  organizationId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  organization Organization? @relation(fields: [organizationId], references: [id])
-
-  @@index([organizationId])
 }
 
 model TrainingCourse {

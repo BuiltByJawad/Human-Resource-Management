@@ -54,6 +54,10 @@ DAILY_RETENTION=30    # Keep 30 days
 WEEKLY_RETENTION=12   # Keep 12 weeks
 MONTHLY_RETENTION=12  # Keep 12 months
 
+# Encryption settings
+BACKUP_ENCRYPTION_ENABLED="${BACKUP_ENCRYPTION_ENABLED:-false}"
+BACKUP_ENCRYPTION_PASSPHRASE="${BACKUP_ENCRYPTION_PASSPHRASE:-}"
+
 ##############################################################################
 # Functions
 ##############################################################################
@@ -82,6 +86,29 @@ notify_failure() {
         echo "Database backup failed: ${message}" | \
             mail -s "HRM Backup Failure" "$EMAIL_TO" 2>/dev/null || true
     fi
+}
+
+encrypt_backup() {
+    if [ "$BACKUP_ENCRYPTION_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    if ! command -v gpg >/dev/null 2>&1; then
+        error "GPG not installed; cannot encrypt backup"
+        return 1
+    fi
+
+    if [ -z "$BACKUP_ENCRYPTION_PASSPHRASE" ]; then
+        error "BACKUP_ENCRYPTION_PASSPHRASE is required when encryption is enabled"
+        return 1
+    fi
+
+    log "Encrypting backup archive..."
+    gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_PASSPHRASE" -c "$BACKUP_PATH"
+    rm -f "$BACKUP_PATH"
+    BACKUP_PATH="${BACKUP_PATH}.gpg"
+    BACKUP_COMPRESSED="${BACKUP_COMPRESSED}.gpg"
+    log "Encrypted backup created: $BACKUP_PATH"
 }
 
 notify_success() {
@@ -213,6 +240,12 @@ main() {
     # Verify backup
     if ! verify_backup; then
         notify_failure "Backup verification failed"
+        exit 1
+    fi
+
+    # Encrypt backup if configured
+    if ! encrypt_backup; then
+        notify_failure "Backup encryption failed"
         exit 1
     fi
     

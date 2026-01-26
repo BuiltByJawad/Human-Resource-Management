@@ -8,15 +8,15 @@ export class RoleService {
     /**
      * Get all roles
      */
-    async getAll(organizationId: string) {
-        return roleRepository.findAll(organizationId);
+    async getAll() {
+        return roleRepository.findAll();
     }
 
     /**
      * Get role by ID
      */
-    async getById(id: string, organizationId: string) {
-        const role = await roleRepository.findById(id, organizationId);
+    async getById(id: string) {
+        const role = await roleRepository.findById(id);
 
         if (!role) {
             throw new NotFoundError('Role not found');
@@ -28,7 +28,7 @@ export class RoleService {
     /**
      * Create new role
      */
-    async create(data: CreateRoleDto, organizationId: string) {
+    async create(data: CreateRoleDto) {
         // Check if role name already exists
         const existingRole = await roleRepository.findByName(data.name);
         if (existingRole) {
@@ -47,7 +47,7 @@ export class RoleService {
 
         await roleRepository.syncPermissions(role.id, Array.isArray(data.permissionIds) ? data.permissionIds : []);
 
-        const created = await roleRepository.findById(role.id, organizationId);
+        const created = await roleRepository.findById(role.id);
         if (!created) {
             throw new NotFoundError('Role not found');
         }
@@ -57,9 +57,9 @@ export class RoleService {
     /**
      * Update role
      */
-    async update(id: string, data: UpdateRoleDto, organizationId: string) {
+    async update(id: string, data: UpdateRoleDto) {
         // Verify role exists
-        await this.getById(id, organizationId);
+        await this.getById(id);
 
         // Check name uniqueness if changing
         if (data.name) {
@@ -83,7 +83,7 @@ export class RoleService {
             await roleRepository.syncPermissions(id, data.permissionIds);
         }
 
-        const full = await roleRepository.findById(updated.id, organizationId);
+        const full = await roleRepository.findById(updated.id);
         if (!full) {
             throw new NotFoundError('Role not found');
         }
@@ -93,8 +93,8 @@ export class RoleService {
     /**
      * Delete role
      */
-    async delete(id: string, organizationId: string) {
-        const role = await roleRepository.findById(id, organizationId);
+    async delete(id: string) {
+        const role = await roleRepository.findById(id);
 
         if (!role) {
             throw new NotFoundError('Role not found');
@@ -113,12 +113,12 @@ export class RoleService {
     /**
      * Assign role to user
      */
-    async assignToUser(data: AssignRoleDto, organizationId: string) {
+    async assignToUser(data: AssignRoleDto) {
         // Verify role exists
-        await this.getById(data.roleId, organizationId);
+        await this.getById(data.roleId);
 
         // Assign role
-        const user = await roleRepository.assignToUser(data.userId, data.roleId, organizationId);
+        const user = await roleRepository.assignToUser(data.userId, data.roleId);
 
         if (!user) {
             throw new NotFoundError('User not found');
@@ -130,11 +130,11 @@ export class RoleService {
     /**
      * Get users by role
      */
-    async getUsersByRole(roleId: string, organizationId: string) {
+    async getUsersByRole(roleId: string) {
         // Verify role exists
-        await this.getById(roleId, organizationId);
+        await this.getById(roleId);
 
-        return roleRepository.getUsersByRole(roleId, organizationId);
+        return roleRepository.getUsersByRole(roleId);
     }
 
     /**

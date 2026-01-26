@@ -1,11 +1,9 @@
 "use server"
 
 import { cookies } from 'next/headers'
-import { headers } from 'next/headers'
 
 import LeavePolicyPageClient from './LeavePolicyPageClient'
 import type { LeavePolicyPayload } from '@/services/leave-policy/types'
-import { extractTenantSlug } from '@/lib/tenant'
 
 type LeavePolicyApiResponse = {
   success?: boolean
@@ -24,17 +22,10 @@ async function fetchWithToken<T = unknown>(path: string, token: string | null): 
   if (!token) return null
   try {
     const base = buildApiBase()
-    const headerList = await headers()
-    const tenantSlug = extractTenantSlug({
-      headerSlug: headerList.get('x-tenant-slug'),
-      hostname: headerList.get('host'),
-    })
-
     const response = await fetch(`${base}${path}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
       },
       cache: 'no-store',
     })

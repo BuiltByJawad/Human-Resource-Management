@@ -13,7 +13,7 @@ We take security seriously and appreciate your efforts to responsibly disclose a
 
 ### How to Report a Security Issue
 
-Please report security issues by emailing our security team at [security@yourcompany.com](mailto:security@yourcompany.com). We will respond within 48 hours to acknowledge your report.
+Please report security issues by emailing our security team at [security@hrm.com](mailto:security@hrm.com). We will respond within 48 hours to acknowledge your report.
 
 **Please do not report security vulnerabilities through public GitHub issues or discussions.**
 
@@ -71,7 +71,7 @@ We follow a 90-day disclosure timeline for security issues:
 
 ## Contact
 
-For security-related inquiries, please contact [security@yourcompany.com](mailto:security@yourcompany.com)
+For security-related inquiries, please contact [security@hrm.com](mailto:security@hrm.com)
 
 ## Legal
 

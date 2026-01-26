@@ -9,6 +9,7 @@ interface BrandingData {
     tagline: string;
     logoUrl: string | null;
     faviconUrl: string | null;
+    footerYear?: number | null;
 }
 
 interface StoreHydratorProps {
@@ -31,6 +32,7 @@ export function StoreHydrator({ branding }: StoreHydratorProps) {
             siteName: branding.siteName,
             shortName: branding.shortName,
             tagline: branding.tagline,
+            footerYear: branding.footerYear ?? null,
             ...(branding.logoUrl ? { logoUrl: branding.logoUrl } : {}),
             ...(branding.faviconUrl ? { faviconUrl: branding.faviconUrl } : {}),
         })

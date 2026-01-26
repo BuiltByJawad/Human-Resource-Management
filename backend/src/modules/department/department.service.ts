@@ -3,12 +3,12 @@ import { NotFoundError, ConflictError } from '../../shared/utils/errors';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto';
 
 export class DepartmentService {
-    async getAll(organizationId: string) {
-        return departmentRepository.findAll(organizationId);
+    async getAll() {
+        return departmentRepository.findAll();
     }
 
-    async getById(id: string, organizationId: string) {
-        const department = await departmentRepository.findById(id, organizationId);
+    async getById(id: string) {
+        const department = await departmentRepository.findById(id);
 
         if (!department) {
             throw new NotFoundError('Department not found');
@@ -17,8 +17,8 @@ export class DepartmentService {
         return department;
     }
 
-    async create(data: CreateDepartmentDto, organizationId: string) {
-        const existing = await departmentRepository.findByName(data.name, organizationId);
+    async create(data: CreateDepartmentDto) {
+        const existing = await departmentRepository.findByName(data.name);
         if (existing) {
             throw new ConflictError('Department with this name already exists');
         }
@@ -30,16 +30,16 @@ export class DepartmentService {
             parentDepartment: data.parentDepartmentId
                 ? { connect: { id: data.parentDepartmentId } }
                 : undefined,
-        }, organizationId);
+        });
 
         return department;
     }
 
-    async update(id: string, data: UpdateDepartmentDto, organizationId: string) {
-        const existing = await this.getById(id, organizationId); // Verify exists
+    async update(id: string, data: UpdateDepartmentDto) {
+        const existing = await this.getById(id); // Verify exists
 
         if (data.name && data.name !== existing.name) {
-            const duplicate = await departmentRepository.findByName(data.name, organizationId);
+            const duplicate = await departmentRepository.findByName(data.name);
             if (duplicate) {
                 throw new ConflictError('Department with this name already exists');
             }
@@ -53,16 +53,16 @@ export class DepartmentService {
             updateData.parentDepartment = { connect: { id: data.parentDepartmentId } };
         }
 
-        const updated = await departmentRepository.update(id, updateData, organizationId);
+        const updated = await departmentRepository.update(id, updateData);
         if (!updated) {
             throw new NotFoundError('Department not found');
         }
         return updated;
     }
 
-    async delete(id: string, organizationId: string) {
-        await this.getById(id, organizationId); // Verify exists
-        await departmentRepository.delete(id, organizationId);
+    async delete(id: string) {
+        await this.getById(id); // Verify exists
+        await departmentRepository.delete(id);
     }
 }
 

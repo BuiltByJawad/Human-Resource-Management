@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBackendBaseUrl } from '@/lib/config/env'
-import { extractTenantSlug } from '@/lib/tenant'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()
-    const tenantSlug = extractTenantSlug({
-      headerSlug: request.headers.get('x-tenant-slug'),
-      hostname: request.headers.get('host'),
-    })
 
     const accessTokenFromCookie = request.cookies.get('accessToken')?.value
     const authHeader = request.headers.get('authorization')
@@ -21,7 +16,6 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body,

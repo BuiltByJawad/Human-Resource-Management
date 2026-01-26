@@ -5,17 +5,13 @@ export class PayrollRepository {
     async findAll(params: {
         skip: number;
         take: number;
-        organizationId: string;
         where?: Prisma.PayrollRecordWhereInput;
     }) {
-        const { organizationId, where, ...rest } = params;
+        const { where, ...rest } = params;
         return prisma.payrollRecord.findMany({
             ...rest,
             where: {
                 ...(where ?? {}),
-                employee: {
-                    organizationId,
-                },
             },
             include: {
                 employee: {
@@ -34,24 +30,18 @@ export class PayrollRepository {
         });
     }
 
-    async count(organizationId: string, where?: Prisma.PayrollRecordWhereInput) {
+    async count(where?: Prisma.PayrollRecordWhereInput) {
         return prisma.payrollRecord.count({
             where: {
                 ...(where ?? {}),
-                employee: {
-                    organizationId,
-                },
             },
         });
     }
 
-    async findById(id: string, organizationId: string) {
+    async findById(id: string) {
         return prisma.payrollRecord.findFirst({
             where: {
                 id,
-                employee: {
-                    organizationId,
-                },
             },
             include: {
                 employee: {
@@ -71,25 +61,19 @@ export class PayrollRepository {
         });
     }
 
-    async findByEmployee(employeeId: string, organizationId: string) {
+    async findByEmployee(employeeId: string) {
         return prisma.payrollRecord.findMany({
             where: {
                 employeeId,
-                employee: {
-                    organizationId,
-                },
             },
             orderBy: { payPeriod: 'desc' },
         });
     }
 
-    async findByEmployeeForExport(employeeId: string, organizationId: string) {
+    async findByEmployeeForExport(employeeId: string) {
         return prisma.payrollRecord.findMany({
             where: {
                 employeeId,
-                employee: {
-                    organizationId,
-                },
             },
             include: {
                 employee: {
@@ -107,13 +91,10 @@ export class PayrollRepository {
         });
     }
 
-    async findByPeriod(payPeriod: string, organizationId: string) {
+    async findByPeriod(payPeriod: string) {
         return prisma.payrollRecord.findMany({
             where: {
                 payPeriod,
-                employee: {
-                    organizationId,
-                },
             },
             include: {
                 employee: {
@@ -127,13 +108,10 @@ export class PayrollRepository {
         });
     }
 
-    async findByPeriodForExport(payPeriod: string, organizationId: string) {
+    async findByPeriodForExport(payPeriod: string) {
         return prisma.payrollRecord.findMany({
             where: {
                 payPeriod,
-                employee: {
-                    organizationId,
-                },
             },
             include: {
                 employee: {
@@ -222,64 +200,7 @@ export class PayrollRepository {
         });
     }
 
-    async updateStatusScoped(
-        id: string,
-        data: {
-            status: string;
-            paidAt?: Date;
-            paymentMethod?: string;
-            paymentReference?: string;
-            paidByUserId?: string;
-        },
-        organizationId: string,
-    ) {
-        const result = await prisma.payrollRecord.updateMany({
-            where: {
-                id,
-                employee: {
-                    organizationId,
-                },
-            },
-            data: {
-                status: data.status as any,
-                processedAt: data.status === 'processed' ? new Date() : undefined,
-                paidAt: data.status === 'paid' ? data.paidAt : null,
-                paymentMethod: data.status === 'paid' ? data.paymentMethod : null,
-                paymentReference: data.status === 'paid' ? data.paymentReference : null,
-                paidByUserId: data.status === 'paid' ? data.paidByUserId : null,
-            },
-        });
-
-        if (!result.count) {
-            return null;
-        }
-
-        return prisma.payrollRecord.findFirst({
-            where: {
-                id,
-                employee: {
-                    organizationId,
-                },
-            },
-            include: {
-                employee: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        employeeNumber: true,
-                        email: true,
-                        salary: true,
-                        department: {
-                            select: { name: true },
-                        },
-                    },
-                },
-            },
-        });
-    }
-
-    async getActiveEmployeesWithAttendance(payPeriod: string, organizationId: string, employeeIds?: string[]) {
+    async getActiveEmployeesWithAttendance(payPeriod: string, employeeIds?: string[]) {
         const startDate = new Date(`${payPeriod}-01`);
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + 1);
@@ -287,7 +208,6 @@ export class PayrollRepository {
         return prisma.employee.findMany({
             where: {
                 status: 'active',
-                organizationId,
                 ...(Array.isArray(employeeIds) && employeeIds.length ? { id: { in: employeeIds } } : {}),
             },
             include: {
@@ -303,14 +223,11 @@ export class PayrollRepository {
         });
     }
 
-    async findOverride(employeeId: string, payPeriod: string, organizationId: string) {
+    async findOverride(employeeId: string, payPeriod: string) {
         return prisma.payrollOverride.findFirst({
             where: {
                 employeeId,
                 payPeriod,
-                employee: {
-                    organizationId,
-                },
             },
         });
     }
@@ -334,29 +251,23 @@ export class PayrollRepository {
         });
     }
 
-    async deleteOverride(employeeId: string, payPeriod: string, organizationId: string) {
+    async deleteOverride(employeeId: string, payPeriod: string) {
         const result = await prisma.payrollOverride.deleteMany({
             where: {
                 employeeId,
                 payPeriod,
-                employee: {
-                    organizationId,
-                },
             },
         });
 
         return result.count;
     }
 
-    async findOverridesForEmployees(payPeriod: string, employeeIds: string[], organizationId: string) {
+    async findOverridesForEmployees(payPeriod: string, employeeIds: string[]) {
         if (!employeeIds.length) return [];
         return prisma.payrollOverride.findMany({
             where: {
                 payPeriod,
                 employeeId: { in: employeeIds },
-                employee: {
-                    organizationId,
-                },
             },
         });
     }

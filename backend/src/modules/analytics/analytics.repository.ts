@@ -1,34 +1,31 @@
 import { prisma } from '../../shared/config/database';
 
 export class AnalyticsRepository {
-    async getEmployeeCount(organizationId: string) {
-        return prisma.employee.count({ where: { organizationId } });
+    async getEmployeeCount() {
+        return prisma.employee.count({});
     }
 
-    async getActiveEmployeeCount(organizationId: string) {
-        return prisma.employee.count({ where: { organizationId, status: 'active' } });
+    async getActiveEmployeeCount() {
+        return prisma.employee.count({ where: { status: 'active' } });
     }
 
-    async getNewHiresCount(organizationId: string, startDate: Date, endDate: Date) {
+    async getNewHiresCount(startDate: Date, endDate: Date) {
         return prisma.employee.count({
             where: {
-                organizationId,
                 hireDate: { gte: startDate, lte: endDate },
             },
         });
     }
 
-    async getAvgSalary(organizationId: string) {
+    async getAvgSalary() {
         const result = await prisma.employee.aggregate({
-            where: { organizationId },
             _avg: { salary: true },
         });
         return result._avg.salary || 0;
     }
 
-    async getDepartmentCounts(organizationId: string) {
+    async getDepartmentCounts() {
         return prisma.department.findMany({
-            where: { organizationId },
             select: {
                 id: true,
                 name: true,
@@ -39,10 +36,9 @@ export class AnalyticsRepository {
         });
     }
 
-    async getUpcomingReviewCycles(organizationId: string, startDate: Date, endDate: Date, limit: number) {
+    async getUpcomingReviewCycles(startDate: Date, endDate: Date, limit: number) {
         return prisma.reviewCycle.findMany({
             where: {
-                organizationId,
                 endDate: {
                     gte: startDate,
                     lte: endDate,
@@ -53,16 +49,13 @@ export class AnalyticsRepository {
         });
     }
 
-    async getUpcomingApprovedLeaves(organizationId: string, startDate: Date, endDate: Date, limit: number) {
+    async getUpcomingApprovedLeaves(startDate: Date, endDate: Date, limit: number) {
         return prisma.leaveRequest.findMany({
             where: {
                 status: 'approved',
                 startDate: {
                     gte: startDate,
                     lte: endDate,
-                },
-                employee: {
-                    organizationId,
                 },
             },
             include: {

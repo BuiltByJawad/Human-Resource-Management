@@ -2,11 +2,9 @@ import { Request, Response } from 'express';
 import { departmentService } from './department.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const departments = await departmentService.getAll(organizationId);
+    const departments = await departmentService.getAll('');
 
     res.json({
         status: 'success',
@@ -15,8 +13,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const department = await departmentService.getById(req.params.id, organizationId);
+    const department = await departmentService.getById(req.params.id, '');
 
     res.json({
         status: 'success',
@@ -25,8 +22,7 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const department = await departmentService.create(req.body, organizationId);
+    const department = await departmentService.create(req.body, '');
 
     res.status(HTTP_STATUS.CREATED).json({
         status: 'success',
@@ -35,8 +31,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const update = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    const department = await departmentService.update(req.params.id, req.body, organizationId);
+    const department = await departmentService.update(req.params.id, req.body, '');
 
     res.json({
         status: 'success',
@@ -45,8 +40,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as any);
-    await departmentService.delete(req.params.id, organizationId);
+    await departmentService.delete(req.params.id, '');
 
     res.json({
         status: 'success',

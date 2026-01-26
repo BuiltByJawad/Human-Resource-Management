@@ -23,7 +23,9 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:status": "prisma migrate status",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "retention:cleanup": "ts-node scripts/retention-cleanup.ts",
+    "backup:verify": "ts-node ../scripts/backup-verification.ts"
   },
   "keywords": [
     "hrm",
@@ -72,6 +74,7 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/bcrypt": "^5.0.2",
+    "bcrypt": "^5.1.1",
     "@types/compression": "^1.7.5",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",

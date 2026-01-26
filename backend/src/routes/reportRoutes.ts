@@ -2,9 +2,9 @@ import { Router } from 'express'
 import { Request, Response } from 'express'
 import { asyncHandler } from '../shared/middleware/errorHandler'
 import { AuthRequest, authenticate, checkPermission } from '../shared/middleware/auth'
+
 import { prisma, logger } from '../shared/config/database'
 import Joi from 'joi'
-import { requireRequestOrganizationId } from '../shared/utils/tenant'
 import PDFDocument from 'pdfkit'
 import { sendEmail } from '../shared/utils/email'
 import { notificationService } from '../modules/notification/notification.service'
@@ -46,15 +46,15 @@ const computeNextRunAt = (frequency: string, from: Date): Date => {
   return next
 }
 
-const buildEmployeesReport = async (organizationId: string, filters: ReportFilters): Promise<BuiltReport> => {
-  const where: any = { organizationId }
+const buildEmployeesReport = async (filters: ReportFilters): Promise<BuiltReport> => {
+  const where: any = {}
+
   if (filters.startDate && filters.endDate) {
     where.createdAt = {
       gte: new Date(filters.startDate),
       lte: new Date(filters.endDate),
     }
   }
-  if (filters.departmentId) where.departmentId = filters.departmentId
 
   const employees = await prisma.employee.findMany({
     where,
@@ -87,7 +87,8 @@ const buildEmployeesReport = async (organizationId: string, filters: ReportFilte
   return { title: 'Employees Report', filenameBase: 'employees', rows }
 }
 
-const buildAttendanceReport = async (organizationId: string, filters: ReportFilters): Promise<BuiltReport> => {
+const buildAttendanceReport = async (filters: ReportFilters): Promise<BuiltReport> => {
+
   const where: any = {}
   if (filters.startDate && filters.endDate) {
     where.checkIn = {
@@ -96,7 +97,6 @@ const buildAttendanceReport = async (organizationId: string, filters: ReportFilt
     }
   }
   where.employee = {
-    organizationId,
     ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
   }
 
@@ -129,7 +129,8 @@ const buildAttendanceReport = async (organizationId: string, filters: ReportFilt
   return { title: 'Attendance Report', filenameBase: 'attendance', rows }
 }
 
-const buildLeaveReport = async (organizationId: string, filters: ReportFilters): Promise<BuiltReport> => {
+const buildLeaveReport = async (filters: ReportFilters): Promise<BuiltReport> => {
+
   const where: any = {}
   if (filters.startDate && filters.endDate) {
     where.startDate = {
@@ -138,7 +139,6 @@ const buildLeaveReport = async (organizationId: string, filters: ReportFilters):
     }
   }
   where.employee = {
-    organizationId,
     ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
   }
 
@@ -179,7 +179,8 @@ const buildLeaveReport = async (organizationId: string, filters: ReportFilters):
   return { title: 'Leave Report', filenameBase: 'leave', rows }
 }
 
-const buildPayrollReport = async (organizationId: string, filters: ReportFilters): Promise<BuiltReport> => {
+const buildPayrollReport = async (filters: ReportFilters): Promise<BuiltReport> => {
+
   const where: any = {}
   if (filters.startDate && filters.endDate) {
     where.createdAt = {
@@ -188,7 +189,6 @@ const buildPayrollReport = async (organizationId: string, filters: ReportFilters
     }
   }
   where.employee = {
-    organizationId,
     ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
   }
 
@@ -222,11 +222,11 @@ const buildPayrollReport = async (organizationId: string, filters: ReportFilters
   return { title: 'Payroll Report', filenameBase: 'payroll', rows }
 }
 
-const buildReport = async (type: string, organizationId: string, filters: ReportFilters): Promise<BuiltReport> => {
-  if (type === 'attendance') return buildAttendanceReport(organizationId, filters)
-  if (type === 'leave') return buildLeaveReport(organizationId, filters)
-  if (type === 'payroll') return buildPayrollReport(organizationId, filters)
-  return buildEmployeesReport(organizationId, filters)
+const buildReport = async (type: string, filters: ReportFilters): Promise<BuiltReport> => {
+  if (type === 'attendance') return buildAttendanceReport(filters)
+  if (type === 'leave') return buildLeaveReport(filters)
+  if (type === 'payroll') return buildPayrollReport(filters)
+  return buildEmployeesReport(filters)
 }
 
 const canExportReport = (req: AuthRequest): boolean => {
@@ -311,7 +311,7 @@ const runScheduledReport = async (scheduledReportId: string): Promise<{ delivere
     include: {
       recipients: {
         include: {
-          user: { select: { id: true, email: true, organizationId: true } },
+          user: { select: { id: true, email: true } },
         },
       },
     },
@@ -323,7 +323,6 @@ const runScheduledReport = async (scheduledReportId: string): Promise<{ delivere
 
   logger.info('scheduled_report.run.start', {
     scheduledReportId: schedule.id,
-    organizationId: schedule.organizationId,
     format: String(schedule.format),
     type: String(schedule.type),
     frequency: String(schedule.frequency),
@@ -339,13 +338,13 @@ const runScheduledReport = async (scheduledReportId: string): Promise<{ delivere
 
   try {
     const filters = toFiltersObject(schedule.filters)
-    const report = await buildReport(String(schedule.type), schedule.organizationId, filters)
+    const report = await buildReport(String(schedule.type), filters)
+
     const attachment = await buildAttachment(String(schedule.format), report)
 
     const recipients = schedule.recipients
       .map((r) => r.user)
-      .filter((u): u is { id: string; email: string; organizationId: string | null } => !!u && !!u.email)
-      .filter((u) => u.organizationId === schedule.organizationId)
+      .filter((u): u is { id: string; email: string } => !!u && !!u.email)
 
     let deliveredCount = 0
 
@@ -389,7 +388,6 @@ const runScheduledReport = async (scheduledReportId: string): Promise<{ delivere
 
     logger.info('scheduled_report.run.success', {
       scheduledReportId: schedule.id,
-      organizationId: schedule.organizationId,
       runId: run.id,
       deliveredCount,
       durationMs: Date.now() - startedAtMs,
@@ -409,7 +407,6 @@ const runScheduledReport = async (scheduledReportId: string): Promise<{ delivere
 
     logger.error('scheduled_report.run.failed', {
       scheduledReportId: schedule.id,
-      organizationId: schedule.organizationId,
       runId: run.id,
       errorMessage: message,
       durationMs: Date.now() - startedAtMs,
@@ -437,10 +434,8 @@ router.get(
   authenticate,
   checkPermission('reports', 'view'),
   asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
-
     const [totalEmployees, presentToday, pendingLeaves, monthlyPayroll] = await Promise.all([
-      prisma.employee.count({ where: { status: 'active', organizationId } }),
+      prisma.employee.count({ where: { status: 'active' } }),
       prisma.attendance.count({
         where: {
           checkIn: {
@@ -448,13 +443,11 @@ router.get(
             lt: new Date(new Date().setHours(23, 59, 59, 999)),
           },
           status: 'present',
-          employee: { organizationId },
         },
       }),
       prisma.leaveRequest.count({
         where: {
           status: 'pending',
-          employee: { organizationId },
         },
       }),
       prisma.payrollRecord.aggregate({
@@ -463,7 +456,6 @@ router.get(
             gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
             lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
           },
-          employee: { organizationId },
         },
         _sum: { netSalary: true },
       }),
@@ -488,10 +480,9 @@ router.get(
   authenticate,
   checkPermission('reports', 'view'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { format, ...rest } = req.query as Record<string, unknown>
     const filters = toFiltersObject(rest)
-    const report = await buildEmployeesReport(organizationId, filters)
+    const report = await buildEmployeesReport(filters)
 
     if (format === 'csv' || format === 'pdf') {
       if (!canExportReport(req)) {
@@ -512,7 +503,6 @@ router.get(
   authenticate,
   checkPermission('reports', 'view'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { format, ...rest } = req.query as Record<string, unknown>
     const filters = toFiltersObject(rest)
 
@@ -524,7 +514,6 @@ router.get(
       }
     }
     where.employee = {
-      organizationId,
       ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
     }
 
@@ -556,7 +545,7 @@ router.get(
       if (!canExportReport(req)) {
         return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
       }
-      const report = await buildAttendanceReport(organizationId, filters)
+      const report = await buildAttendanceReport(filters)
       const attachment = await buildAttachment(String(format), report)
       res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`)
       res.setHeader('Content-Type', attachment.contentType)
@@ -572,7 +561,6 @@ router.get(
   authenticate,
   checkPermission('reports', 'view'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { format, ...rest } = req.query as Record<string, unknown>
     const filters = toFiltersObject(rest)
 
@@ -584,7 +572,6 @@ router.get(
       }
     }
     where.employee = {
-      organizationId,
       ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
     }
 
@@ -622,7 +609,7 @@ router.get(
       if (!canExportReport(req)) {
         return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
       }
-      const report = await buildLeaveReport(organizationId, filters)
+      const report = await buildLeaveReport(filters)
       const attachment = await buildAttachment(String(format), report)
       res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`)
       res.setHeader('Content-Type', attachment.contentType)
@@ -638,7 +625,6 @@ router.get(
   authenticate,
   checkPermission('reports', 'view'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { format, ...rest } = req.query as Record<string, unknown>
     const filters = toFiltersObject(rest)
 
@@ -650,7 +636,6 @@ router.get(
       }
     }
     where.employee = {
-      organizationId,
       ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
     }
 
@@ -681,7 +666,7 @@ router.get(
       if (!canExportReport(req)) {
         return res.status(403).json({ success: false, message: 'Missing permission: reports.export' })
       }
-      const report = await buildPayrollReport(organizationId, filters)
+      const report = await buildPayrollReport(filters)
       const attachment = await buildAttachment(String(format), report)
       res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`)
       res.setHeader('Content-Type', attachment.contentType)
@@ -711,9 +696,7 @@ router.get(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const schedules = await prisma.scheduledReport.findMany({
-      where: { organizationId },
       include: {
         recipients: {
           include: {
@@ -734,9 +717,8 @@ router.get(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const users = await prisma.user.findMany({
-      where: { organizationId, status: 'active' },
+      where: { status: 'active' },
       select: { id: true, email: true, firstName: true, lastName: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
@@ -750,9 +732,8 @@ router.get(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const schedule = await prisma.scheduledReport.findFirst({
-      where: { id: req.params.id, organizationId },
+      where: { id: req.params.id },
       include: {
         recipients: {
           include: {
@@ -772,8 +753,8 @@ router.post(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const actorUserId = req.user?.id
+
     const { error, value } = scheduleSchema.validate(req.body, { abortEarly: false, stripUnknown: true })
     if (error) {
       return res.status(400).json({ success: false, message: error.message })
@@ -784,9 +765,10 @@ router.post(
 
     const recipientUserIds: string[] = Array.isArray(value.recipientUserIds) ? value.recipientUserIds : []
     const users = await prisma.user.findMany({
-      where: { id: { in: recipientUserIds }, organizationId },
+      where: { id: { in: recipientUserIds } },
       select: { id: true },
     })
+
     const validRecipientIds = users.map((u) => u.id)
     if (!validRecipientIds.length) {
       return res.status(400).json({ success: false, message: 'No valid recipients found for this organization' })
@@ -797,7 +779,6 @@ router.post(
 
     const created = await prisma.scheduledReport.create({
       data: {
-        organizationId,
         name: value.name,
         type: value.type,
         format: value.format,
@@ -824,22 +805,22 @@ router.put(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { error, value } = scheduleSchema.validate(req.body, { abortEarly: false, stripUnknown: true })
     if (error) {
       return res.status(400).json({ success: false, message: error.message })
     }
 
-    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id, organizationId } })
+    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id } })
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Schedule not found' })
     }
 
     const recipientUserIds: string[] = Array.isArray(value.recipientUserIds) ? value.recipientUserIds : []
     const users = await prisma.user.findMany({
-      where: { id: { in: recipientUserIds }, organizationId },
+      where: { id: { in: recipientUserIds } },
       select: { id: true },
     })
+
     const validRecipientIds = users.map((u) => u.id)
     if (!validRecipientIds.length) {
       return res.status(400).json({ success: false, message: 'No valid recipients found for this organization' })
@@ -877,14 +858,13 @@ router.patch(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
     const { isEnabled } = req.body as { isEnabled?: boolean }
 
     if (typeof isEnabled !== 'boolean') {
       return res.status(400).json({ success: false, message: 'isEnabled must be a boolean' })
     }
 
-    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id, organizationId } })
+    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id } })
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Schedule not found' })
     }
@@ -915,8 +895,7 @@ router.delete(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
-    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id, organizationId } })
+    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id } })
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Schedule not found' })
     }
@@ -931,8 +910,7 @@ router.post(
   authenticate,
   checkPermission('reports', 'configure'),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest)
-    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id, organizationId } })
+    const schedule = await prisma.scheduledReport.findFirst({ where: { id: req.params.id } })
     if (!schedule) {
       return res.status(404).json({ success: false, message: 'Schedule not found' })
     }

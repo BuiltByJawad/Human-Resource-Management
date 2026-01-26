@@ -18,9 +18,9 @@ export class PerformanceRepository {
         return prisma.performanceReview.count({ where });
     }
 
-    async findReviewById(organizationId: string, id: string) {
+    async findReviewById(id: string) {
         return prisma.performanceReview.findFirst({
-            where: { id, organizationId },
+            where: { id },
             include: { employee: true, reviewer: true, cycle: true },
         });
     }
@@ -29,20 +29,20 @@ export class PerformanceRepository {
         return prisma.performanceReview.create({ data });
     }
 
-    async findAllCycles(organizationId: string) {
-        return prisma.reviewCycle.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' } });
+    async findAllCycles() {
+        return prisma.reviewCycle.findMany({ orderBy: { createdAt: 'desc' } });
     }
 
     async createCycle(data: any) {
         return prisma.reviewCycle.create({ data });
     }
 
-    async findCycleById(organizationId: string, id: string) {
-        return prisma.reviewCycle.findFirst({ where: { id, organizationId } });
+    async findCycleById(id: string) {
+        return prisma.reviewCycle.findFirst({ where: { id } });
     }
 
-    async findEmployeeById(organizationId: string, id: string) {
-        return prisma.employee.findFirst({ where: { id, organizationId } });
+    async findEmployeeById(id: string) {
+        return prisma.employee.findFirst({ where: { id } });
     }
 }
 

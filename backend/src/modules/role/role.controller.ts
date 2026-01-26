@@ -3,7 +3,6 @@ import { roleService } from './role.service';
 import { asyncHandler } from '../../shared/utils/async-handler';
 import { HTTP_STATUS } from '../../shared/constants';
 import { prisma } from '../../shared/config/database';
-import { requireRequestOrganizationId } from '../../shared/utils/tenant';
 import { createAuditLog } from '../../shared/utils/audit';
 import { AuthRequest } from '../../shared/middleware/auth';
 
@@ -11,8 +10,7 @@ import { AuthRequest } from '../../shared/middleware/auth';
  * Get all roles
  */
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const roles = await roleService.getAll(organizationId);
+    const roles = await roleService.getAll();
 
     res.json({
         success: true,
@@ -24,8 +22,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
  * Get role by ID
  */
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const role = await roleService.getById(req.params.id, organizationId);
+    const role = await roleService.getById(req.params.id);
 
     res.json({
         success: true,
@@ -38,8 +35,7 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
  */
 export const create = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const role = await roleService.create(req.body, organizationId);
+    const role = await roleService.create(req.body);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -67,8 +63,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
  */
 export const update = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const role = await roleService.update(req.params.id, req.body, organizationId);
+    const role = await roleService.update(req.params.id, req.body);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -98,8 +93,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
  */
 export const remove = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    await roleService.delete(req.params.id, organizationId);
+    await roleService.delete(req.params.id);
 
     const actorUserId = authReq.user?.id;
     if (actorUserId) {
@@ -122,8 +116,7 @@ export const remove = asyncHandler(async (req: Request, res: Response) => {
  */
 export const assignToUser = asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as unknown as AuthRequest;
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const user = await roleService.assignToUser(req.body, organizationId);
+    const user = await roleService.assignToUser(req.body);
 
     const actorUserId = authReq.user?.id;
     const body: Record<string, unknown> =
@@ -151,8 +144,7 @@ export const assignToUser = asyncHandler(async (req: Request, res: Response) => 
  * Get users by role
  */
 export const getUsersByRole = asyncHandler(async (req: Request, res: Response) => {
-    const organizationId = requireRequestOrganizationId(req as unknown as AuthRequest);
-    const users = await roleService.getUsersByRole(req.params.id, organizationId);
+    const users = await roleService.getUsersByRole(req.params.id);
 
     res.json({
         success: true,

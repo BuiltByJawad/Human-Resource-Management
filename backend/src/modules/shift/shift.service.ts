@@ -5,8 +5,8 @@ import { BadRequestError, NotFoundError } from '../../shared/utils/errors';
 import { prisma } from '../../shared/config/database';
 
 export class ShiftService {
-    async scheduleShift(organizationId: string, data: CreateShiftDto) {
-        const employeeExists = await prisma.employee.findFirst({ where: { id: data.employeeId, organizationId } });
+    async scheduleShift(data: CreateShiftDto) {
+        const employeeExists = await prisma.employee.findFirst({ where: { id: data.employeeId } });
         if (!employeeExists) {
             throw new NotFoundError('Employee not found');
         }
@@ -19,17 +19,17 @@ export class ShiftService {
         });
     }
 
-    async getRoster(organizationId: string, startDate: string, endDate: string) {
-        return shiftRepository.getShifts(organizationId, new Date(startDate), new Date(endDate));
+    async getRoster(startDate: string, endDate: string) {
+        return shiftRepository.getShifts(new Date(startDate), new Date(endDate));
     }
 
-    async requestSwap(organizationId: string, requestorId: string, data: RequestSwapDto) {
-        const shift = await shiftRepository.getShiftById(organizationId, data.shiftId);
+    async requestSwap(requestorId: string, data: RequestSwapDto) {
+        const shift = await shiftRepository.getShiftById(data.shiftId);
         if (!shift) throw new NotFoundError('Shift not found');
         if (shift.employeeId !== requestorId) throw new BadRequestError('You can only swap your own shifts');
 
         if (data.targetId) {
-            const targetExists = await prisma.employee.findFirst({ where: { id: data.targetId, organizationId } });
+            const targetExists = await prisma.employee.findFirst({ where: { id: data.targetId } });
             if (!targetExists) {
                 throw new NotFoundError('Target employee not found');
             }
@@ -44,12 +44,12 @@ export class ShiftService {
         });
     }
 
-    async approveSwap(organizationId: string, requestId: string, status: 'approved' | 'rejected') {
-        const swapRequest = await shiftRepository.getSwapRequestById(organizationId, requestId);
+    async approveSwap(requestId: string, status: 'approved' | 'rejected') {
+        const swapRequest = await shiftRepository.getSwapRequestById(requestId);
         if (!swapRequest) throw new NotFoundError('Swap request not found');
 
         if (status === 'rejected') {
-            const updated = await shiftRepository.updateSwapRequest(organizationId, requestId, { status: 'rejected' });
+            const updated = await shiftRepository.updateSwapRequest(requestId, { status: 'rejected' });
             if (!updated) throw new NotFoundError('Swap request not found');
             return updated;
         }
@@ -61,18 +61,18 @@ export class ShiftService {
 
         if (!swapRequest.targetId) {
             // Just mark approved, allow admin to reassign later
-            const updated = await shiftRepository.updateSwapRequest(organizationId, requestId, { status: 'approved' });
+            const updated = await shiftRepository.updateSwapRequest(requestId, { status: 'approved' });
             if (!updated) throw new NotFoundError('Swap request not found');
             return updated;
         }
 
         // Execute reassignment
-        const shiftUpdated = await shiftRepository.updateShift(organizationId, swapRequest.shiftId, {
+        const shiftUpdated = await shiftRepository.updateShift(swapRequest.shiftId, {
             employeeId: swapRequest.targetId
         });
         if (!shiftUpdated) throw new NotFoundError('Shift not found');
 
-        const updated = await shiftRepository.updateSwapRequest(organizationId, requestId, { status: 'approved' });
+        const updated = await shiftRepository.updateSwapRequest(requestId, { status: 'approved' });
         if (!updated) throw new NotFoundError('Swap request not found');
         return updated;
     }

@@ -1,19 +1,18 @@
 import api from '@/lib/axios'
 import { NotificationsResponse } from './types'
 
-const headersFor = (token?: string | null, tenantSlug?: string | null): Record<string, string> => {
+const headersFor = (token?: string | null): Record<string, string> => {
   const headers: Record<string, string> = {
     'Cache-Control': 'no-store',
   }
 
   if (token) headers.Authorization = `Bearer ${token}`
-  if (tenantSlug) headers['X-Tenant-Slug'] = tenantSlug
 
   return headers
 }
 
-export const fetchNotifications = async (token?: string | null, tenantSlug?: string | null): Promise<NotificationsResponse> => {
-  const headers = headersFor(token, tenantSlug)
+export const fetchNotifications = async (token?: string | null): Promise<NotificationsResponse> => {
+  const headers = headersFor(token)
 
   const res = await fetch('/api/notifications', {
     method: 'GET',
@@ -35,8 +34,8 @@ export const fetchNotifications = async (token?: string | null, tenantSlug?: str
   return (parsed as NotificationsResponse) || {}
 }
 
-export const markAllNotificationsRead = async (token?: string | null, tenantSlug?: string | null) => {
-  const headers = headersFor(token, tenantSlug)
+export const markAllNotificationsRead = async (token?: string | null) => {
+  const headers = headersFor(token)
 
   const res = await fetch('/api/notifications/mark-all-read', {
     method: 'POST',
@@ -55,8 +54,8 @@ export const markAllNotificationsRead = async (token?: string | null, tenantSlug
   return res.json().catch(() => null)
 }
 
-export const markNotificationRead = async (id: string, token?: string | null, tenantSlug?: string | null) => {
-  const headers = headersFor(token, tenantSlug)
+export const markNotificationRead = async (id: string, token?: string | null) => {
+  const headers = headersFor(token)
 
   const res = await fetch(`/api/notifications/${id}/read`, {
     method: 'PATCH',

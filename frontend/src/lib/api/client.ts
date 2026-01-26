@@ -1,6 +1,5 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/store/useAuthStore'
-import { getClientTenantSlug } from '@/lib/tenant'
 import { getApiBaseUrl } from '@/lib/config/env'
 
 export const API_BASE_URL: string = getApiBaseUrl()
@@ -24,11 +23,6 @@ const attachInterceptors = (instance: AxiosInstance): void => {
         config.headers.Authorization = `Bearer ${token}`
       }
 
-      const tenantSlug = getClientTenantSlug()
-      if (tenantSlug) {
-        config.headers = config.headers ?? {}
-        ;(config.headers as Record<string, string>)['X-Tenant-Slug'] = tenantSlug
-      }
     }
     return config
   })

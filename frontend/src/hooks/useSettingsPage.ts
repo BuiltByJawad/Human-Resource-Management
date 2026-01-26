@@ -54,6 +54,9 @@ const DEFAULT_ORG_SETTINGS: OrgSettingsFormState = {
   tagline: '',
   companyName: '',
   companyAddress: '',
+  footerYear: '',
+  privacyPolicyText: '',
+  termsOfServiceText: '',
 }
 
 const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
@@ -67,7 +70,7 @@ interface UseSettingsPageOptions {
 
 export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) => {
   const { showToast } = useToast()
-  const { updateOrg, logoUrl, faviconUrl, setLoaded } = useOrgStore()
+  const { updateOrg, setLoaded } = useOrgStore()
 
   const normalizedInitialOrg = useMemo(
     () => ({
@@ -75,6 +78,9 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
       tagline: initialOrgSettings.tagline ?? '',
       companyName: initialOrgSettings.companyName ?? '',
       companyAddress: initialOrgSettings.companyAddress ?? '',
+      footerYear: initialOrgSettings.footerYear ? String(initialOrgSettings.footerYear) : '',
+      privacyPolicyText: initialOrgSettings.privacyPolicyText ?? '',
+      termsOfServiceText: initialOrgSettings.termsOfServiceText ?? '',
       logoUrl: initialOrgSettings.logoUrl ?? null,
       faviconUrl: initialOrgSettings.faviconUrl ?? null,
     }),
@@ -117,12 +123,16 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
       tagline: normalizedInitialOrg.tagline,
       companyName: normalizedInitialOrg.companyName,
       companyAddress: normalizedInitialOrg.companyAddress,
+      footerYear: normalizedInitialOrg.footerYear,
+      privacyPolicyText: normalizedInitialOrg.privacyPolicyText,
+      termsOfServiceText: normalizedInitialOrg.termsOfServiceText,
     })
     updateOrg({
       siteName: normalizedInitialOrg.siteName,
       tagline: normalizedInitialOrg.tagline,
       companyName: normalizedInitialOrg.companyName,
       companyAddress: normalizedInitialOrg.companyAddress,
+      footerYear: normalizedInitialOrg.footerYear ? Number(normalizedInitialOrg.footerYear) : null,
       logoUrl: normalizedInitialOrg.logoUrl,
       faviconUrl: normalizedInitialOrg.faviconUrl,
     })
@@ -152,12 +162,22 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
 
     setIsSavingSettings(true)
     try {
-      const data = await updateOrgSettings(orgSettings)
+      const payload: OrgSettingsPayload = {
+        siteName: orgSettings.siteName,
+        tagline: orgSettings.tagline,
+        companyName: orgSettings.companyName,
+        companyAddress: orgSettings.companyAddress,
+        footerYear: orgSettings.footerYear ? Number(orgSettings.footerYear) : null,
+        privacyPolicyText: orgSettings.privacyPolicyText,
+        termsOfServiceText: orgSettings.termsOfServiceText,
+      }
+      const data = await updateOrgSettings(payload)
       updateOrg({
         siteName: data.siteName ?? orgSettings.siteName,
         tagline: data.tagline ?? orgSettings.tagline,
         companyName: data.companyName ?? orgSettings.companyName,
         companyAddress: data.companyAddress ?? orgSettings.companyAddress,
+        footerYear: data.footerYear ?? (orgSettings.footerYear ? Number(orgSettings.footerYear) : null),
       })
       showToast('Organization settings saved', 'success')
     } catch (error: unknown) {
@@ -226,8 +246,6 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
   )
 
   return {
-    logoUrl,
-    faviconUrl,
     orgSettings,
     setOrgSettings,
     orgErrors,

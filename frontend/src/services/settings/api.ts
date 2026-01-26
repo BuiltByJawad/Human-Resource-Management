@@ -1,12 +1,12 @@
 import api from '@/lib/axios'
 import type {
   ChangePasswordPayload,
-  OrgSettingsFormState,
   OrgSettingsPayload,
   OrgSettingsUpdateResponse,
+  PolicyHistoryEntry,
 } from '@/services/settings/types'
 
-export const updateOrgSettings = async (payload: OrgSettingsFormState): Promise<OrgSettingsPayload> => {
+export const updateOrgSettings = async (payload: OrgSettingsPayload): Promise<OrgSettingsPayload> => {
   const response = await api.put<OrgSettingsUpdateResponse>('/org/settings', payload)
   return response.data?.data ?? payload
 }
@@ -43,4 +43,9 @@ export const uploadOrgFavicon = async (file: File): Promise<string | null> => {
 
 export const changePassword = async (payload: ChangePasswordPayload): Promise<void> => {
   await api.post('/auth/password/change', payload)
+}
+
+export const fetchPolicyHistory = async (): Promise<PolicyHistoryEntry[]> => {
+  const response = await api.get<{ success?: boolean; data?: PolicyHistoryEntry[] }>('/org/policies/history')
+  return response.data?.data ?? []
 }

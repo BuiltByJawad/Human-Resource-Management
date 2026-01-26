@@ -1,167 +1,158 @@
-# HRM Enterprise Readiness - Task Checklist
-# check this one
-**Timeline:** 2-4 Weeks  
-**Goal:** Prepare for enterprise/government commercial contracts
+# Enterprise Readiness Testing Protocol (Master Guide)
+
+**Objective:** Validate that the HRM System meets industrial enterprise standards through a rigorous, step-by-step testing regime.
+**Status:** Ready to Start
+**Estimated Duration:** 3-5 Days
 
 ---
 
-## Week 1: Legal & Compliance Documentation
+## 🟢 Phase 1: Code Quality & Unit Testing
+*Ensure individual components work correctly and code is maintainable.*
 
-### [ ] Privacy Policy & Terms of Service (2 days)
-- [ ] Create `/frontend/src/app/privacy/page.tsx` 
-- [ ] Create `/frontend/src/app/terms/page.tsx`
-- [ ] Add footer links to privacy/terms pages
-- [ ] Include GDPR data processing terms
-- [ ] Include cookie policy section
-- [ ] Define data retention periods
+### 1.1 Backend Verification
+```bash
+cd backend
+# 1. Run functionality tests
+npm run test
 
-### [ ] GDPR Compliance Features (3 days)
-- [ ] Add data export endpoint `GET /api/users/:id/export`
-- [ ] Implement user data anonymization function
-- [ ] Add "Right to Erasure" endpoint `DELETE /api/users/:id/gdpr`
-- [ ] Create data processing agreement template
-- [ ] Add consent management UI component
-- [ ] Document data flows and processing purposes
+# 2. Check test coverage (Target: >80%)
+npm run test:coverage
 
-### [ ] Data Retention Policy (1 day)
-- [ ] Create `RETENTION_POLICY.md` document
-- [ ] Define retention periods per data category:
-  - Employee records: 7 years after termination
-  - Attendance: 3 years
-  - Payroll: 7 years
-  - Audit logs: 5 years
-- [ ] Implement automated data cleanup scripts
-- [ ] Add scheduled job for retention enforcement
+# 3. Linting check (Static Analysis)
+npm run lint
+```
 
----
+### 1.2 Frontend Verification
+```bash
+cd frontend
+# 1. Run component tests
+npm run test
 
-## Week 2: Backup & Disaster Recovery
+# 2. Linting check
+npm run lint
+```
 
-### [ ] Automated Backup Strategy (2 days)
-- [ ] Create `/scripts/backup/pg_backup.sh` script
-- [ ] Create `/scripts/backup/redis_backup.sh` script
-- [ ] Add backup to Docker Compose (prod)
-- [ ] Configure daily/hourly backup schedule
-- [ ] Implement backup to cloud storage (S3/Azure Blob)
-- [ ] Add backup encryption
-
-### [ ] Backup Verification (1 day)
-- [ ] Create `/scripts/backup/verify_backup.sh`
-- [ ] Add automated restore testing
-- [ ] Create backup integrity check job
-- [ ] Add monitoring alerts for backup failures
-
-### [ ] Disaster Recovery Plan (2 days)
-- [ ] Create `DISASTER_RECOVERY.md` document
-- [ ] Define RTO (Recovery Time Objective): 4 hours
-- [ ] Define RPO (Recovery Point Objective): 1 hour
-- [ ] Document recovery procedures step-by-step
-- [ ] Create database failover runbook
-- [ ] Document rollback procedures
+**Checklist:**
+- [ ] All Backend tests passing (Green)
+- [ ] Backend Line Coverage > 80%
+- [ ] All Frontend tests passing (Green)
+- [ ] No Linting errors in both projects
 
 ---
 
-## Week 3: Operational Documentation
+## 🛡️ Phase 2: Security Assessment
+*Identify and mitigate vulnerabilities before deployment.*
 
-### [ ] Deployment Runbook (1 day)
-- [ ] Create `docs/runbooks/DEPLOYMENT.md`
-- [ ] Document production deployment steps
-- [ ] Document rollback procedures
-- [ ] Document environment configuration
-- [ ] Add pre-deployment checklist
-- [ ] Add post-deployment verification steps
+### 2.1 Dependency Auditing
+```bash
+# Backend
+cd backend && npm audit
 
-### [ ] Incident Response Plan (1 day)
-- [ ] Create `docs/runbooks/INCIDENT_RESPONSE.md`
-- [ ] Define severity levels (P1-P4)
-- [ ] Define escalation matrix
-- [ ] Define communication templates
-- [ ] Document on-call procedures
-- [ ] Add postmortem template
+# Frontend
+cd frontend && npm audit
+```
+*Action: Run `npm audit fix` if vulnerabilities are found.*
 
-### [ ] Troubleshooting Guide (1 day)
-- [ ] Create `docs/runbooks/TROUBLESHOOTING.md`
-- [ ] Document common issues and solutions
-- [ ] Add database recovery procedures
-- [ ] Add authentication debugging
-- [ ] Add performance troubleshooting
+### 2.2 Static Application Security Testing (SAST)
+*Scan source code for security flaws.*
+- Run the GitHub Action or local CodeQL/Snyk scan if configured.
+- **Manual Check:** Search codebase for hardcoded secrets (`password`, `key`, `secret`).
 
-### [ ] SLA Documentation (1 day)
-- [ ] Create `docs/SLA.md`
-- [ ] Define uptime guarantee (99.9%)
-- [ ] Define support response times
-- [ ] Define maintenance windows
-- [ ] Create status page setup instructions
+### 2.3 Dynamic Scanning (OWASP ZAP)
+1. Start your application (`npm run dev` or `docker-compose up`).
+2. Run OWASP ZAP (or similar tool) against `http://localhost:5000` and `http://localhost:3000`.
+3. **Goal:** Zero "High" or "Critical" alerts.
+
+**Checklist:**
+- [ ] `npm audit` returns 0 critical vulnerabilities
+- [ ] No hardcoded secrets in code (checked `env.example` vs `.env`)
+- [ ] OWASP ZAP scan clean
 
 ---
 
-## Week 4: Security Hardening & Audit
+## 🔄 Phase 3: End-to-End (E2E) Verification
+*Simulate real user behavior to verify entire workflows.*
 
-### [ ] Professional Security Audit (External)
-- [ ] Engage penetration testing firm
-- [ ] Complete vulnerability assessment questionnaire
-- [ ] Provide audit access to staging environment
-- [ ] Review and remediate findings
-- [ ] Obtain security certification letter
+### 3.1 Setup Playwright
+```bash
+cd backend
+npx playwright install
+```
 
-### [ ] Security Enhancements (2 days)
-- [ ] Implement Content Security Policy (CSP) headers
-- [ ] Add HTTPS enforcement middleware
-- [ ] Configure rate limiting per endpoint
-- [ ] Add request ID tracking for tracing
-- [ ] Implement session timeout controls
-- [ ] Add IP allowlisting for admin endpoints
+### 3.2 Execute User Journeys
+Run the automated E2E suite to verify:
+1. **Auth:** Login, Logout, Token Refresh.
+2. **HR Core:** Employee Creation, Department Mgt.
+3. **Self-Service:** Leave Requests, Profile Updates.
 
-### [ ] Health Check Improvements (1 day)
-- [ ] Enhance `/health` endpoint
-- [ ] Add database connectivity check
-- [ ] Add Redis connectivity check
-- [ ] Add external dependency checks
-- [ ] Create `/health/ready` and `/health/live` endpoints
+```bash
+# Run headless
+npm run test:e2e
 
-### [ ] SOC 2 Documentation (2 days)
-- [ ] Create `docs/compliance/SOC2.md`
-- [ ] Document security policies
-- [ ] Document access control procedures
-- [ ] Document change management process
-- [ ] Document monitoring and alerting
-- [ ] Create evidence collection process
+# Run with UI (for debugging)
+npm run test:e2e:ui
+```
+
+**Checklist:**
+- [ ] Authentication flow verified
+- [ ] Employee CRUD operations verified
+- [ ] Leave Request flow verified
+- [ ] All E2E tests passing
 
 ---
 
-## Final Checklist Before Enterprise Sale
+## 🚀 Phase 4: Performance & Load Testing
+*Ensure system stability under high traffic.*
 
-### [ ] License Clean-up
-- [ ] Add root `LICENSE` file (choose MIT or ISC)
-- [ ] Update `package.json` license fields consistently
-- [ ] Generate Software Bill of Materials (SBOM)
-- [ ] Check third-party license compliance
+### 4.1 Setup k6
+Download and install k6 (if not present).
 
-### [ ] Documentation Review
-- [ ] Update `README.md` with latest features
-- [ ] Review and update `SECURITY.md` contact info
-- [ ] Create `CHANGELOG.md` with version history
-- [ ] Add API versioning documentation
+### 4.2 Create/Run Load Script
+Create `scripts/load-test.js` if missing.
 
-### [ ] Pre-Launch Verification
-- [ ] Run full E2E test suite
-- [ ] Complete security scan with zero high/critical issues
-- [ ] Verify backup/restore process works
-- [ ] Test disaster recovery procedure
-- [ ] Performance load test (1000 concurrent users)
+```bash
+# Run a smoke test (minimal load)
+k6 run --vus 10 --duration 30s scripts/load-test.js
+
+# Run a load test (simulate normal traffic)
+k6 run --vus 100 --duration 5m scripts/load-test.js
+
+# Run a stress test (find breaking point)
+k6 run --vus 500 --duration 1m scripts/load-test.js
+```
+
+**Success Criteria:**
+- [ ] P95 Response Time < 500ms
+- [ ] Error Rate < 1%
+- [ ] No server crashes during stress test
 
 ---
 
-## Quick Reference
+## 💾 Phase 5: Disaster Recovery & Infrastructure
+*Verify you can recover from failures.*
 
-| Priority | Task | Effort | Week |
-|----------|------|--------|------|
-| 🔴 Critical | Privacy Policy | 1 day | 1 |
-| 🔴 Critical | Terms of Service | 1 day | 1 |
-| 🔴 Critical | GDPR Data Export | 2 days | 1 |
-| 🟠 High | Backup Scripts | 2 days | 2 |
-| 🟠 High | DR Plan | 2 days | 2 |
-| 🟠 High | Deployment Runbook | 1 day | 3 |
-| 🟡 Medium | Incident Response | 1 day | 3 |
-| 🟡 Medium | SOC 2 Docs | 2 days | 4 |
-| 🟢 Low | License Cleanup | 0.5 days | 4 |
+### 5.1 Database Recovery Drill
+1. **Backup:** Run `./scripts/backup-database.sh`.
+2. **Simulate Failure:** Manually drop the `employees` table in the database.
+3. **Restore:** Run `./scripts/restore-database.sh <backup-file>`.
+4. **Verify:** Check if `employees` data is back.
+
+### 5.2 Container Resilience
+1. Start app with Docker Compose.
+2. Manually kill the backend container (`docker kill <container_id>`).
+3. Verify it auto-restarts (Simulating crash recovery).
+
+**Checklist:**
+- [ ] Backup created successfully
+- [ ] Restore successfully recovers deleted data
+- [ ] Containers auto-restart on failure
+
+---
+
+## 📝 Final Sign-Off
+- **Date:** ______________
+- **Tester:** ______________
+- **Status:** [ ] GO for Production / [ ] NO-GO
+
+---
+*Generated by Antigravity*

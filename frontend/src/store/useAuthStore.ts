@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { Permission } from '@/constants/permissions'
-import { buildTenantStorageKey, getClientTenantSlug } from '@/lib/tenant'
 import type { CurrentUser } from '@/types/hrm'
 
 type AuthPersistMode = 'local' | 'session'
@@ -9,10 +8,7 @@ type AuthPersistMode = 'local' | 'session'
 const AUTH_STORAGE_KEY = 'auth-storage'
 const AUTH_STORAGE_MODE_KEY = 'auth-storage-mode'
 
-const resolveTenantKey = (baseKey: string) => {
-    if (typeof window === 'undefined') return baseKey
-    return buildTenantStorageKey(baseKey, getClientTenantSlug())
-}
+const resolveTenantKey = (baseKey: string) => baseKey
 
 function resolvePersistMode(): AuthPersistMode {
     if (typeof window === 'undefined') return 'session'
@@ -27,13 +23,6 @@ function resolvePersistMode(): AuthPersistMode {
         const hasTenantLocalAuth = !!window.localStorage.getItem(tenantAuthKey)
         if (hasTenantLocalAuth) {
             return 'local'
-        }
-
-        const tenantSlug = getClientTenantSlug()
-        const shouldMigrateLegacy = !tenantSlug
-        if (shouldMigrateLegacy) {
-            const hasLegacyLocalAuth = !!window.localStorage.getItem(AUTH_STORAGE_KEY)
-            return hasLegacyLocalAuth ? 'local' : 'session'
         }
 
         return 'session'
@@ -60,16 +49,6 @@ const authPersistStorage = {
             const value = storage.getItem(tenantKey)
             if (value) return value
 
-            const tenantSlug = getClientTenantSlug()
-            if (!tenantSlug && tenantKey !== name) {
-                const legacy = storage.getItem(name)
-                if (legacy) {
-                    storage.setItem(tenantKey, legacy)
-                    storage.removeItem(name)
-                    return legacy
-                }
-            }
-
             return null
         } catch {
             return null
@@ -95,16 +74,13 @@ const authPersistStorage = {
         } catch {
         }
 
-        const tenantSlug = typeof window !== 'undefined' ? getClientTenantSlug() : null
-        if (!tenantSlug) {
-            try {
-                window.localStorage.removeItem(name)
-            } catch {
-            }
-            try {
-                window.sessionStorage.removeItem(name)
-            } catch {
-            }
+        try {
+            window.localStorage.removeItem(name)
+        } catch {
+        }
+        try {
+            window.sessionStorage.removeItem(name)
+        } catch {
         }
     },
 }
@@ -208,12 +184,10 @@ export const useAuthStore = create<AuthState>()(
                     }
                     set({ isAuthTransition: true })
                     try {
-                        const tenantSlug = getClientTenantSlug()
                         const response = await fetch('/api/auth/login', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
                             },
                             credentials: 'include',
                             body: JSON.stringify({ email, password, rememberMe }),
@@ -304,17 +278,15 @@ export const useAuthStore = create<AuthState>()(
                     })
                 },
                 refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
-                    const { token, user, rememberMe } = get()
+                    const { token, user, rememberMe, refreshToken } = get()
                     try {
-                        const tenantSlug = getClientTenantSlug()
                         const response = await fetch('/api/auth/refresh', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                ...(tenantSlug ? { 'X-Tenant-Slug': tenantSlug } : {}),
                             },
                             credentials: 'include',
-                            body: JSON.stringify({ rememberMe }),
+                            body: JSON.stringify({ rememberMe, refreshToken }),
                         })
                         const json = await response.json()
                         if (!response.ok) {
@@ -322,7 +294,7 @@ export const useAuthStore = create<AuthState>()(
                         }
                         const payload = json?.data ?? json
                         const newAccessToken = payload?.accessToken || payload?.token || token
-                        const newRefreshToken = null
+                        const newRefreshToken = payload?.refreshToken ?? refreshToken ?? null
                         const nextUser = payload?.user
                             ? { ...(payload.user || {}), permissions: payload.permissions ?? payload.user?.permissions ?? user?.permissions ?? [] }
                             : user

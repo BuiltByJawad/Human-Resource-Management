@@ -2,15 +2,15 @@ import { analyticsRepository } from './analytics.repository';
 import { DashboardQueryDto } from './dto';
 
 export class AnalyticsService {
-    async getDashboardMetrics(organizationId: string, query: DashboardQueryDto = {}) {
+    async getDashboardMetrics(query: DashboardQueryDto = {}) {
         const startDate = query.startDate ? new Date(query.startDate) : new Date(new Date().setMonth(new Date().getMonth() - 1));
         const endDate = query.endDate ? new Date(query.endDate) : new Date();
 
         const [totalEmployees, activeEmployees, newHires, avgSalary] = await Promise.all([
-            analyticsRepository.getEmployeeCount(organizationId),
-            analyticsRepository.getActiveEmployeeCount(organizationId),
-            analyticsRepository.getNewHiresCount(organizationId, startDate, endDate),
-            analyticsRepository.getAvgSalary(organizationId),
+            analyticsRepository.getEmployeeCount(),
+            analyticsRepository.getActiveEmployeeCount(),
+            analyticsRepository.getNewHiresCount(startDate, endDate),
+            analyticsRepository.getAvgSalary(),
         ]);
 
         const turnoverRate = totalEmployees > 0 ? ((totalEmployees - activeEmployees) / totalEmployees) * 100 : 0;
@@ -24,12 +24,12 @@ export class AnalyticsService {
         };
     }
 
-    async getDepartmentStats(organizationId: string) {
-        const counts = await analyticsRepository.getDepartmentCounts(organizationId);
+    async getDepartmentStats() {
+        const counts = await analyticsRepository.getDepartmentCounts();
         return counts;
     }
 
-    async getUpcomingEvents(organizationId: string, query: DashboardQueryDto = {}) {
+    async getUpcomingEvents(query: DashboardQueryDto = {}) {
         const now = new Date();
         const startDate = query.startDate ? new Date(query.startDate) : now;
         const endDate = query.endDate
@@ -39,8 +39,8 @@ export class AnalyticsService {
         const limit = 8;
 
         const [reviewCycles, approvedLeaves] = await Promise.all([
-            analyticsRepository.getUpcomingReviewCycles(organizationId, startDate, endDate, limit),
-            analyticsRepository.getUpcomingApprovedLeaves(organizationId, startDate, endDate, limit),
+            analyticsRepository.getUpcomingReviewCycles(startDate, endDate, limit),
+            analyticsRepository.getUpcomingApprovedLeaves(startDate, endDate, limit),
         ]);
 
         const events = [
