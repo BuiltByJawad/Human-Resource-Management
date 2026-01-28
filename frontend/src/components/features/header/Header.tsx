@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Bars3Icon } from '@heroicons/react/24/outline'
 import { useBranding } from '@/components/providers/BrandingProvider'
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 import { useAuthStore } from '@/store/useAuthStore'
 import MobileMenu from '@/components/ui/MobileMenu'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -31,7 +31,7 @@ export default function Header() {
   const { showToast } = useToast()
   const router = useRouter()
   const branding = useBranding()
-  const { siteName: storeSiteName, tagline: storeTagline } = useOrgStore()
+  const { siteName: storeSiteName, tagline: storeTagline } = useBrandingStore()
 
   const pathname = usePathname()
   const searchParams = useSearchParams()

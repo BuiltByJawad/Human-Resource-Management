@@ -54,7 +54,7 @@ export class AttendanceService {
             throw new NotFoundError('Employee not found');
         }
 
-        const todayRecord = await attendanceRepository.findTodayRecord(employeeId, organizationId);
+        const todayRecord = await attendanceRepository.findTodayRecord(employeeId);
         if (!todayRecord) {
             throw new BadRequestError('No check-in found for today');
         }

@@ -19,7 +19,7 @@ export async function fetchLoginBranding(): Promise<LoginBranding> {
     'http://localhost:5000'
 
   try {
-    const response = await fetch(`${apiBase}/api/org/branding/public`, {
+    const response = await fetch(`${apiBase}/api/settings/branding/public`, {
       cache: 'no-store',
     })
 

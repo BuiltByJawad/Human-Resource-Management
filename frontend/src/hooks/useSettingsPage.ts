@@ -6,18 +6,18 @@ import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 
 import { useToast } from '@/components/ui/ToastProvider'
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 import {
   changePassword,
-  updateOrgSettings,
-  uploadOrgFavicon,
-  uploadOrgLogo,
+  updateBrandingSettings,
+  uploadBrandingFavicon,
+  uploadBrandingLogo,
 } from '@/services/settings/api'
 import type {
   ChangePasswordPayload,
   NotificationPreferences,
-  OrgSettingsFormState,
-  OrgSettingsPayload,
+  BrandingSettingsFormState,
+  BrandingSettingsPayload,
 } from '@/services/settings/types'
 
 type PasswordFormData = ChangePasswordPayload & {
@@ -49,7 +49,7 @@ const passwordSchema = yup.object({
     .required('Confirm password is required'),
 })
 
-const DEFAULT_ORG_SETTINGS: OrgSettingsFormState = {
+const DEFAULT_BRANDING_SETTINGS: BrandingSettingsFormState = {
   siteName: '',
   tagline: '',
   companyName: '',
@@ -65,39 +65,39 @@ const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
 }
 
 interface UseSettingsPageOptions {
-  initialOrgSettings: OrgSettingsPayload
+  initialBrandingSettings: BrandingSettingsPayload
 }
 
-export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) => {
+export const useSettingsPage = ({ initialBrandingSettings }: UseSettingsPageOptions) => {
   const { showToast } = useToast()
-  const { updateOrg, setLoaded } = useOrgStore()
+  const { updateBranding, setLoaded } = useBrandingStore()
 
-  const normalizedInitialOrg = useMemo(
+  const normalizedInitialBranding = useMemo(
     () => ({
-      siteName: initialOrgSettings.siteName ?? '',
-      tagline: initialOrgSettings.tagline ?? '',
-      companyName: initialOrgSettings.companyName ?? '',
-      companyAddress: initialOrgSettings.companyAddress ?? '',
-      footerYear: initialOrgSettings.footerYear ? String(initialOrgSettings.footerYear) : '',
-      privacyPolicyText: initialOrgSettings.privacyPolicyText ?? '',
-      termsOfServiceText: initialOrgSettings.termsOfServiceText ?? '',
-      logoUrl: initialOrgSettings.logoUrl ?? null,
-      faviconUrl: initialOrgSettings.faviconUrl ?? null,
+      siteName: initialBrandingSettings.siteName ?? '',
+      tagline: initialBrandingSettings.tagline ?? '',
+      companyName: initialBrandingSettings.companyName ?? '',
+      companyAddress: initialBrandingSettings.companyAddress ?? '',
+      footerYear: initialBrandingSettings.footerYear ? String(initialBrandingSettings.footerYear) : '',
+      privacyPolicyText: initialBrandingSettings.privacyPolicyText ?? '',
+      termsOfServiceText: initialBrandingSettings.termsOfServiceText ?? '',
+      logoUrl: initialBrandingSettings.logoUrl ?? null,
+      faviconUrl: initialBrandingSettings.faviconUrl ?? null,
     }),
-    [initialOrgSettings],
+    [initialBrandingSettings],
   )
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATIONS)
-  const [orgSettings, setOrgSettings] = useState<OrgSettingsFormState>(() => ({
-    ...DEFAULT_ORG_SETTINGS,
-    siteName: normalizedInitialOrg.siteName,
-    tagline: normalizedInitialOrg.tagline,
-    companyName: normalizedInitialOrg.companyName,
-    companyAddress: normalizedInitialOrg.companyAddress,
+  const [brandingSettings, setBrandingSettings] = useState<BrandingSettingsFormState>(() => ({
+    ...DEFAULT_BRANDING_SETTINGS,
+    siteName: normalizedInitialBranding.siteName,
+    tagline: normalizedInitialBranding.tagline,
+    companyName: normalizedInitialBranding.companyName,
+    companyAddress: normalizedInitialBranding.companyAddress,
   }))
-  const [orgErrors, setOrgErrors] = useState<
+  const [brandingErrors, setBrandingErrors] = useState<
     Partial<Record<'siteName' | 'companyName' | 'companyAddress', string>>
   >({})
   const [isSavingSettings, setIsSavingSettings] = useState(false)
@@ -118,26 +118,26 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
   })
 
   useEffect(() => {
-    setOrgSettings({
-      siteName: normalizedInitialOrg.siteName,
-      tagline: normalizedInitialOrg.tagline,
-      companyName: normalizedInitialOrg.companyName,
-      companyAddress: normalizedInitialOrg.companyAddress,
-      footerYear: normalizedInitialOrg.footerYear,
-      privacyPolicyText: normalizedInitialOrg.privacyPolicyText,
-      termsOfServiceText: normalizedInitialOrg.termsOfServiceText,
+    setBrandingSettings({
+      siteName: normalizedInitialBranding.siteName,
+      tagline: normalizedInitialBranding.tagline,
+      companyName: normalizedInitialBranding.companyName,
+      companyAddress: normalizedInitialBranding.companyAddress,
+      footerYear: normalizedInitialBranding.footerYear,
+      privacyPolicyText: normalizedInitialBranding.privacyPolicyText,
+      termsOfServiceText: normalizedInitialBranding.termsOfServiceText,
     })
-    updateOrg({
-      siteName: normalizedInitialOrg.siteName,
-      tagline: normalizedInitialOrg.tagline,
-      companyName: normalizedInitialOrg.companyName,
-      companyAddress: normalizedInitialOrg.companyAddress,
-      footerYear: normalizedInitialOrg.footerYear ? Number(normalizedInitialOrg.footerYear) : null,
-      logoUrl: normalizedInitialOrg.logoUrl,
-      faviconUrl: normalizedInitialOrg.faviconUrl,
+    updateBranding({
+      siteName: normalizedInitialBranding.siteName,
+      tagline: normalizedInitialBranding.tagline,
+      companyName: normalizedInitialBranding.companyName,
+      companyAddress: normalizedInitialBranding.companyAddress,
+      footerYear: normalizedInitialBranding.footerYear ? Number(normalizedInitialBranding.footerYear) : null,
+      logoUrl: normalizedInitialBranding.logoUrl,
+      faviconUrl: normalizedInitialBranding.faviconUrl,
     })
     setLoaded(true)
-  }, [normalizedInitialOrg, updateOrg, setLoaded])
+  }, [normalizedInitialBranding, updateBranding, setLoaded])
 
   useEffect(() => {
     setIsMounted(true)
@@ -147,14 +147,14 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
     showToast('Notification preferences saved', 'success')
   }, [showToast])
 
-  const handleSaveOrgSettings = useCallback(async () => {
+  const handleSaveBrandingSettings = useCallback(async () => {
     const errorsMap: Partial<Record<'siteName' | 'companyName' | 'companyAddress', string>> = {}
-    if (!orgSettings.siteName.trim()) errorsMap.siteName = 'Site name is required'
-    if (!orgSettings.companyName.trim()) errorsMap.companyName = 'Company name is required'
-    if (!orgSettings.companyAddress.trim()) errorsMap.companyAddress = 'Company address is required'
+    if (!brandingSettings.siteName.trim()) errorsMap.siteName = 'Site name is required'
+    if (!brandingSettings.companyName.trim()) errorsMap.companyName = 'Company name is required'
+    if (!brandingSettings.companyAddress.trim()) errorsMap.companyAddress = 'Company address is required'
 
     if (Object.keys(errorsMap).length > 0) {
-      setOrgErrors(errorsMap)
+      setBrandingErrors(errorsMap)
       const firstError = Object.values(errorsMap).find(Boolean)
       if (firstError) showToast(firstError, 'error')
       return
@@ -162,38 +162,38 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
 
     setIsSavingSettings(true)
     try {
-      const payload: OrgSettingsPayload = {
-        siteName: orgSettings.siteName,
-        tagline: orgSettings.tagline,
-        companyName: orgSettings.companyName,
-        companyAddress: orgSettings.companyAddress,
-        footerYear: orgSettings.footerYear ? Number(orgSettings.footerYear) : null,
-        privacyPolicyText: orgSettings.privacyPolicyText,
-        termsOfServiceText: orgSettings.termsOfServiceText,
+      const payload: BrandingSettingsPayload = {
+        siteName: brandingSettings.siteName,
+        tagline: brandingSettings.tagline,
+        companyName: brandingSettings.companyName,
+        companyAddress: brandingSettings.companyAddress,
+        footerYear: brandingSettings.footerYear ? Number(brandingSettings.footerYear) : null,
+        privacyPolicyText: brandingSettings.privacyPolicyText,
+        termsOfServiceText: brandingSettings.termsOfServiceText,
       }
-      const data = await updateOrgSettings(payload)
-      updateOrg({
-        siteName: data.siteName ?? orgSettings.siteName,
-        tagline: data.tagline ?? orgSettings.tagline,
-        companyName: data.companyName ?? orgSettings.companyName,
-        companyAddress: data.companyAddress ?? orgSettings.companyAddress,
-        footerYear: data.footerYear ?? (orgSettings.footerYear ? Number(orgSettings.footerYear) : null),
+      const data = await updateBrandingSettings(payload)
+      updateBranding({
+        siteName: data.siteName ?? brandingSettings.siteName,
+        tagline: data.tagline ?? brandingSettings.tagline,
+        companyName: data.companyName ?? brandingSettings.companyName,
+        companyAddress: data.companyAddress ?? brandingSettings.companyAddress,
+        footerYear: data.footerYear ?? (brandingSettings.footerYear ? Number(brandingSettings.footerYear) : null),
       })
-      showToast('Organization settings saved', 'success')
+      showToast('Settings saved', 'success')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save settings'
       showToast(message, 'error')
     } finally {
       setIsSavingSettings(false)
     }
-  }, [orgSettings, showToast, updateOrg])
+  }, [brandingSettings, showToast, updateBranding])
 
   const handleLogoUpload = useCallback(
     async (file: File) => {
       try {
-        const url = await uploadOrgLogo(file)
+        const url = await uploadBrandingLogo(file)
         if (url) {
-          updateOrg({ logoUrl: url })
+          updateBranding({ logoUrl: url })
           showToast('Logo updated', 'success')
         } else {
           showToast('Logo uploaded but no URL returned from server', 'error')
@@ -203,15 +203,15 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
         showToast(message, 'error')
       }
     },
-    [showToast, updateOrg],
+    [showToast, updateBranding],
   )
 
   const handleFaviconUpload = useCallback(
     async (file: File) => {
       try {
-        const url = await uploadOrgFavicon(file)
+        const url = await uploadBrandingFavicon(file)
         if (url) {
-          updateOrg({ faviconUrl: url })
+          updateBranding({ faviconUrl: url })
           showToast('Favicon updated', 'success')
         } else {
           showToast('Favicon uploaded but no URL returned from server', 'error')
@@ -221,7 +221,7 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
         showToast(message, 'error')
       }
     },
-    [showToast, updateOrg],
+    [showToast, updateBranding],
   )
 
   const onSubmit = useCallback(
@@ -246,10 +246,10 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
   )
 
   return {
-    orgSettings,
-    setOrgSettings,
-    orgErrors,
-    setOrgErrors,
+    brandingSettings,
+    setBrandingSettings,
+    brandingErrors,
+    setBrandingErrors,
     isSavingSettings,
     isMounted,
     notifications,
@@ -258,7 +258,7 @@ export const useSettingsPage = ({ initialOrgSettings }: UseSettingsPageOptions) 
     setShowPasswordModal,
     isChangingPassword,
     handleSaveNotifications,
-    handleSaveOrgSettings,
+    handleSaveBrandingSettings,
     handleLogoUpload,
     handleFaviconUpload,
     onSubmit,

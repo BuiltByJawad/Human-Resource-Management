@@ -771,7 +771,7 @@ router.post(
 
     const validRecipientIds = users.map((u) => u.id)
     if (!validRecipientIds.length) {
-      return res.status(400).json({ success: false, message: 'No valid recipients found for this organization' })
+      return res.status(400).json({ success: false, message: 'No valid recipients found for this workspace' })
     }
 
     const now = new Date()
@@ -823,7 +823,7 @@ router.put(
 
     const validRecipientIds = users.map((u) => u.id)
     if (!validRecipientIds.length) {
-      return res.status(400).json({ success: false, message: 'No valid recipients found for this organization' })
+      return res.status(400).json({ success: false, message: 'No valid recipients found for this workspace' })
     }
 
     const now = new Date()

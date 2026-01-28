@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useBranding } from '@/components/providers/BrandingProvider'
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 
 const DEFAULT_TITLE = 'HRM Platform'
 
@@ -11,7 +11,7 @@ export function FaviconManager() {
   const pathname = usePathname()
   const branding = useBranding()
   const siteName = branding?.siteName
-  const storeFaviconUrl = useOrgStore((state) => state.faviconUrl)
+  const storeFaviconUrl = useBrandingStore((state) => state.faviconUrl)
 
   // Keep document.title in sync with branding
   useEffect(() => {

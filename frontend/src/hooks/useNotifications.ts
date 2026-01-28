@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { io, type Socket } from 'socket.io-client'
 import { getBackendBaseUrl } from '@/lib/config/env'
-import { readTenantUnreadCount, writeTenantUnreadCount } from '@/lib/utils/notificationStorage'
+import { readUnreadCount, writeUnreadCount } from '@/lib/utils/notificationStorage'
 import { mapNotificationPayload } from '@/lib/utils/notifications'
 import {
   fetchNotifications,
@@ -69,7 +69,7 @@ export type UseNotificationsResult = {
 }
 
 export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMutationError }: UseNotificationsParams): UseNotificationsResult {
-  const [cachedUnreadCount, setCachedUnreadCount] = useState<number>(() => readTenantUnreadCount())
+  const [cachedUnreadCount, setCachedUnreadCount] = useState<number>(() => readUnreadCount())
   const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -88,7 +88,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
         if (maybeUnreadCount != null) {
           setServerUnreadCount(maybeUnreadCount)
           setCachedUnreadCount(maybeUnreadCount)
-          writeTenantUnreadCount(maybeUnreadCount)
+          writeUnreadCount(maybeUnreadCount)
         }
 
         const rawItems = extractArray(root)
@@ -101,7 +101,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
           }).length
           setServerUnreadCount(unreadFromPayload)
           setCachedUnreadCount(unreadFromPayload)
-          writeTenantUnreadCount(unreadFromPayload)
+          writeUnreadCount(unreadFromPayload)
         }
 
         setError(null)
@@ -156,7 +156,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
       )
       setServerUnreadCount(0)
       setCachedUnreadCount(0)
-      writeTenantUnreadCount(0)
+      writeUnreadCount(0)
       queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
     },
     onError: (err) => onMutationError?.(err, 'all'),
@@ -173,7 +173,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
       })
       setServerUnreadCount(nextUnread)
       setCachedUnreadCount(nextUnread)
-      writeTenantUnreadCount(nextUnread)
+      writeUnreadCount(nextUnread)
       queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
     },
     onError: (err) => onMutationError?.(err, 'one'),
@@ -187,7 +187,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
     if (notificationData.length === 0) {
       setServerUnreadCount(0)
       setCachedUnreadCount(0)
-      writeTenantUnreadCount(0)
+      writeUnreadCount(0)
       return
     }
     const nextUnread = notificationData.filter((item) => !item.read).length
@@ -195,7 +195,7 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
 
     setServerUnreadCount((prev) => (prev === nextUnread ? prev : nextUnread))
     setCachedUnreadCount((prev) => (prev === nextUnread ? prev : nextUnread))
-    writeTenantUnreadCount(nextUnread)
+    writeUnreadCount(nextUnread)
   }, [notificationsQuery.isSuccess, notificationData, serverUnreadCount, error])
 
   const unreadCount = useMemo(() => {

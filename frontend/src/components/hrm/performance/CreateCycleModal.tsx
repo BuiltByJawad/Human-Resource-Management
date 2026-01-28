@@ -80,7 +80,7 @@ export function CreateCycleModal({ isOpen, onClose, onSubmit, loading }: CreateC
                                             </Dialog.Title>
                                             <div className="mt-2">
                                                 <p className="text-sm text-gray-500 mb-4">
-                                                    Set up a new performance review cycle for the organization.
+                                                    Set up a new performance review cycle for the company.
                                                 </p>
                                                 <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
                                                     <div>

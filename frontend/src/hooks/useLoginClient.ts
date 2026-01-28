@@ -8,7 +8,7 @@ import * as yup from 'yup'
 
 import { useToast } from '@/components/ui/ToastProvider'
 import { useAuthStore } from '@/store/useAuthStore'
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 import type { LoginBranding } from '@/services/login/types'
 
 const loginSchema = yup.object().shape({
@@ -22,7 +22,7 @@ export type LoginFormData = yup.InferType<typeof loginSchema>
 export function useLoginClient(branding: LoginBranding) {
   const router = useRouter()
   const { login, isAuthTransition, endAuthTransition, isAuthenticated } = useAuthStore()
-  const { updateOrg } = useOrgStore()
+  const { updateBranding } = useBrandingStore()
   const { showToast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const isSubmittingRef = useRef(false)
@@ -39,15 +39,15 @@ export function useLoginClient(branding: LoginBranding) {
   }, [router])
 
   useEffect(() => {
-    updateOrg({
-      siteName: branding.siteName,
+    updateBranding({
+      siteName: branding.siteName ?? '',
       tagline: branding.tagline ?? '',
       companyName: branding.companyName ?? '',
       companyAddress: branding.companyAddress ?? '',
       logoUrl: branding.logoUrl ?? null,
-      ...(branding.faviconUrl ? { faviconUrl: branding.faviconUrl } : {}),
+      faviconUrl: branding.faviconUrl ?? null,
     })
-  }, [branding, updateOrg])
+  }, [branding, updateBranding])
 
   const {
     register,

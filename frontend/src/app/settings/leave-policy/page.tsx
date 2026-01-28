@@ -45,7 +45,7 @@ function isLeavePolicyResponse(value: unknown): value is LeavePolicyApiResponse 
 }
 
 async function fetchInitialLeavePolicy(token: string | null): Promise<LeavePolicyPayload> {
-  const data = await fetchWithToken<LeavePolicyPayload | LeavePolicyApiResponse>('/api/org/leave-policy', token)
+  const data = await fetchWithToken<LeavePolicyPayload | LeavePolicyApiResponse>('/api/settings/leave-policy', token)
   if (!data) return {}
   if (isLeavePolicyResponse(data)) {
     return data.data ?? {}

@@ -28,7 +28,7 @@ const sections = [
   {
     title: "Contact",
     body: [
-      "For privacy inquiries, contact your organization administrator or our security contact.",
+      "For privacy inquiries, contact your administrator or our security contact.",
     ],
   },
 ];
@@ -44,7 +44,7 @@ async function fetchPolicyText(): Promise<string | null> {
   const apiBase = getBackendBaseUrl()
 
   try {
-    const response = await fetch(`${apiBase}/api/org/policies/public`, {
+    const response = await fetch(`${apiBase}/api/settings/policies/public`, {
       cache: 'no-store',
     })
     if (!response.ok) return null
@@ -65,7 +65,7 @@ export default async function PrivacyPolicyPage() {
           <h1 className="text-3xl font-semibold text-slate-900">Privacy Policy</h1>
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
             Effective date: {new Date().getFullYear()}-01-01. This policy is intended to be adapted to your
-            organization’s legal requirements.
+            legal requirements.
           </p>
         </header>
 

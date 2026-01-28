@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-interface OrgState {
+interface BrandingState {
   siteName: string
   shortName: string
   tagline: string
@@ -13,16 +13,14 @@ interface OrgState {
   loaded: boolean
 }
 
-interface OrgStore extends OrgState {
-  updateOrg: (updates: Partial<OrgState>) => void
+interface BrandingStore extends BrandingState {
+  updateBranding: (updates: Partial<BrandingState>) => void
   setLoaded: (loaded: boolean) => void
 }
 
-const ORG_STORAGE_KEY = 'org-config'
+const BRANDING_STORAGE_KEY = 'branding-config'
 
-const resolveTenantKey = (baseKey: string) => baseKey
-
-const DEFAULTS: OrgState = {
+const DEFAULTS: BrandingState = {
   siteName: '',
   shortName: 'HR',
   tagline: '',
@@ -35,8 +33,8 @@ const DEFAULTS: OrgState = {
   loaded: false,
 }
 
-const getInitialState = (): OrgState => {
-  // IMPORTANT: Initial org state must be identical on the server and on the
+const getInitialState = (): BrandingState => {
+  // IMPORTANT: Initial branding state must be identical on the server and on the
   // first client render to avoid hydration mismatches. We rely on the
   // BrandingProvider (server-fetched) for SSR values and let the persist
   // middleware rehydrate from localStorage *after* mount via onRehydrateStorage.
@@ -44,12 +42,11 @@ const getInitialState = (): OrgState => {
   return DEFAULTS
 }
 
-const orgPersistStorage = {
+const brandingPersistStorage = {
   getItem: (name: string) => {
     if (typeof window === 'undefined') return null
     try {
-      const tenantKey = resolveTenantKey(name)
-      const value = window.localStorage.getItem(tenantKey)
+      const value = window.localStorage.getItem(name)
       if (value) return value
 
       return null
@@ -60,14 +57,14 @@ const orgPersistStorage = {
   setItem: (name: string, value: string) => {
     if (typeof window === 'undefined') return
     try {
-      window.localStorage.setItem(resolveTenantKey(name), value)
+      window.localStorage.setItem(name, value)
     } catch {
     }
   },
   removeItem: (name: string) => {
     if (typeof window === 'undefined') return
     try {
-      window.localStorage.removeItem(resolveTenantKey(name))
+      window.localStorage.removeItem(name)
     } catch {
     }
 
@@ -88,11 +85,11 @@ function deriveShortName(name: string | null | undefined, fallback: string): str
   return letters || fallback
 }
 
-export const useOrgStore = create<OrgStore>()(
+export const useBrandingStore = create<BrandingStore>()(
   persist(
     (set, get) => ({
       ...getInitialState(),
-      updateOrg: (updates) => {
+      updateBranding: (updates) => {
         const current = get()
         const nextSiteName = updates.siteName ?? current.siteName
         set({
@@ -104,15 +101,15 @@ export const useOrgStore = create<OrgStore>()(
       setLoaded: (loaded) => set((state) => ({ ...state, loaded })),
     }),
     {
-      name: ORG_STORAGE_KEY,
-      storage: createJSONStorage(() => orgPersistStorage),
+      name: BRANDING_STORAGE_KEY,
+      storage: createJSONStorage(() => brandingPersistStorage),
       partialize: (state) => {
         const { faviconUrl, ...rest } = state
         return rest
       },
       onRehydrateStorage: () => (state, error) => {
         if (state && !error) {
-          state.updateOrg({ siteName: state.siteName, faviconUrl: null })
+          state.updateBranding({ siteName: state.siteName, faviconUrl: null })
           state.setLoaded(true)
         }
       },

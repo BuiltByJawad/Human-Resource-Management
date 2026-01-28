@@ -21,7 +21,7 @@ import {
     ComputerDesktopIcon
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 import { PERMISSIONS, type Permission } from '@/constants/permissions'
 
 type NavIcon = typeof HomeIcon
@@ -78,7 +78,7 @@ export default function MobileMenu({ isOpen, onClose, user }: MobileMenuProps) {
     const pathname = usePathname()
     const { hasAnyPermission } = useAuthStore()
     const branding = useBranding()
-    const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl } = useOrgStore()
+    const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl } = useBrandingStore()
 
     const siteName = branding?.siteName || storeSiteName
     const shortName = branding?.shortName || storeShortName

@@ -3,11 +3,11 @@
 import { cookies } from "next/headers"
 
 import { SettingsPageClient } from "./SettingsPageClient"
-import type { OrgSettingsPayload } from "@/services/settings/types"
+import type { BrandingSettingsPayload } from "@/services/settings/types"
 
-type OrgSettingsApiResponse = {
+type BrandingSettingsApiResponse = {
   success?: boolean
-  data?: OrgSettingsPayload
+  data?: BrandingSettingsPayload
 }
 
 function buildApiBase() {
@@ -39,15 +39,15 @@ async function fetchWithToken<T = any>(path: string, token: string | null): Prom
   }
 }
 
-function isOrgSettingsResponse(value: unknown): value is OrgSettingsApiResponse {
+function isBrandingSettingsResponse(value: unknown): value is BrandingSettingsApiResponse {
   if (!value || typeof value !== "object") return false
   return "success" in value || "data" in (value as Record<string, unknown>)
 }
 
-async function fetchInitialOrgSettings(token: string | null): Promise<OrgSettingsPayload> {
-  const data = await fetchWithToken<OrgSettingsPayload | OrgSettingsApiResponse>("/api/org/settings", token)
+async function fetchInitialBrandingSettings(token: string | null): Promise<BrandingSettingsPayload> {
+  const data = await fetchWithToken<BrandingSettingsPayload | BrandingSettingsApiResponse>("/api/settings", token)
   if (!data) return {}
-  if (isOrgSettingsResponse(data)) {
+  if (isBrandingSettingsResponse(data)) {
     return data.data ?? {}
   }
   return data
@@ -57,7 +57,7 @@ export default async function SettingsPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get("accessToken")?.value ?? null
 
-  const initialOrgSettings = await fetchInitialOrgSettings(token)
+  const initialBrandingSettings = await fetchInitialBrandingSettings(token)
 
-  return <SettingsPageClient initialOrgSettings={initialOrgSettings} />
+  return <SettingsPageClient initialBrandingSettings={initialBrandingSettings} />
 }

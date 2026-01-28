@@ -1,22 +1,24 @@
 import api from '@/lib/axios'
 import type {
   ChangePasswordPayload,
-  OrgSettingsPayload,
-  OrgSettingsUpdateResponse,
+  BrandingSettingsPayload,
+  BrandingSettingsUpdateResponse,
   PolicyHistoryEntry,
 } from '@/services/settings/types'
 
-export const updateOrgSettings = async (payload: OrgSettingsPayload): Promise<OrgSettingsPayload> => {
-  const response = await api.put<OrgSettingsUpdateResponse>('/org/settings', payload)
+export const updateBrandingSettings = async (
+  payload: BrandingSettingsPayload
+): Promise<BrandingSettingsPayload> => {
+  const response = await api.put<BrandingSettingsUpdateResponse>('/settings', payload)
   return response.data?.data ?? payload
 }
 
-export const uploadOrgLogo = async (file: File): Promise<string | null> => {
+export const uploadBrandingLogo = async (file: File): Promise<string | null> => {
   const formData = new FormData()
   formData.append('logo', file)
 
   const response = await api.post<{ data?: { logoUrl?: string }; logoUrl?: string }>(
-    '/org/branding/logo',
+    '/settings/branding/logo',
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -26,12 +28,12 @@ export const uploadOrgLogo = async (file: File): Promise<string | null> => {
   return response.data?.data?.logoUrl ?? response.data?.logoUrl ?? null
 }
 
-export const uploadOrgFavicon = async (file: File): Promise<string | null> => {
+export const uploadBrandingFavicon = async (file: File): Promise<string | null> => {
   const formData = new FormData()
   formData.append('favicon', file)
 
   const response = await api.post<{ data?: { faviconUrl?: string }; faviconUrl?: string }>(
-    '/org/branding/favicon',
+    '/settings/branding/favicon',
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -46,6 +48,6 @@ export const changePassword = async (payload: ChangePasswordPayload): Promise<vo
 }
 
 export const fetchPolicyHistory = async (): Promise<PolicyHistoryEntry[]> => {
-  const response = await api.get<{ success?: boolean; data?: PolicyHistoryEntry[] }>('/org/policies/history')
+  const response = await api.get<{ success?: boolean; data?: PolicyHistoryEntry[] }>('/settings/policies/history')
   return response.data?.data ?? []
 }

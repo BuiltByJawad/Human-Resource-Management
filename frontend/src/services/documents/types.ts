@@ -7,7 +7,6 @@ export interface CompanyDocument {
   type: string
   isVisible: boolean
   uploadedBy: string
-  organizationId?: string
   createdAt: string
   updatedAt: string
 }

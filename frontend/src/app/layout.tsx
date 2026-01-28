@@ -52,7 +52,7 @@ async function fetchBranding(): Promise<BrandingData> {
   const apiBase = getBackendBaseUrl()
 
   try {
-    const response = await fetch(`${apiBase}/api/org/branding/public`, {
+    const response = await fetch(`${apiBase}/api/settings/branding/public`, {
       cache: 'no-store',
     });
 

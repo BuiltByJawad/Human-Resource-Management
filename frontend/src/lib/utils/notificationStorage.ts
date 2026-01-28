@@ -2,19 +2,19 @@ const LEGACY_LOCAL_KEY = 'hrm:notificationUnreadCount'
 const LEGACY_SESSION_KEY = 'ui:lastUnreadCount'
 const UNREAD_COUNT_KEY = 'notification-unread-count'
 
-export const readTenantUnreadCount = (): number => {
+export const readUnreadCount = (): number => {
   if (typeof window === 'undefined') return 0
 
-  const rawTenantLocal = window.localStorage.getItem(UNREAD_COUNT_KEY)
-  const rawTenantSession = window.sessionStorage.getItem(UNREAD_COUNT_KEY)
+  const rawLocal = window.localStorage.getItem(UNREAD_COUNT_KEY)
+  const rawSession = window.sessionStorage.getItem(UNREAD_COUNT_KEY)
   const rawLegacyLocal = window.localStorage.getItem(LEGACY_LOCAL_KEY)
   const rawLegacySession = window.sessionStorage.getItem(LEGACY_SESSION_KEY)
-  const candidate = rawTenantLocal ?? rawTenantSession ?? rawLegacyLocal ?? rawLegacySession
+  const candidate = rawLocal ?? rawSession ?? rawLegacyLocal ?? rawLegacySession
   const parsed = candidate ? Number(candidate) : 0
 
   if (!Number.isFinite(parsed) || parsed < 0) return 0
 
-  if (rawTenantLocal == null && rawTenantSession == null) {
+  if (rawLocal == null && rawSession == null) {
     window.localStorage.setItem(UNREAD_COUNT_KEY, String(parsed))
     window.sessionStorage.setItem(UNREAD_COUNT_KEY, String(parsed))
   }
@@ -26,7 +26,7 @@ export const readTenantUnreadCount = (): number => {
   return parsed
 }
 
-export const writeTenantUnreadCount = (count: number) => {
+export const writeUnreadCount = (count: number) => {
   if (typeof window === 'undefined') return
   if (!Number.isFinite(count) || count < 0) return
 

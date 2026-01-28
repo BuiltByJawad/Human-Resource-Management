@@ -24,8 +24,9 @@ export const getApiEnvConfig = (): ApiEnvConfig => {
 
   if (envApiUrl && isAbsoluteHttpUrl(envApiUrl) && !isLikelyNextOrigin(envApiUrl)) {
     const normalized = trimTrailingSlash(envApiUrl);
-    apiBaseUrl = normalized;
-    const withoutApi = normalized.replace(/\/?api\/?$/i, "");
+    const normalizedWithApi = /\/api$/i.test(normalized) ? normalized : `${normalized}/api`;
+    apiBaseUrl = normalizedWithApi;
+    const withoutApi = normalizedWithApi.replace(/\/?api\/?$/i, "");
     backendUrl = withoutApi ? withoutApi : DEFAULT_BACKEND_URL;
   } else if (backendUrlEnv && isAbsoluteHttpUrl(backendUrlEnv)) {
     const normalizedBackend = trimTrailingSlash(backendUrlEnv);

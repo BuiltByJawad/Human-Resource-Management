@@ -1,17 +1,17 @@
 import AvatarUpload from '@/components/ui/AvatarUpload'
 import { Input, TextArea } from '@/components/ui/FormComponents'
 import type {
-  OrgSettingsErrors,
-  OrgSettingsFormState,
+  BrandingSettingsErrors,
+  BrandingSettingsFormState,
 } from '@/services/settings/types'
 
 interface BrandingSettingsSectionProps {
   logoUrl: string | null
   faviconUrl: string | null
-  orgSettings: OrgSettingsFormState
-  orgErrors: OrgSettingsErrors
-  onUpdateOrgSettings: (next: OrgSettingsFormState) => void
-  onUpdateOrgErrors: (updater: (prev: OrgSettingsErrors) => OrgSettingsErrors) => void
+  brandingSettings: BrandingSettingsFormState
+  brandingErrors: BrandingSettingsErrors
+  onUpdateBrandingSettings: (next: BrandingSettingsFormState) => void
+  onUpdateBrandingErrors: (updater: (prev: BrandingSettingsErrors) => BrandingSettingsErrors) => void
   onSave: () => void
   isSaving: boolean
   onLogoUpload: (file: File) => void
@@ -21,10 +21,10 @@ interface BrandingSettingsSectionProps {
 export const BrandingSettingsSection = ({
   logoUrl,
   faviconUrl,
-  orgSettings,
-  orgErrors,
-  onUpdateOrgSettings,
-  onUpdateOrgErrors,
+  brandingSettings,
+  brandingErrors,
+  onUpdateBrandingSettings,
+  onUpdateBrandingErrors,
   onSave,
   isSaving,
   onLogoUpload,
@@ -48,26 +48,26 @@ export const BrandingSettingsSection = ({
       <Input
         label="Site Name"
         required
-        error={orgErrors.siteName}
-        value={orgSettings.siteName}
+        error={brandingErrors.siteName}
+        value={brandingSettings.siteName}
         onChange={(e) => {
-          if (orgErrors.siteName) {
-            onUpdateOrgErrors((prev) => ({ ...prev, siteName: undefined }))
+          if (brandingErrors.siteName) {
+            onUpdateBrandingErrors((prev) => ({ ...prev, siteName: undefined }))
           }
-          onUpdateOrgSettings({ ...orgSettings, siteName: e.target.value })
+          onUpdateBrandingSettings({ ...brandingSettings, siteName: e.target.value })
         }}
       />
       <Input
         label="Tagline"
-        value={orgSettings.tagline}
-        onChange={(e) => onUpdateOrgSettings({ ...orgSettings, tagline: e.target.value })}
+        value={brandingSettings.tagline}
+        onChange={(e) => onUpdateBrandingSettings({ ...brandingSettings, tagline: e.target.value })}
       />
       <Input
         label="Footer Year"
         placeholder="2026"
-        value={orgSettings.footerYear}
+        value={brandingSettings.footerYear}
         onChange={(e) => {
-          onUpdateOrgSettings({ ...orgSettings, footerYear: e.target.value })
+          onUpdateBrandingSettings({ ...brandingSettings, footerYear: e.target.value })
         }}
       />
     </div>
@@ -75,39 +75,39 @@ export const BrandingSettingsSection = ({
       <TextArea
         label="Privacy Policy"
         rows={6}
-        value={orgSettings.privacyPolicyText}
-        onChange={(e) => onUpdateOrgSettings({ ...orgSettings, privacyPolicyText: e.target.value })}
+        value={brandingSettings.privacyPolicyText}
+        onChange={(e) => onUpdateBrandingSettings({ ...brandingSettings, privacyPolicyText: e.target.value })}
       />
       <TextArea
         label="Terms of Service"
         rows={6}
-        value={orgSettings.termsOfServiceText}
-        onChange={(e) => onUpdateOrgSettings({ ...orgSettings, termsOfServiceText: e.target.value })}
+        value={brandingSettings.termsOfServiceText}
+        onChange={(e) => onUpdateBrandingSettings({ ...brandingSettings, termsOfServiceText: e.target.value })}
       />
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Input
         label="Company Name (for payslips)"
         required
-        error={orgErrors.companyName}
-        value={orgSettings.companyName}
+        error={brandingErrors.companyName}
+        value={brandingSettings.companyName}
         onChange={(e) => {
-          if (orgErrors.companyName) {
-            onUpdateOrgErrors((prev) => ({ ...prev, companyName: undefined }))
+          if (brandingErrors.companyName) {
+            onUpdateBrandingErrors((prev) => ({ ...prev, companyName: undefined }))
           }
-          onUpdateOrgSettings({ ...orgSettings, companyName: e.target.value })
+          onUpdateBrandingSettings({ ...brandingSettings, companyName: e.target.value })
         }}
       />
       <Input
         label="Company Address (for payslips)"
         required
-        error={orgErrors.companyAddress}
-        value={orgSettings.companyAddress}
+        error={brandingErrors.companyAddress}
+        value={brandingSettings.companyAddress}
         onChange={(e) => {
-          if (orgErrors.companyAddress) {
-            onUpdateOrgErrors((prev) => ({ ...prev, companyAddress: undefined }))
+          if (brandingErrors.companyAddress) {
+            onUpdateBrandingErrors((prev) => ({ ...prev, companyAddress: undefined }))
           }
-          onUpdateOrgSettings({ ...orgSettings, companyAddress: e.target.value })
+          onUpdateBrandingSettings({ ...brandingSettings, companyAddress: e.target.value })
         }}
       />
     </div>

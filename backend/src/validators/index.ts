@@ -105,7 +105,7 @@ export const roleSchema = Joi.object({
   permissions: Joi.object().required(),
 })
 
-export const orgSettingsSchema = Joi.object({
+export const settingsSchema = Joi.object({
   siteName: Joi.string().max(100).allow('', null),
   tagline: Joi.string().max(150).allow('', null),
   companyName: Joi.string().max(150).allow('', null),

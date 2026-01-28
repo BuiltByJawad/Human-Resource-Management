@@ -124,7 +124,6 @@ const options: swaggerJsdoc.Options = {
             { name: 'Assets', description: 'Asset management' },
             { name: 'Compliance', description: 'Compliance tracking' },
             { name: 'Analytics', description: 'Reports and analytics' },
-            { name: 'Organization', description: 'Organization settings' },
         ],
     },
     apis: [

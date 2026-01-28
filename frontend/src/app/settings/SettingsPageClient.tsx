@@ -4,11 +4,11 @@ import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 
 import { useAuthStore } from "@/store/useAuthStore"
-import { useOrgStore } from "@/store/useOrgStore"
+import { useBrandingStore } from "@/store/useBrandingStore"
 import { PERMISSIONS } from "@/constants/permissions"
 import DashboardShell from "@/components/ui/DashboardShell"
 import { useSettingsPage } from "@/hooks/useSettingsPage"
-import type { OrgSettingsPayload } from "@/services/settings/types"
+import type { BrandingSettingsPayload } from "@/services/settings/types"
 import { NotificationsSection } from "@/components/features/settings/NotificationsSection"
 import { SettingsActionCard } from "@/components/features/settings/SettingsActionCard"
 import { BrandingSettingsSection } from "@/components/features/settings/BrandingSettingsSection"
@@ -17,18 +17,18 @@ import { PasswordChangeModal } from "@/components/features/settings/PasswordChan
 import { PolicyHistorySection } from "@/components/features/settings/PolicyHistorySection"
 
 interface SettingsPageClientProps {
-  initialOrgSettings: OrgSettingsPayload
+  initialBrandingSettings: BrandingSettingsPayload
 }
 
-export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientProps) {
+export function SettingsPageClient({ initialBrandingSettings }: SettingsPageClientProps) {
   const router = useRouter()
   const { hasPermission } = useAuthStore()
-  const { logoUrl, faviconUrl } = useOrgStore()
+  const { logoUrl, faviconUrl } = useBrandingStore()
   const {
-    orgSettings,
-    setOrgSettings,
-    orgErrors,
-    setOrgErrors,
+    brandingSettings,
+    setBrandingSettings,
+    brandingErrors,
+    setBrandingErrors,
     isSavingSettings,
     isMounted,
     notifications,
@@ -37,7 +37,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
     setShowPasswordModal,
     isChangingPassword,
     handleSaveNotifications,
-    handleSaveOrgSettings,
+    handleSaveBrandingSettings,
     handleLogoUpload,
     handleFaviconUpload,
     onSubmit,
@@ -45,7 +45,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
     handleSubmit,
     reset,
     errors,
-  } = useSettingsPage({ initialOrgSettings })
+  } = useSettingsPage({ initialBrandingSettings })
 
   const adminSections = useMemo(
     () => [
@@ -53,11 +53,11 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         key: 'notifications',
         permission: PERMISSIONS.MANAGE_NOTIFICATIONS,
         title: "Notifications",
-        description: "Manage how your organization receives system notifications.",
+        description: "Manage how your workspace receives system notifications.",
         content: (
           <NotificationsSection
             title="Notifications"
-            description="Manage how your organization receives system notifications."
+            description="Manage how your workspace receives system notifications."
             notifications={notifications}
             onChange={setNotifications}
             onSave={handleSaveNotifications}
@@ -78,7 +78,7 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
         key: 'roles-permissions',
         permission: PERMISSIONS.MANAGE_ROLES,
         title: "Roles & Permissions",
-        description: "Create roles, assign permissions, and control access across the organization.",
+        description: "Create roles, assign permissions, and control access across the workspace.",
         action: () => router.push("/roles"),
         actionLabel: "Manage roles",
       },
@@ -101,17 +101,17 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
       {
         key: 'branding',
         permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
-        title: "Organization Branding",
+        title: "Branding",
         description: "Configure the name, logo, and public identity of your HR workspace.",
         content: (
           <BrandingSettingsSection
             logoUrl={logoUrl}
             faviconUrl={faviconUrl}
-            orgSettings={orgSettings}
-            orgErrors={orgErrors}
-            onUpdateOrgSettings={setOrgSettings}
-            onUpdateOrgErrors={setOrgErrors}
-            onSave={handleSaveOrgSettings}
+            brandingSettings={brandingSettings}
+            brandingErrors={brandingErrors}
+            onUpdateBrandingSettings={setBrandingSettings}
+            onUpdateBrandingErrors={setBrandingErrors}
+            onSave={handleSaveBrandingSettings}
             isSaving={isSavingSettings}
             onLogoUpload={handleLogoUpload}
             onFaviconUpload={handleFaviconUpload}
@@ -122,14 +122,14 @@ export function SettingsPageClient({ initialOrgSettings }: SettingsPageClientPro
     [
       notifications,
       handleSaveNotifications,
-      orgSettings,
+      brandingSettings,
       isSavingSettings,
       logoUrl,
       faviconUrl,
       router,
       handleFaviconUpload,
       handleLogoUpload,
-      handleSaveOrgSettings,
+      handleSaveBrandingSettings,
     ],
   )
 

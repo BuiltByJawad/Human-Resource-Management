@@ -611,7 +611,6 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
         lastName: user.lastName,
         role: user.role.name,
         avatarUrl: user.avatarUrl,
-        organizationId: user.organizationId,
         phoneNumber: employee?.phoneNumber ?? null,
         address: employee?.address ?? null,
         dateOfBirth: employee?.dateOfBirth ?? null,
