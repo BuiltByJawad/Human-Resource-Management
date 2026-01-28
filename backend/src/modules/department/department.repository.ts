@@ -66,7 +66,7 @@ export class DepartmentRepository {
     }
 
     async update(id: string, data: Prisma.DepartmentUpdateInput) {
-        // Existence and organization ownership are validated in the service layer.
+        // Existence and workspace ownership are validated in the service layer.
         // Use `update` here so relational fields (manager, parentDepartment) are supported.
         return prisma.department.update({
             where: { id },

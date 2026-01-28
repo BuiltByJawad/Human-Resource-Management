@@ -75,7 +75,7 @@ export class EmployeeRepository {
     }
 
     async update(id: string, data: Prisma.EmployeeUpdateInput) {
-        // Organization ownership is already validated in the service via getById,
+        // Workspace ownership is already validated in the service via getById,
         // so we can safely update by primary key here to allow relational updates.
         return prisma.employee.update({
             where: { id },

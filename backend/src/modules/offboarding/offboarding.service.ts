@@ -50,11 +50,11 @@ export class OffboardingService {
     async initiateOffboarding(data: InitiateOffboardingDto) {
         const { employeeId, exitDate, reason, notes } = data;
 
-        const employeeInTenant = await prisma.employee.findFirst({
+        const employeeRecord = await prisma.employee.findFirst({
             where: { id: employeeId },
             select: { id: true },
         });
-        if (!employeeInTenant) {
+        if (!employeeRecord) {
             throw new NotFoundError('Employee not found');
         }
 

@@ -8,20 +8,17 @@ type AuthPersistMode = 'local' | 'session'
 const AUTH_STORAGE_KEY = 'auth-storage'
 const AUTH_STORAGE_MODE_KEY = 'auth-storage-mode'
 
-const resolveTenantKey = (baseKey: string) => baseKey
-
 function resolvePersistMode(): AuthPersistMode {
     if (typeof window === 'undefined') return 'session'
 
     try {
-        const explicitMode = window.localStorage.getItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY)) as AuthPersistMode | null
+        const explicitMode = window.localStorage.getItem(AUTH_STORAGE_MODE_KEY) as AuthPersistMode | null
         if (explicitMode === 'local' || explicitMode === 'session') {
             return explicitMode
         }
 
-        const tenantAuthKey = resolveTenantKey(AUTH_STORAGE_KEY)
-        const hasTenantLocalAuth = !!window.localStorage.getItem(tenantAuthKey)
-        if (hasTenantLocalAuth) {
+        const hasLocalAuth = !!window.localStorage.getItem(AUTH_STORAGE_KEY)
+        if (hasLocalAuth) {
             return 'local'
         }
 
@@ -34,7 +31,7 @@ function resolvePersistMode(): AuthPersistMode {
 function setPersistMode(mode: AuthPersistMode) {
     if (typeof window === 'undefined') return
     try {
-        window.localStorage.setItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY), mode)
+        window.localStorage.setItem(AUTH_STORAGE_MODE_KEY, mode)
     } catch {
     }
 }
@@ -45,8 +42,7 @@ const authPersistStorage = {
         try {
             const mode = resolvePersistMode()
             const storage = mode === 'local' ? window.localStorage : window.sessionStorage
-            const tenantKey = resolveTenantKey(name)
-            const value = storage.getItem(tenantKey)
+            const value = storage.getItem(name)
             if (value) return value
 
             return null
@@ -59,18 +55,18 @@ const authPersistStorage = {
         try {
             const mode = resolvePersistMode()
             const storage = mode === 'local' ? window.localStorage : window.sessionStorage
-            storage.setItem(resolveTenantKey(name), value)
+            storage.setItem(name, value)
         } catch {
         }
     },
     removeItem: (name: string) => {
         if (typeof window === 'undefined') return
         try {
-            window.localStorage.removeItem(resolveTenantKey(name))
+            window.localStorage.removeItem(name)
         } catch {
         }
         try {
-            window.sessionStorage.removeItem(resolveTenantKey(name))
+            window.sessionStorage.removeItem(name)
         } catch {
         }
 
@@ -92,7 +88,6 @@ export interface User {
     lastName: string | null
     role: string
     avatarUrl: string | null
-    organizationId?: string | null
     department?: string
     phoneNumber?: string
     address?: string
@@ -178,7 +173,7 @@ export const useAuthStore = create<AuthState>()(
                     if (typeof window !== 'undefined') {
                         try {
                             const opposite = rememberMe ? window.sessionStorage : window.localStorage
-                            opposite.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
+                            opposite.removeItem(AUTH_STORAGE_KEY)
                         } catch {
                         }
                     }
@@ -232,18 +227,18 @@ export const useAuthStore = create<AuthState>()(
                     }
                     if (typeof window !== 'undefined') {
                         try {
-                            window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
+                            window.localStorage.removeItem(AUTH_STORAGE_KEY)
                         } catch (error) {
                             if (process.env.NODE_ENV !== 'production') {
                                 console.warn('Failed to clear auth storage', error)
                             }
                         }
                         try {
-                            window.sessionStorage.removeItem(resolveTenantKey(AUTH_STORAGE_KEY))
+                            window.sessionStorage.removeItem(AUTH_STORAGE_KEY)
                         } catch {
                         }
                         try {
-                            window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY))
+                            window.localStorage.removeItem(AUTH_STORAGE_MODE_KEY)
                         } catch {
                         }
                     }
@@ -262,7 +257,7 @@ export const useAuthStore = create<AuthState>()(
                 clearAuth: () => {
                     if (typeof window !== 'undefined') {
                         try {
-                            window.localStorage.removeItem(resolveTenantKey(AUTH_STORAGE_MODE_KEY))
+                            window.localStorage.removeItem(AUTH_STORAGE_MODE_KEY)
                         } catch {
                         }
                     }
@@ -390,7 +385,6 @@ export const useAuthStore = create<AuthState>()(
                                 lastName: serverUser.lastName ?? null,
                                 role: serverUser.role ?? 'User',
                                 avatarUrl: serverUser.avatarUrl ?? null,
-                                organizationId: null,
                                 department: undefined,
                                 phoneNumber: undefined,
                                 address: undefined,

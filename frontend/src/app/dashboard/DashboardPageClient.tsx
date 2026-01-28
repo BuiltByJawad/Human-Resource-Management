@@ -61,7 +61,7 @@ export function DashboardPageClient({
           <div className="max-w-7xl mx-auto w-full">
             <DashboardHeader
               title="Dashboard"
-              subtitle="Welcome back! Here’s what’s happening in your organization."
+              subtitle="Welcome back! Here’s what’s happening in your workspace."
             />
 
             <DashboardStatsGrid stats={stats} loading={statsLoading} />

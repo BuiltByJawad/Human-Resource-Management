@@ -13,7 +13,6 @@ const { app } = createApp()
 describe('Onboarding API', () => {
   let adminToken
   let employeeId
-  let organizationId
   let superAdminRoleId
   let employeeRoleId
 
@@ -23,14 +22,6 @@ describe('Onboarding API', () => {
   const EMP_PASSWORD = 'EmployeePassword123!'
 
   beforeAll(async () => {
-    const org = await prisma.organization.create({
-      data: {
-        name: `Test Org ${Date.now()}`,
-        slug: `test-org-${Date.now()}`
-      }
-    })
-    organizationId = org.id
-
     const onboardingManage = await prisma.permission.upsert({
       where: { resource_action: { resource: 'onboarding', action: 'manage' } },
       update: {},
@@ -75,7 +66,6 @@ describe('Onboarding API', () => {
         password: adminHashed,
         firstName: 'Admin',
         lastName: 'User',
-        organizationId,
         roleId: superAdminRoleId,
         status: 'active'
       }
@@ -88,7 +78,6 @@ describe('Onboarding API', () => {
         password: empHashed,
         firstName: 'Emp',
         lastName: 'User',
-        organizationId,
         roleId: employeeRoleId,
         status: 'active'
       }
@@ -101,7 +90,6 @@ describe('Onboarding API', () => {
         firstName: 'Emp',
         lastName: 'User',
         email: EMP_EMAIL,
-        organizationId,
         hireDate: new Date(),
         salary: 50000,
         status: 'active'
@@ -110,7 +98,7 @@ describe('Onboarding API', () => {
 
     employeeId = employee.id
     adminToken = jwt.sign(
-      { userId: adminUser.id, organizationId },
+      { userId: adminUser.id },
       process.env.JWT_SECRET || 'test-secret',
       { expiresIn: '1h' }
     )
@@ -119,7 +107,6 @@ describe('Onboarding API', () => {
   })
 
   afterAll(async () => {
-    await prisma.organization.deleteMany({ where: { id: organizationId } })
     await prisma.$disconnect()
   })
 

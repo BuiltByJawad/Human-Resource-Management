@@ -28,17 +28,8 @@ async function main() {
 
   console.log('🌱 Starting seeding...')
 
-  // 0. Create Demo Organization
-  const demoOrg = await prisma.organization.create({
-    data: {
-      name: 'NovaHR Demo Corp',
-      slug: 'novahr',
-    },
-  })
-
   await prisma.companySettings.create({
     data: {
-      organizationId: demoOrg.id,
       siteName: 'NovaHR Workspace',
       tagline: 'Empowering Humans',
       companyName: 'NovaHR Global Solutions',
@@ -235,7 +226,7 @@ async function main() {
   const dbDepts = new Map<string, string>()
   for (const d of deptConfigs) {
     const dept = await prisma.department.create({
-      data: { ...d, organizationId: demoOrg.id }
+      data: { ...d }
     })
     dbDepts.set(d.name, dept.id)
   }
@@ -295,7 +286,6 @@ async function main() {
         firstName: u.firstName,
         lastName: u.lastName,
         roleId: dbRoles.get(u.role)!,
-        organizationId: demoOrg.id,
         status: 'active',
         verified: true,
         avatarUrl: `https://ui-avatars.com/api/?name=${u.firstName}+${u.lastName}&background=random&color=fff`
@@ -307,7 +297,6 @@ async function main() {
       await prisma.employee.create({
         data: {
           userId: user.id,
-          organizationId: demoOrg.id,
           departmentId: dbDepts.get(u.dept),
           employeeNumber: u.empNo,
           firstName: u.firstName,

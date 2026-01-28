@@ -13,7 +13,7 @@ export function DepartmentFilters({ searchTerm, onSearchChange, onCreate }: Depa
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Departments</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage company organizational structure and hierarchy</p>
+        <p className="mt-1 text-sm text-gray-500">Manage company structure and hierarchy</p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">

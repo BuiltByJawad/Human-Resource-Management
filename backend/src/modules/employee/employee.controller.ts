@@ -9,7 +9,7 @@ import { AuthRequest } from '../../shared/middleware/auth';
  * Get all employees with pagination and filters
  */
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-    const result = await employeeService.getAll(req.query, '');
+    const result = await employeeService.getAll(req.query);
 
     res.json({
         status: 'success',
@@ -21,7 +21,7 @@ export const getAll = asyncHandler(async (req: Request, res: Response) => {
  * Get employee by ID
  */
 export const getById = asyncHandler(async (req: Request, res: Response) => {
-    const employee = await employeeService.getById(req.params.id, '');
+    const employee = await employeeService.getById(req.params.id);
 
     res.json({
         status: 'success',
@@ -33,7 +33,7 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
  * Create new employee
  */
 export const create = asyncHandler(async (req: Request, res: Response) => {
-    const employee = await employeeService.create(req.body, '');
+    const employee = await employeeService.create(req.body);
 
     const authReq = req as unknown as AuthRequest;
     const actorUserId = authReq.user?.id;
@@ -67,7 +67,7 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
  * Update employee
  */
 export const update = asyncHandler(async (req: Request, res: Response) => {
-    const employee = await employeeService.update(req.params.id, req.body, '');
+    const employee = await employeeService.update(req.params.id, req.body);
 
     const authReq = req as unknown as AuthRequest;
     const actorUserId = authReq.user?.id;
@@ -96,7 +96,7 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
  * Delete employee
  */
 export const remove = asyncHandler(async (req: Request, res: Response) => {
-    await employeeService.delete(req.params.id, '');
+    await employeeService.delete(req.params.id);
 
     const authReq = req as unknown as AuthRequest;
     const actorUserId = authReq.user?.id;

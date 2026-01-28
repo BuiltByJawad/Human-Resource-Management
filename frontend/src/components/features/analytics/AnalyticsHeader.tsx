@@ -14,7 +14,7 @@ export function AnalyticsHeader({ period, onPeriodChange, onRefresh, isRefreshin
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Organization Analytics</h1>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Company Analytics</h1>
         <p className="mt-1 text-sm text-gray-500">Comprehensive overview of company workforce and performance.</p>
       </div>
       <div className="mt-4 md:mt-0 flex items-center space-x-3">

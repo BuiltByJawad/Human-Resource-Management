@@ -19,7 +19,7 @@ export const FALLBACK_BRANDING: LoginBranding = {
   siteName: 'Nimbus HR',
   tagline: 'Modern HR infrastructure for growing teams',
   heroTitle: 'Welcome back',
-  heroSubtitle: 'Securely access your organization workspace',
+  heroSubtitle: 'Securely access your HR workspace',
   highlights: FALLBACK_HIGHLIGHTS,
   logoUrl: null,
   faviconUrl: null,

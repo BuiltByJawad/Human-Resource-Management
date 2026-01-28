@@ -1,11 +1,11 @@
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 
 interface PayslipHeaderProps {
   payPeriod: string
 }
 
 export function PayslipHeader({ payPeriod }: PayslipHeaderProps) {
-  const { companyName, companyAddress } = useOrgStore()
+  const { companyName, companyAddress } = useBrandingStore()
 
   return (
     <div className="text-center border-b pb-6 mb-6">

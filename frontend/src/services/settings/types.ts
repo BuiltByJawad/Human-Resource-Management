@@ -1,4 +1,4 @@
-export interface OrgSettingsPayload {
+export interface BrandingSettingsPayload {
   siteName?: string | null
   tagline?: string | null
   companyName?: string | null
@@ -10,12 +10,12 @@ export interface OrgSettingsPayload {
   termsOfServiceText?: string | null
 }
 
-export interface OrgSettingsUpdateResponse {
+export interface BrandingSettingsUpdateResponse {
   success?: boolean
-  data?: OrgSettingsPayload
+  data?: BrandingSettingsPayload
 }
 
-export interface OrgSettingsFormState {
+export interface BrandingSettingsFormState {
   siteName: string
   tagline: string
   companyName: string
@@ -25,9 +25,9 @@ export interface OrgSettingsFormState {
   termsOfServiceText: string
 }
 
-export type OrgSettingsErrorFields = 'siteName' | 'companyName' | 'companyAddress'
+export type BrandingSettingsErrorFields = 'siteName' | 'companyName' | 'companyAddress'
 
-export type OrgSettingsErrors = Partial<Record<OrgSettingsErrorFields, string>>
+export type BrandingSettingsErrors = Partial<Record<BrandingSettingsErrorFields, string>>
 
 export interface NotificationPreferences {
   emailNotifs: boolean

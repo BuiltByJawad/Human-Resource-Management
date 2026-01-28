@@ -5,8 +5,8 @@ const sections = [
   {
     title: "Agreement",
     body: [
-      "These Terms of Service govern access to the HRM Platform provided by your organization.",
-      "By using the platform, you agree to comply with organizational policies and applicable laws.",
+      "These Terms of Service govern access to the HRM Platform.",
+      "By using the platform, you agree to comply with platform policies and applicable laws.",
     ],
   },
   {
@@ -20,7 +20,7 @@ const sections = [
   {
     title: "Data & Privacy",
     body: [
-      "Personal data is processed according to the Privacy Policy and organizational instructions.",
+      "Personal data is processed according to the Privacy Policy and platform instructions.",
       "Users are responsible for safeguarding credentials and reporting suspicious activity.",
     ],
   },
@@ -48,7 +48,7 @@ const sections = [
   {
     title: "Contact",
     body: [
-      "Questions about these terms should be directed to your organization’s HR or compliance lead.",
+      "Questions about these terms should be directed to your HR or compliance lead.",
     ],
   },
 ];
@@ -64,7 +64,7 @@ async function fetchPolicyText(): Promise<string | null> {
   const apiBase = getBackendBaseUrl()
 
   try {
-    const response = await fetch(`${apiBase}/api/org/policies/public`, {
+    const response = await fetch(`${apiBase}/api/settings/policies/public`, {
       cache: 'no-store',
     })
     if (!response.ok) return null
@@ -84,7 +84,7 @@ export default async function TermsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-slate-500">HRM Platform</p>
           <h1 className="text-3xl font-semibold text-slate-900">Terms of Service</h1>
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
-            These terms outline platform usage expectations. Customize for your organization’s legal counsel.
+            These terms outline platform usage expectations. Customize for your legal counsel.
           </p>
         </header>
 

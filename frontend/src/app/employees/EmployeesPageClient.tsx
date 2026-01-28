@@ -104,7 +104,7 @@ function EmployeesContent({
         isOpen={!!pendingDelete}
         title="Remove employee?"
         message={
-          pendingDelete ? `${pendingDelete.firstName} ${pendingDelete.lastName} will be removed from your organization.` : ''
+          pendingDelete ? `${pendingDelete.firstName} ${pendingDelete.lastName} will be removed from your workspace.` : ''
         }
         confirmText="Delete"
         onConfirm={onConfirmDelete}

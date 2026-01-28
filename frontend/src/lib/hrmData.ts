@@ -802,7 +802,6 @@ export interface ScheduledReportRun {
 
 export interface ScheduledReport {
   id: string
-  organizationId: string
   name: string
   type: ScheduledReportType
   format: ScheduledReportFormat

@@ -30,7 +30,7 @@ import {
   ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline'
 import { useAuthStore } from '@/store/useAuthStore'
-import { useOrgStore } from '@/store/useOrgStore'
+import { useBrandingStore } from '@/store/useBrandingStore'
 import { PERMISSIONS, type Permission } from '@/constants/permissions'
 import { useInitialAuth } from '@/components/providers/AuthBootstrapProvider'
 
@@ -113,7 +113,7 @@ const navigation: { label: string; items: NavItem[]; isPersonal?: boolean }[] = 
 // navigations) start with isMounted=true so we don't re-show skeletons.
 let sidebarHydratedOnce = false
 
-function useSidebarState() {
+function useSidebarState(brandingLoaded: boolean) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMounted, setIsMounted] = useState(() =>
     typeof window !== 'undefined' ? sidebarHydratedOnce : false,
@@ -132,7 +132,7 @@ function useSidebarState() {
       const newState = !prev
       localStorage.setItem('sidebarCollapsed', String(newState))
       // Update the class for consistency
-      if (newState) {
+      if (!brandingLoaded) {
         document.documentElement.classList.add('sidebar-collapsed')
       } else {
         document.documentElement.classList.remove('sidebar-collapsed')
@@ -145,11 +145,11 @@ function useSidebarState() {
 }
 
 export default function Sidebar() {
-  const { toggle, isMounted } = useSidebarState()
   const router = useRouter()
   const storeUser = useAuthStore((state) => state.user)
   const branding = useBranding()
-  const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl, loaded: orgLoaded } = useOrgStore()
+  const { siteName: storeSiteName, shortName: storeShortName, tagline: storeTagline, logoUrl: storeLogoUrl, loaded: brandingLoaded } = useBrandingStore()
+  const { toggle, isMounted } = useSidebarState(brandingLoaded)
   const initialAuth = useInitialAuth()
   // Prefer server-fetched user for SSR/first paint; fall back to client store
   const user = (initialAuth?.user ?? storeUser) as any
@@ -279,7 +279,7 @@ export default function Sidebar() {
 
   // Show branding immediately if it's in the store (hydrated on server or from localStorage)
   // This prevents the flickering logo/name on refresh
-  const showOrgSkeleton = !orgLoaded && !siteName && !tagline
+  const showOrgSkeleton = !brandingLoaded && !siteName && !tagline
 
   return (
     <aside
