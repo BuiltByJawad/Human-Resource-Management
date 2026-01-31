@@ -1,19 +1,24 @@
 import { test, expect } from '@playwright/test';
+import { loginUser } from './utils';
 
 let authToken: string;
 
 test.beforeAll(async ({ request }) => {
-    const email = `payroll${Date.now()}@example.com`;
-    const registerRes = await request.post('/api/auth/register', {
-        data: {
-            email,
-            password: 'Payroll123!@#',
-            firstName: 'Payroll',
-            lastName: 'Manager',
-        },
+    authToken = await loginUser(request, 'hr@novahr.com', 'password123');
+
+    const employeeToken = await loginUser(request, 'employee@novahr.com', 'password123');
+    const checkInRes = await request.post('/api/attendance/check-in', {
+        headers: { Authorization: `Bearer ${employeeToken}` },
+        data: { latitude: 40.7128, longitude: -74.006 },
     });
-    const data = await registerRes.json();
-    authToken = data.data.accessToken;
+
+    if (!checkInRes.ok()) {
+        const error = await checkInRes.json();
+        const message = typeof error?.error === 'string' ? error.error : error?.error?.message;
+        if (!message || !message.toLowerCase().includes('already')) {
+            throw new Error(`Attendance check-in failed: ${message || checkInRes.status()}`);
+        }
+    }
 });
 
 test.describe('Payroll Management', () => {
@@ -75,7 +80,7 @@ test.describe('Payroll Management', () => {
         if (payrollId) {
             const response = await request.put(`/api/payroll/${payrollId}/status`, {
                 headers: { Authorization: `Bearer ${authToken}` },
-                data: { status: 'approved' },
+                data: { status: 'processed' },
             });
 
             expect(response.ok()).toBeTruthy();

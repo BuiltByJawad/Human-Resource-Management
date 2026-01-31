@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { defineConfig, devices } from '@playwright/test';
 
 /**
@@ -25,7 +26,10 @@ export default defineConfig({
 
     webServer: {
         command: 'npm run dev',
-        url: 'http://localhost:5000',
+        url: 'http://localhost:5000/health',
         reuseExistingServer: !process.env.CI,
+        env: {
+            NODE_ENV: 'test',
+        },
     },
 });

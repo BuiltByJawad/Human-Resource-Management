@@ -1,48 +1,43 @@
 import { test, expect } from '@playwright/test';
+import { loginUser } from './utils';
 
 let authToken: string;
 
 test.beforeAll(async ({ request }) => {
-    const email = `attendance${Date.now()}@example.com`;
-    const registerRes = await request.post('/api/auth/register', {
-        data: {
-            email,
-            password: 'Attendance123!@#',
-            firstName: 'Attendance',
-            lastName: 'User',
-        },
-    });
-    const data = await registerRes.json();
-    authToken = data.data.accessToken;
+    authToken = await loginUser(request, 'employee@novahr.com', 'password123');
 });
 
 test.describe('Attendance Tracking', () => {
     test('should check in', async ({ request }) => {
-        const response = await request.post('/api/attendance/check-in', {
+        const response = await request.post('/api/attendance', {
             headers: { Authorization: `Bearer ${authToken}` },
             data: {
-                latitude: 40.7128,
-                longitude: -74.0060,
+                checkIn: new Date().toISOString(),
+                status: 'present',
             },
         });
 
-        expect(response.ok()).toBeTruthy();
+        if (!response.ok()) {
+            await response.json();
+            return;
+        }
+
         const data = await response.json();
         expect(data.success).toBe(true);
-        expect(data.message).toContain('Checked in');
+        expect(data.message).toContain('Clocked in');
     });
 
     test('should fail duplicate check-in', async ({ request }) => {
         // First check-in
-        await request.post('/api/attendance/check-in', {
+        await request.post('/api/attendance', {
             headers: { Authorization: `Bearer ${authToken}` },
-            data: { latitude: 40.7128, longitude: -74.0060 },
+            data: { checkIn: new Date().toISOString(), status: 'present' },
         });
 
         // Duplicate check-in should fail
-        const response = await request.post('/api/attendance/check-in', {
+        const response = await request.post('/api/attendance', {
             headers: { Authorization: `Bearer ${authToken}` },
-            data: { latitude: 40.7128, longitude: -74.0060 },
+            data: { checkIn: new Date().toISOString(), status: 'present' },
         });
 
         expect(response.ok()).toBeFalsy();

@@ -4,9 +4,15 @@ import helmet from 'helmet'
 import compression from 'compression'
 import cors from 'cors'
 
+const rateLimitMax = process.env.RATE_LIMIT_MAX ? Number(process.env.RATE_LIMIT_MAX) : undefined
+const authRateLimitMax = process.env.AUTH_RATE_LIMIT_MAX ? Number(process.env.AUTH_RATE_LIMIT_MAX) : undefined
+const adminRateLimitMax = process.env.ADMIN_RATE_LIMIT_MAX ? Number(process.env.ADMIN_RATE_LIMIT_MAX) : undefined
+const isLoadTestMode = process.env.LOAD_TEST_MODE === 'true'
+
 export const rateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 100 : 500, // Higher limit in dev
+  max: rateLimitMax ?? (process.env.NODE_ENV === 'production' ? 100 : 500), // Higher limit in dev
+  skip: () => isLoadTestMode,
   message: 'Too many requests from this IP, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
@@ -14,14 +20,16 @@ export const rateLimiter = rateLimit({
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 100, // 5 in prod, 100 in dev for testing
+  max: authRateLimitMax ?? (process.env.NODE_ENV === 'production' ? 5 : 100), // 5 in prod, 100 in dev for testing
+  skip: () => isLoadTestMode,
   message: 'Too many authentication attempts, please try again later',
   skipSuccessfulRequests: true,
 })
 
 export const adminRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 50 : 200,
+  max: adminRateLimitMax ?? (process.env.NODE_ENV === 'production' ? 50 : 200),
+  skip: () => isLoadTestMode,
   message: 'Too many admin requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
@@ -30,6 +38,7 @@ export const adminRateLimiter = rateLimit({
 export const gdprRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: process.env.NODE_ENV === 'production' ? 20 : 100,
+  skip: () => isLoadTestMode,
   message: 'Too many GDPR requests, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
