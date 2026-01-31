@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { uniqueEmail } from './utils';
 
 let authToken: string;
 
@@ -6,7 +7,7 @@ test.describe('Authentication Flow', () => {
     test('should register a new user', async ({ request }) => {
         const response = await request.post('/api/auth/register', {
             data: {
-                email: `test${Date.now()}@example.com`,
+                email: uniqueEmail('auth'),
                 password: 'Test123!@#',
                 firstName: 'Test',
                 lastName: 'User',
@@ -21,7 +22,7 @@ test.describe('Authentication Flow', () => {
 
     test('should login with valid credentials', async ({ request }) => {
         // First, register a user
-        const email = `test${Date.now()}@example.com`;
+        const email = uniqueEmail('auth');
         await request.post('/api/auth/register', {
             data: {
                 email,
@@ -60,7 +61,7 @@ test.describe('Authentication Flow', () => {
 
     test('should get user profile with valid token', async ({ request }) => {
         // Register and login
-        const email = `test${Date.now()}@example.com`;
+        const email = uniqueEmail('auth');
         const registerRes = await request.post('/api/auth/register', {
             data: {
                 email,
@@ -82,6 +83,6 @@ test.describe('Authentication Flow', () => {
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
         expect(data.success).toBe(true);
-        expect(data.data.email).toBe(email);
+        expect(data.data.user.email).toBe(email);
     });
 });

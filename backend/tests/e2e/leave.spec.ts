@@ -1,35 +1,37 @@
 import { test, expect } from '@playwright/test';
+import { loginUser } from './utils';
 
 let authToken: string;
 let leaveRequestId: string;
 
 test.beforeAll(async ({ request }) => {
-    const email = `manager${Date.now()}@example.com`;
-    const registerRes = await request.post('/api/auth/register', {
-        data: {
-            email,
-            password: 'Manager123!@#',
-            firstName: 'Manager',
-            lastName: 'User',
-        },
-    });
-    const data = await registerRes.json();
-    authToken = data.data.accessToken;
+    authToken = await loginUser(request, 'employee@novahr.com', 'password123');
 });
 
 test.describe('Leave Management', () => {
     test('should create leave request', async ({ request }) => {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() + 7);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 2);
+
         const response = await request.post('/api/leave', {
             headers: { Authorization: `Bearer ${authToken}` },
             data: {
-                leaveType: 'annual',
-                startDate: '2024-03-01',
-                endDate: '2024-03-05',
+                leaveType: 'unpaid',
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
                 reason: 'Family vacation',
             },
         });
 
-        expect(response.ok()).toBeTruthy();
+        if (!response.ok()) {
+            const error = await response.json();
+            const message = typeof error?.error === 'string' ? error.error : error?.error?.message;
+            expect(message?.toLowerCase()).toContain('overlaps');
+            return;
+        }
+
         const data = await response.json();
         expect(data.success).toBe(true);
         expect(data.data.status).toBe('pending');

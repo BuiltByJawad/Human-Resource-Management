@@ -24,6 +24,7 @@ import settingsRoutes from './settingsRoutes';
 import shiftRoutes from '../modules/shift/shift.routes';
 import timeTrackingRoutes from '../modules/time-tracking/time-tracking.routes';
 import trainingRoutes from '../modules/training/training.routes';
+import portalRoutes from '../modules/portal/portal.routes';
 
 const router = Router();
 
@@ -53,5 +54,6 @@ router.use('/settings', settingsRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/time-tracking', timeTrackingRoutes);
 router.use('/training', trainingRoutes);
+router.use('/portal', portalRoutes);
 
 export default router;

@@ -1,32 +1,30 @@
 import { test, expect } from '@playwright/test';
+import { loginUser } from './utils';
 
 let authToken: string;
+let departmentId: string;
 
 test.beforeAll(async ({ request }) => {
-    const email = `recruit${Date.now()}@example.com`;
-    const registerRes = await request.post('/api/auth/register', {
-        data: {
-            email,
-            password: 'Recruit123!@#',
-            firstName: 'Recruiter',
-            lastName: 'User',
-        },
+    authToken = await loginUser(request, 'admin@novahr.com', 'password123');
+
+    const departmentsRes = await request.get('/api/departments', {
+        headers: { Authorization: `Bearer ${authToken}` },
     });
-    const data = await registerRes.json();
-    authToken = data.data.accessToken;
+    const departmentsData = await departmentsRes.json();
+    departmentId = departmentsData.data?.departments?.[0]?.id;
 });
 
 test.describe('Recruitment & ATS', () => {
     test('should create job posting', async ({ request }) => {
+        expect(departmentId).toBeTruthy();
         const response = await request.post('/api/recruitment/jobs', {
             headers: { Authorization: `Bearer ${authToken}` },
             data: {
                 title: 'Senior Software Engineer',
-                department: 'Engineering',
-                location: 'Remote',
-                type: 'full-time',
+                departmentId,
                 description: 'Looking for experienced developer',
-                requirements: ['5+ years experience', 'React', 'Node.js'],
+                requirements: '5+ years experience, React, Node.js',
+                closingDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             },
         });
 
@@ -37,7 +35,9 @@ test.describe('Recruitment & ATS', () => {
     });
 
     test('should get all jobs', async ({ request }) => {
-        const response = await request.get('/api/recruitment/jobs');
+        const response = await request.get('/api/recruitment/jobs', {
+            headers: { Authorization: `Bearer ${authToken}` },
+        });
 
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
@@ -51,18 +51,22 @@ test.describe('Recruitment & ATS', () => {
             headers: { Authorization: `Bearer ${authToken}` },
             data: {
                 title: 'Developer',
-                type: 'full-time',
+                departmentId,
+                description: 'Generalist developer',
+                requirements: 'Generalist role',
             },
         });
         const jobData = await jobRes.json();
         const jobId = jobData.data.id;
 
-        // Submit application (no auth needed - public endpoint)
-        const response = await request.post('/api/recruitment/applications', {
+        // Submit application (auth required)
+        const response = await request.post('/api/recruitment/applicants', {
+            headers: { Authorization: `Bearer ${authToken}` },
             data: {
                 jobId,
-                candidateName: 'John Doe',
-                candidateEmail: `candidate${Date.now()}@example.com`,
+                firstName: 'John',
+                lastName: 'Doe',
+                email: `candidate${Date.now()}@example.com`,
                 phone: '1234567890',
             },
         });
@@ -73,7 +77,7 @@ test.describe('Recruitment & ATS', () => {
     });
 
     test('should get all applications', async ({ request }) => {
-        const response = await request.get('/api/recruitment/applications', {
+        const response = await request.get('/api/recruitment/applicants', {
             headers: { Authorization: `Bearer ${authToken}` },
         });
 

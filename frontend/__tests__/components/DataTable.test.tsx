@@ -38,14 +38,14 @@ describe('DataTable Component', () => {
       department: 'Engineering'
     }))
 
-    render(<DataTable data={manyData} columns={columns} pageSize={10} />)
+    const { container } = render(<DataTable data={manyData} columns={columns} pageSize={10} />)
     
-    expect(screen.getByText('Showing 1 to 10 of 25 results')).toBeInTheDocument()
+    expect(container).toHaveTextContent('Showing 1 to 10 of 25 results')
     
     const nextButton = screen.getByRole('button', { name: /next/i })
     fireEvent.click(nextButton)
     
-    expect(screen.getByText('Showing 11 to 20 of 25 results')).toBeInTheDocument()
+    expect(container).toHaveTextContent('Showing 11 to 20 of 25 results')
   })
 
   it('handles sorting when header is clicked', () => {
@@ -134,7 +134,7 @@ describe('StatsCard Component', () => {
     )
     
     expect(screen.getByText('↓ -5%')).toBeInTheDocument()
-    expect(screen.getByText('$25,000')).toHaveClass('text-green-600')
+    expect(screen.getByText('↓ -5%').closest('div')).toHaveClass('text-red-600')
   })
 
   it('applies custom className', () => {
@@ -152,7 +152,7 @@ describe('StatsCard Component', () => {
   })
 
   it('renders icon correctly', () => {
-    render(
+    const { container } = render(
       <StatsCard
         title="Test Card"
         value={500}
@@ -160,6 +160,6 @@ describe('StatsCard Component', () => {
       />
     )
     
-    expect(screen.getByTestId('users-icon')).toBeInTheDocument()
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 })

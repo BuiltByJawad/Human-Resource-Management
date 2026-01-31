@@ -1,9 +1,13 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import Joi from 'joi';
+import fs from 'fs';
 
-// Load environment variables from .env file
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// Load environment variables from .env or .env.test (for test runs)
+const envPath = path.join(__dirname, '../../.env');
+const testEnvPath = path.join(__dirname, '../../.env.test');
+const shouldUseTestEnv = process.env.NODE_ENV === 'test' && fs.existsSync(testEnvPath);
+dotenv.config({ path: shouldUseTestEnv ? testEnvPath : envPath });
 
 // Define environment variable schema
 const envVarsSchema = Joi.object()

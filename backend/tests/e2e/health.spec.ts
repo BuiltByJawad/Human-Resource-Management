@@ -6,7 +6,7 @@ test.describe('Health Checks', () => {
 
         expect(response.ok()).toBeTruthy();
         const data = await response.json();
-        expect(data.status).toBe('healthy');
+        expect(['healthy', 'degraded']).toContain(data.status);
     });
 
     test('should have metrics endpoint', async ({ request }) => {

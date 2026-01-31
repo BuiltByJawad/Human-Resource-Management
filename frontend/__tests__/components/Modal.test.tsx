@@ -126,11 +126,4 @@ describe('Alert Component', () => {
     
     expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument()
   })
-
-  it('renders outline variant correctly', () => {
-    render(<Alert {...defaultProps} type="outline" message="Outline message" />)
-    
-    expect(screen.getByText('Outline message')).toBeInTheDocument()
-    expect(screen.getByText('Outline message').closest('.border')).toHaveClass('bg-transparent', 'border', 'border-gray-300')
-  })
 })

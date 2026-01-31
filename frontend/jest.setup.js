@@ -24,6 +24,13 @@ jest.mock('next/navigation', () => ({
 // Mock fetch
 global.fetch = jest.fn()
 
+// Mock ResizeObserver for components relying on it (e.g. headlessui)
+global.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,

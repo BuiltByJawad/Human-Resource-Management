@@ -1,19 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { loginUser } from './utils';
 
 let authToken: string;
 
 test.beforeAll(async ({ request }) => {
-    const email = `asset${Date.now()}@example.com`;
-    const registerRes = await request.post('/api/auth/register', {
-        data: {
-            email,
-            password: 'Asset123!@#',
-            firstName: 'Asset',
-            lastName: 'Manager',
-        },
-    });
-    const data = await registerRes.json();
-    authToken = data.data.accessToken;
+    authToken = await loginUser(request, 'admin@novahr.com', 'password123');
 });
 
 test.describe('Asset Management', () => {
@@ -22,10 +13,14 @@ test.describe('Asset Management', () => {
             headers: { Authorization: `Bearer ${authToken}` },
             data: {
                 name: 'MacBook Pro',
-                assetType: 'laptop',
+                type: 'laptop',
                 serialNumber: `SN${Date.now()}`,
                 purchaseDate: '2024-01-01',
-                purchaseCost: 2499,
+                purchasePrice: 2499,
+                vendor: 'Apple',
+                status: 'available',
+                assignedTo: null,
+                assignedDate: null,
             },
         });
 

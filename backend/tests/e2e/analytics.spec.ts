@@ -1,19 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { loginUser } from './utils';
 
 let authToken: string;
 
 test.beforeAll(async ({ request }) => {
-    const email = `analytics${Date.now()}@example.com`;
-    const registerRes = await request.post('/api/auth/register', {
-        data: {
-            email,
-            password: 'Analytics123!@#',
-            firstName: 'Analytics',
-            lastName: 'User',
-        },
-    });
-    const data = await registerRes.json();
-    authToken = data.data.accessToken;
+    authToken = await loginUser(request, 'admin@novahr.com', 'password123');
 });
 
 test.describe('Analytics & Reporting', () => {
