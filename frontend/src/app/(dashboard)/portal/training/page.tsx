@@ -1,4 +1,4 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
 import { getServerAuthContext } from '@/lib/auth/serverAuth'
 import { fetchMyCoursesServer } from '@/services/training/api'

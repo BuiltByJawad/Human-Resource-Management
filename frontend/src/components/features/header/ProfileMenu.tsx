@@ -1,9 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronDownIcon } from '@heroicons/react/24/outline'
+const ChevronDownIcon = dynamic(() => import('@heroicons/react/24/outline').then((mod) => mod.ChevronDownIcon), {
+  ssr: false,
+})
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
 

@@ -3,7 +3,6 @@
 import { useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-import DashboardShell from '@/components/ui/DashboardShell'
 import { LeavePolicyHeader } from '@/components/features/settings/leave-policy/LeavePolicyHeader'
 import { LeavePolicyAccessCard } from '@/components/features/settings/leave-policy/LeavePolicyAccessCard'
 import { LeaveTypesCard } from '@/components/features/settings/leave-policy/LeaveTypesCard'
@@ -34,37 +33,37 @@ export default function LeavePolicyPageClient({ initialLeavePolicy }: LeavePolic
   }, [handleSave, router])
 
   return (
-    <DashboardShell>
-      <div className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+    <>
+      <div className="p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Leave Policy</h1>
           <p className="text-sm text-gray-600 mb-8">Configure leave entitlements, carry-forward rules, and holidays.</p>
 
           <div className="space-y-6">
-        <LeavePolicyHeader
-          onBack={() => router.push('/settings')}
-          onSave={handleSaveAndRefresh}
-          isSaving={isSaving}
-          canManage={canManage}
-        />
+            <LeavePolicyHeader
+              onBack={() => router.push('/settings')}
+              onSave={handleSaveAndRefresh}
+              isSaving={isSaving}
+              canManage={canManage}
+            />
 
-        <LeavePolicyAccessCard canManage={canManage} />
+            <LeavePolicyAccessCard canManage={canManage} />
 
-        <LeaveTypesCard
-          leaveTypes={leaveTypes}
-          policies={policies}
-          canManage={canManage}
-          onUpdatePolicy={updatePolicyField}
-        />
+            <LeaveTypesCard
+              leaveTypes={leaveTypes}
+              policies={policies}
+              canManage={canManage}
+              onUpdatePolicy={updatePolicyField}
+            />
 
-        <HolidayCalendarCard
-          holidaysText={holidaysText}
-          onChange={setHolidaysText}
-          canManage={canManage}
-        />
+            <HolidayCalendarCard
+              holidaysText={holidaysText}
+              onChange={setHolidaysText}
+              canManage={canManage}
+            />
           </div>
         </div>
       </div>
-    </DashboardShell>
+    </>
   )
 }

@@ -163,15 +163,15 @@ export function RoleForm({
           </div>
 
           <div className="border rounded-xl overflow-hidden flex flex-col flex-1 shadow-sm min-h-[400px]">
-            <div className="bg-gray-100 px-4 py-3 border-b flex justify-between items-center">
+            <div className="bg-gray-100 px-4 py-3 border-b flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="font-medium text-gray-900">Permissions Configuration</h3>
               <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border">
                 {selectedPermissionIds.length} permissions selected
               </span>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
-              <div className="w-1/3 border-r bg-gray-50 overflow-y-auto">
+            <div className="flex flex-1 flex-col overflow-hidden sm:flex-row">
+              <div className="w-full border-b bg-gray-50 overflow-y-auto sm:w-1/3 sm:border-b-0 sm:border-r">
                 {Object.entries(groupedPermissions).map(([resource, perms]) => {
                   const safePerms = Array.isArray(perms) ? perms : []
                   const selectedCount = safePerms.filter((p) => selectedPermissionIds.includes(p.id)).length
@@ -208,7 +208,7 @@ export function RoleForm({
                 })}
               </div>
 
-              <div className="w-2/3 bg-white overflow-y-auto p-4">
+              <div className="w-full bg-white overflow-y-auto p-4 sm:w-2/3">
                 {!Object.keys(groupedPermissions).length ? (
                   <div className="space-y-3">
                     <div className="text-sm text-gray-500">No permissions available.</div>
@@ -294,22 +294,22 @@ export function RoleForm({
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-between items-center z-10">
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between z-10">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="w-full px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
           >
             Cancel
           </button>
-          <div className="flex items-center space-x-4">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4">
             <span className="text-sm text-gray-500">
               {initialData ? 'Changes will affect all users with this role.' : 'New role will be inactive until assigned.'}
             </span>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="w-full px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 sm:w-auto"
             >
               {loading ? 'Saving...' : initialData ? 'Save Changes' : 'Create Role'}
             </button>

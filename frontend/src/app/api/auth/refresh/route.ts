@@ -1,21 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBackendBaseUrl } from '@/lib/config/env'
 
+const splitSetCookieHeader = (raw: string): string[] => {
+  // Some servers (or proxies) may return multiple cookies in a single header value.
+  // Split on commas that start a new cookie (best-effort; avoids breaking on Expires=...)
+  return raw.split(/,(?=\s*[^\s;,]+=)/g).map((part) => part.trim()).filter(Boolean)
+}
+
+const extractCookieValue = (setCookieHeaders: string[], name: string): string | null => {
+  const prefix = `${name}=`
+  for (const header of setCookieHeaders) {
+    if (typeof header !== 'string') continue
+    const trimmed = header.trim()
+
+    if (!trimmed.toLowerCase().startsWith(prefix.toLowerCase())) continue
+    const valuePart = trimmed.slice(prefix.length)
+    const endIdx = valuePart.indexOf(';')
+    const value = (endIdx === -1 ? valuePart : valuePart.slice(0, endIdx)).trim()
+    return value || null
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
-    let body: any = {}
+    let body: unknown = {}
     try {
       body = await request.json()
     } catch {
       body = {}
     }
+    
+    const bodyRecord = (body && typeof body === 'object' && !Array.isArray(body))
+      ? (body as Record<string, unknown>)
+      : {}
 
-    const rememberMe = body?.rememberMe
+    const rememberMe = bodyRecord.rememberMe
     const shouldRemember = rememberMe === true
 
-    const refreshTokenFromBody = body?.refreshToken
+    const refreshTokenFromRequestBody = typeof bodyRecord.refreshToken === 'string' ? bodyRecord.refreshToken : null
     const refreshTokenFromCookie = request.cookies.get('refreshToken')?.value
-    const refreshToken = refreshTokenFromBody || refreshTokenFromCookie
+    const refreshToken = refreshTokenFromRequestBody || refreshTokenFromCookie
 
     if (!refreshToken) {
       return NextResponse.json(
@@ -26,10 +51,14 @@ export async function POST(request: NextRequest) {
 
     const backendBaseUrl = getBackendBaseUrl()
 
-    const response = await fetch(`${backendBaseUrl}/api/auth/refresh-token`, {
+    const cookieHeader = request.headers.get('cookie')
+
+    // Prefer the backend refresh endpoint that supports cookie-based refresh.
+    const response = await fetch(`${backendBaseUrl}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
       },
       body: JSON.stringify({ refreshToken }),
     })
@@ -37,6 +66,9 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
     
     if (!response.ok) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Refresh proxy failed', { status: response.status })
+      }
       return NextResponse.json(
         { error: data.message || 'Token refresh failed' },
         { status: response.status }
@@ -50,6 +82,16 @@ export async function POST(request: NextRequest) {
     const setCookies = typeof headerObj.getSetCookie === 'function' ? headerObj.getSetCookie() : []
     const nextResponse = NextResponse.json(data)
 
+    const rawSetCookie = response.headers.get('set-cookie')
+    const refreshTokenFromResponseBody = typeof payload?.refreshToken === 'string' ? payload.refreshToken : null
+    const cookieCandidates = setCookies.length
+      ? setCookies
+      : (rawSetCookie ? splitSetCookieHeader(rawSetCookie) : [])
+    const refreshTokenFromSetCookie =
+      extractCookieValue(cookieCandidates, 'refreshToken') ??
+      extractCookieValue(cookieCandidates, 'refresh_token')
+    const nextRefreshToken = refreshTokenFromResponseBody || refreshTokenFromSetCookie
+
     // Forward backend refreshToken cookie updates (including rotation) as-is.
     // This avoids losing the new refresh token when the backend rotates it.
     if (setCookies.length) {
@@ -57,7 +99,6 @@ export async function POST(request: NextRequest) {
         nextResponse.headers.append('set-cookie', cookie)
       })
     } else {
-      const rawSetCookie = response.headers.get('set-cookie')
       if (rawSetCookie) {
         nextResponse.headers.set('set-cookie', rawSetCookie)
       }
@@ -81,10 +122,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // refreshToken cookie is managed by the backend and forwarded above.
-    
+    // Ensure the refresh token is persisted on the frontend domain as well.
+    // Some backends set a Domain attribute that won't match localhost, so forwarding
+    // set-cookie alone can lead to missing refreshToken cookies in the browser.
+    if (nextRefreshToken) {
+      nextResponse.cookies.set('refreshToken', nextRefreshToken, {
+        httpOnly: true,
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        ...(shouldRemember ? { maxAge: 60 * 60 * 24 * 7 } : {}),
+      })
+    }
+
     return nextResponse
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Refresh proxy error', error)
+    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

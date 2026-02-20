@@ -2,7 +2,6 @@ import { PrismaClient } from '@prisma/client'
 import { createClient } from 'redis'
 import winston from 'winston'
 import { config } from 'dotenv'
-import path from 'path'
 
 config()
 
@@ -102,16 +101,6 @@ export const connectDatabases = async () => {
         throw err
       }
     }
-
-    // Try to connect to Redis, but don't fail if it's not available
-    /*
-    try {
-      await redis.connect()
-      logger.info('Redis connected successfully')
-    } catch (redisError) {
-      logger.warn('Redis connection failed, continuing without Redis:', redisError)
-    }
-    */
     logger.info('Skipping Redis connection for now')
   } catch (error) {
     logger.error('Database connection failed:', error)

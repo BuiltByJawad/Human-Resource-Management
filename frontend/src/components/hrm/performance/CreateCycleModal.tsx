@@ -1,7 +1,8 @@
 import { useState, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { CalendarIcon } from '@heroicons/react/24/outline';
-import { Button, Input, DatePicker } from '@/components/ui/FormComponents';
+import { Button, Input } from '@/components/ui/FormComponents';
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -98,7 +99,7 @@ export function CreateCycleModal({ isOpen, onClose, onSubmit, loading }: CreateC
                                                                 control={control}
                                                                 name="startDate"
                                                                 render={({ field }) => (
-                                                                    <DatePicker
+                                                                    <LazyDatePicker
                                                                         label="Start Date"
                                                                         required
                                                                         value={field.value}
@@ -113,7 +114,7 @@ export function CreateCycleModal({ isOpen, onClose, onSubmit, loading }: CreateC
                                                                 control={control}
                                                                 name="endDate"
                                                                 render={({ field }) => (
-                                                                    <DatePicker
+                                                                    <LazyDatePicker
                                                                         label="End Date"
                                                                         required
                                                                         value={field.value}

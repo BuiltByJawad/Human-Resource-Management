@@ -8,6 +8,14 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.{js,ts}',
   ],
+  coverageThreshold: {
+    global: {
+      branches: 1,
+      functions: 1,
+      lines: 20,
+      statements: 20,
+    },
+  },
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   moduleNameMapper: {

@@ -1,12 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import Sidebar from "@/components/ui/Sidebar"
-import Header from "@/components/ui/Header"
 import { KanbanBoard, type Applicant, type JobPosting, type ApplicantStatus } from "@/components/hrm/RecruitmentComponents"
-import JobForm from "@/components/hrm/JobForm"
+const JobForm = dynamic(() => import("@/components/hrm/JobForm"), { ssr: false })
 import { Button, Select } from "@/components/ui/FormComponents"
 import { LoadingSpinner } from "@/components/ui/CommonComponents"
 import { useToast } from "@/components/ui/ToastProvider"
@@ -116,55 +115,51 @@ export function RecruitmentPageClient({
   const loadingBoard = (applicantsLoading || applicantsFetching) && !!selectedJobId
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-[1600px] mx-auto h-full flex flex-col space-y-6">
-            <div className="flex justify-between items-center flex-shrink-0">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Recruitment Pipeline</h1>
-                <p className="text-sm text-gray-500">Manage applicants and job postings</p>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="w-64">
-                  <Select
-                    value={selectedJobId}
-                    onChange={(value) => setSelectedJobId(value)}
-                    options={jobOptions}
-                    disabled={jobsLoading}
-                  />
-                </div>
-                <Button onClick={() => setIsJobFormOpen(true)}>Post Job</Button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              {!selectedJobId ? (
-                <div className="flex flex-col items-center justify-center h-full text-sm text-gray-500">
-                  <p>Select a job posting to view its applicants.</p>
-                </div>
-              ) : loadingBoard ? (
-                <div className="flex justify-center items-center h-full">
-                  <LoadingSpinner size="lg" />
-                </div>
-              ) : (
-                <KanbanBoard applicants={applicants} onStatusChange={handleStatusChange} />
-              )}
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-[1600px] mx-auto h-full flex flex-col space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Recruitment Pipeline</h1>
+            <p className="text-sm text-gray-500">Manage applicants and job postings</p>
           </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="w-full sm:w-64">
+              <Select
+                value={selectedJobId}
+                onChange={(value) => setSelectedJobId(value)}
+                options={jobOptions}
+                disabled={jobsLoading}
+              />
+            </div>
+            <Button onClick={() => setIsJobFormOpen(true)}>Post Job</Button>
+          </div>
+        </div>
 
-          <JobForm
-            isOpen={isJobFormOpen}
-            onClose={() => setIsJobFormOpen(false)}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ["recruitment", "jobs"] })
-              setIsJobFormOpen(false)
-            }}
-          />
-        </main>
+        <div className="flex-1 overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          {!selectedJobId ? (
+            <div className="flex flex-col items-center justify-center h-full text-sm text-gray-500">
+              <p>Select a job posting to view its applicants.</p>
+            </div>
+          ) : loadingBoard ? (
+            <div className="flex justify-center items-center h-full">
+              <LoadingSpinner size="lg" />
+            </div>
+          ) : (
+            <KanbanBoard applicants={applicants} onStatusChange={handleStatusChange} />
+          )}
+        </div>
       </div>
+
+      {isJobFormOpen && (
+        <JobForm
+          isOpen={isJobFormOpen}
+          onClose={() => setIsJobFormOpen(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["recruitment", "jobs"] })
+            setIsJobFormOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }

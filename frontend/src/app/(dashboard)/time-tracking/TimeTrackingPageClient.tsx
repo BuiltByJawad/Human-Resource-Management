@@ -1,6 +1,5 @@
 "use client"
 
-import DashboardShell from '@/components/ui/DashboardShell'
 import { Modal } from '@/components/ui/Modal'
 import { Input, TextArea } from '@/components/ui/FormComponents'
 import { TimeTrackingHeader } from '@/components/features/time-tracking/TimeTrackingHeader'
@@ -33,8 +32,8 @@ export function TimeTrackingPageClient({ initialProjects, employees }: TimeTrack
   } = useTimeTrackingPage({ initialProjects, employees })
 
   return (
-    <DashboardShell>
-      <div className="p-6">
+    <>
+      <div className="p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <TimeTrackingHeader title="Time Tracking" subtitle="Manage projects and view employee timesheets" />
 
@@ -120,6 +119,6 @@ export function TimeTrackingPageClient({ initialProjects, employees }: TimeTrack
           </div>
         </div>
       </Modal>
-    </DashboardShell>
+    </>
   )
 }

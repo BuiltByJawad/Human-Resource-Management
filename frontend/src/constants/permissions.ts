@@ -37,6 +37,10 @@ export const PERMISSIONS = {
   MANAGE_ASSETS: 'assets.manage',
   ASSIGN_ASSETS: 'assets.assign',
 
+  MANAGE_DOCUMENTS: 'documents.manage',
+  UPLOAD_DOCUMENTS: 'documents.upload',
+  MANAGE_DOCUMENT_CATEGORIES: 'document_categories.manage',
+
   VIEW_COMPLIANCE: 'compliance.view',
   MANAGE_COMPLIANCE: 'compliance.manage',
 

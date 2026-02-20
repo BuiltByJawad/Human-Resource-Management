@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/FormComponents'
 import { Modal } from '@/components/ui/Modal'
+import { PasswordStrengthBar } from '@/components/ui/PasswordStrengthBar'
 import type { ChangePasswordFormValues } from '@/services/settings/types'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 
@@ -10,6 +11,7 @@ interface PasswordChangeModalProps {
   register: UseFormRegister<ChangePasswordFormValues>
   errors: FieldErrors<ChangePasswordFormValues>
   isChangingPassword: boolean
+  newPasswordValue: string
 }
 
 export const PasswordChangeModal = ({
@@ -19,6 +21,7 @@ export const PasswordChangeModal = ({
   register,
   errors,
   isChangingPassword,
+  newPasswordValue,
 }: PasswordChangeModalProps) => (
   <Modal isOpen={isOpen} onClose={onClose} title="Change Password">
     <form onSubmit={onSubmit} className="space-y-4">
@@ -36,6 +39,7 @@ export const PasswordChangeModal = ({
         error={errors.newPassword?.message}
         {...register('newPassword')}
       />
+      <PasswordStrengthBar password={newPasswordValue} />
       <Input
         label="Confirm New Password"
         type="password"

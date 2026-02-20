@@ -13,9 +13,7 @@ if (process.env.DOTENV_CONFIG_PATH) {
   }
 }
 
-const { PrismaClient } = require('@prisma/client')
-
-const prisma = new PrismaClient()
+const { prisma, redis } = require('./src/shared/config/database')
 
 const clearTestData = async () => {
   await prisma.shiftSwapRequest.deleteMany({})
@@ -66,4 +64,13 @@ beforeAll(async () => {
 afterEach(async () => {
   // Clean up after each test (keep roles intact for subsequent tests)
   await clearTestData()
+})
+
+afterAll(async () => {
+  await prisma.$disconnect()
+  try {
+    await redis.disconnect()
+  } catch {
+    // ignore
+  }
 })

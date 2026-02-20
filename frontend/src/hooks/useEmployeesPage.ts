@@ -128,6 +128,10 @@ export function useEmployeesPage({
     queryFn: () => fetchDepartments(token ?? undefined),
     enabled: !!token,
     initialData: initialDepartments,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   })
 
   const rolesQuery = useQuery<Role[]>({
@@ -135,6 +139,10 @@ export function useEmployeesPage({
     queryFn: () => fetchRolesWithToken(token ?? undefined),
     enabled: !!token,
     initialData: initialRoles,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   })
 
   const isDefaultFilters =
@@ -144,12 +152,22 @@ export function useEmployeesPage({
     filterDepartment === 'all' &&
     !debouncedSearch
 
+  const employeesQueryKey = useMemo(
+    () => ['employees', token, pagination.page, pagination.limit, debouncedSearch, filterStatus, filterDepartment] as const,
+    [token, pagination.page, pagination.limit, debouncedSearch, filterStatus, filterDepartment]
+  )
+
   const employeesQuery = useQuery<EmployeesPage>({
-    queryKey: ['employees', token, pagination.page, pagination.limit, debouncedSearch, filterStatus, filterDepartment],
+    queryKey: employeesQueryKey,
     queryFn: () => fetchEmployees(baseQueryParams, token ?? undefined),
     enabled: !!token,
     placeholderData: (previousData) => previousData,
     initialData: isDefaultFilters ? initialEmployees ?? undefined : undefined,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   useEffect(() => {
@@ -169,7 +187,7 @@ export function useEmployeesPage({
     },
     onSuccess: () => {
       showToast('Invite link sent to employee', 'success')
-      queryClient.invalidateQueries({ queryKey: ['employees', token] })
+      queryClient.invalidateQueries({ queryKey: employeesQueryKey, exact: true })
     },
     onError: (error: any) => {
       showToast(error?.response?.data?.message || 'Failed to send invite', 'error')
@@ -180,7 +198,7 @@ export function useEmployeesPage({
     mutationFn: async (payload: EmployeePayload) => createEmployee(payload, token ?? undefined),
     onSuccess: async (_data, variables) => {
       showToast('Employee created successfully', 'success')
-      queryClient.invalidateQueries({ queryKey: ['employees', token] })
+      queryClient.invalidateQueries({ queryKey: employeesQueryKey, exact: true })
       setIsModalOpen(false)
 
       if (variables.email && variables.roleId) {
@@ -204,7 +222,7 @@ export function useEmployeesPage({
     },
     onSuccess: () => {
       showToast('Employee updated successfully', 'success')
-      queryClient.invalidateQueries({ queryKey: ['employees', token] })
+      queryClient.invalidateQueries({ queryKey: employeesQueryKey, exact: true })
       setIsModalOpen(false)
     },
     onError: (error: any) => {
@@ -216,7 +234,7 @@ export function useEmployeesPage({
     mutationFn: async (id: string) => deleteEmployeeById(id, token ?? undefined),
     onSuccess: () => {
       showToast('Employee deleted successfully', 'success')
-      queryClient.invalidateQueries({ queryKey: ['employees', token] })
+      queryClient.invalidateQueries({ queryKey: employeesQueryKey, exact: true })
       setPendingDelete(null)
     },
     onError: () => {

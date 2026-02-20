@@ -67,4 +67,17 @@ export interface AuthResponse {
         employee?: any;
     };
     permissions?: string[];
+    requiresMfa?: boolean;
+    mustSetupMfa?: boolean;
+}
+
+export interface StartMfaEnrollmentResponse {
+    otpauthUrl: string;
+    secretMasked: string;
+    enrollmentToken: string;
+}
+
+export interface MfaVerifyDto {
+    mfaToken: string;
+    code: string;
 }

@@ -3,8 +3,6 @@
 import { useEffect, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { AttendanceCard, AttendanceHistory, type AttendanceRecord } from '@/components/hrm/AttendanceComponents'
 import { useAuthStore } from '@/store/useAuthStore'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -172,12 +170,8 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
               <p className="text-sm text-gray-500">Track your daily work hours</p>
@@ -211,8 +205,6 @@ export function AttendancePageClient({ initialAttendance = [] }: AttendancePageC
                 )}
               </div>
             </div>
-          </div>
-        </main>
       </div>
     </div>
   )

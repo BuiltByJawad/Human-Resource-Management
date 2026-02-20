@@ -59,3 +59,9 @@ export interface PolicyHistoryEntry {
   oldValues?: Record<string, unknown> | null
   newValues?: Record<string, unknown> | null
 }
+
+export interface StartMfaEnrollmentResponse {
+  otpauthUrl: string
+  secretMasked: string
+  enrollmentToken: string
+}

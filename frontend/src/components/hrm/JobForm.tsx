@@ -85,7 +85,7 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
 
             <div className="fixed inset-0 flex items-center justify-center p-4">
                 <Dialog.Panel className="mx-auto max-w-md w-full rounded-xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                         <Dialog.Title className="text-lg font-bold text-gray-900">Post New Job</Dialog.Title>
                         <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
                             <XMarkIcon className="h-6 w-6" />
@@ -135,11 +135,11 @@ export default function JobForm({ isOpen, onClose, onSuccess }: JobFormProps) {
                             {...register('description')}
                         />
 
-                        <div className="flex justify-end space-x-3 mt-6">
-                            <Button variant="secondary" onClick={onClose} type="button">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:items-center mt-6">
+                            <Button variant="secondary" onClick={onClose} type="button" className="w-full sm:w-auto">
                                 Cancel
                             </Button>
-                            <Button type="submit" loading={createJob.isPending}>
+                            <Button type="submit" loading={createJob.isPending} className="w-full sm:w-auto">
                                 Create Job
                             </Button>
                         </div>

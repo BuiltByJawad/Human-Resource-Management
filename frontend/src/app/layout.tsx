@@ -1,6 +1,8 @@
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 
+import { AuthTransitionOverlay } from "@/components/ui/AuthTransitionOverlay";
+
 const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -24,6 +26,7 @@ export default async function RootLayout({
         className={`${inter.variable} ${robotoMono.variable} bg-[var(--background)] text-[var(--foreground)] antialiased`}
       >
         {children}
+        <AuthTransitionOverlay />
       </body>
     </html>
   );

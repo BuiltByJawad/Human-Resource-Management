@@ -42,11 +42,11 @@ export const KeyResultList: React.FC<KeyResultListProps> = ({ keyResults, onUpda
                 const percentage = Math.min((kr.currentValue / kr.targetValue) * 100, 100);
                 return (
                     <div key={kr.id} className="space-y-1">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="font-medium">{kr.description}</span>
-                            <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm">
+                            <span className="font-medium break-words">{kr.description}</span>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                                 {editingId === kr.id ? (
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex flex-wrap items-center gap-1">
                                         <Input
                                             type="number"
                                             className="h-6 w-16 text-right"
@@ -59,8 +59,8 @@ export const KeyResultList: React.FC<KeyResultListProps> = ({ keyResults, onUpda
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-gray-600">{kr.currentValue} / {kr.targetValue} {kr.unit}</span>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-gray-600 break-words">{kr.currentValue} / {kr.targetValue} {kr.unit}</span>
                                         <Button size="icon" variant="ghost" className="h-6 w-6 text-blue-600" onClick={() => startEdit(kr)}>
                                             <PencilIcon className="w-3 h-3" />
                                         </Button>

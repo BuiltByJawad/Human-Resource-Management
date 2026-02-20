@@ -1,5 +1,10 @@
 import PageSkeleton from '@/components/ui/PageSkeleton'
+import { PageSkeletonGate } from '@/components/ui/PageSkeletonGate'
 
 export default function Loading() {
-    return <PageSkeleton variant="cards" title="Recruitment" itemCount={6} />
+    return (
+        <PageSkeletonGate>
+            <PageSkeleton />
+        </PageSkeletonGate>
+    )
 }

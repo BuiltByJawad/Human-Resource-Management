@@ -4,8 +4,6 @@ import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Skeleton } from '@/components/ui/Skeleton'
 import type { OffboardingProcess } from '@/services/offboarding/types'
@@ -44,16 +42,12 @@ export function OffboardingPageClient({ employeeId, initialProcess }: Offboardin
   }, [isError, error, showToast])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">My Offboarding</h1>
-              <p className="text-gray-600">Track your exit tasks and next steps.</p>
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Offboarding</h1>
+          <p className="text-gray-600">Track your exit tasks and next steps.</p>
+        </div>
 
             {!employeeId ? (
               <div className="bg-white border border-amber-100 rounded-lg p-6 text-amber-700">
@@ -130,8 +124,6 @@ export function OffboardingPageClient({ employeeId, initialProcess }: Offboardin
                 </div>
               </div>
             )}
-          </div>
-        </main>
       </div>
     </div>
   )

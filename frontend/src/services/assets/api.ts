@@ -41,6 +41,58 @@ const normalizeAssets = (payload: unknown): Asset[] => {
   return Array.isArray(root) ? (root as Asset[]) : []
 }
 
+const normalizeUpsertPayload = (payload: UpsertAssetPayload): UpsertAssetPayload => {
+  const base: UpsertAssetPayload = {
+    name: payload.name,
+    serialNumber: payload.serialNumber,
+    type: payload.type,
+    purchaseDate: payload.purchaseDate,
+  }
+
+  if (typeof payload.purchasePrice === 'number' && Number.isFinite(payload.purchasePrice)) {
+    base.purchasePrice = payload.purchasePrice
+  }
+
+  if (typeof payload.vendor === 'string' && payload.vendor.trim()) {
+    base.vendor = payload.vendor.trim()
+  }
+
+  if (typeof payload.description === 'string' && payload.description.trim()) {
+    base.description = payload.description.trim()
+  }
+
+  return base
+}
+
+const normalizePartialUpsertPayload = (payload: Partial<UpsertAssetPayload>): Partial<UpsertAssetPayload> => {
+  const result: Partial<UpsertAssetPayload> = {}
+
+  if (typeof payload.name === 'string') result.name = payload.name
+  if (typeof payload.serialNumber === 'string') result.serialNumber = payload.serialNumber
+  if (typeof payload.type === 'string') result.type = payload.type
+  if (typeof payload.purchaseDate === 'string') result.purchaseDate = payload.purchaseDate
+
+  if (payload.purchasePrice === null || payload.purchasePrice === undefined) {
+    // omit
+  } else if (typeof payload.purchasePrice === 'number' && Number.isFinite(payload.purchasePrice)) {
+    result.purchasePrice = payload.purchasePrice
+  }
+
+  if (payload.vendor === undefined || payload.vendor === null) {
+    // omit
+  } else if (typeof payload.vendor === 'string' && payload.vendor.trim()) {
+    result.vendor = payload.vendor.trim()
+  }
+
+  if (payload.description === undefined || payload.description === null) {
+    // omit
+  } else if (typeof payload.description === 'string' && payload.description.trim()) {
+    result.description = payload.description.trim()
+  }
+
+  return result
+}
+
 export const fetchAssets = async (params: AssetsFilterParams, token?: string): Promise<Asset[]> => {
   const query: Record<string, string> = {}
   if (params.status) query.status = params.status
@@ -62,7 +114,7 @@ export const fetchAssetById = async (assetId: string, token?: string): Promise<A
 }
 
 export const createAsset = async (payload: UpsertAssetPayload, token?: string): Promise<Asset> => {
-  const response = await api.post('/assets', payload, withAuthConfig(token))
+  const response = await api.post('/assets', normalizeUpsertPayload(payload), withAuthConfig(token))
   const data = response.data?.data ?? response.data
   return data as Asset
 }
@@ -72,7 +124,11 @@ export const updateAsset = async (
   payload: Partial<UpsertAssetPayload>,
   token?: string
 ): Promise<Asset> => {
-  const response = await api.patch(`/assets/${assetId}`, payload, withAuthConfig(token))
+  const response = await api.patch(
+    `/assets/${assetId}`,
+    normalizePartialUpsertPayload(payload),
+    withAuthConfig(token)
+  )
   const data = response.data?.data ?? response.data
   return data as Asset
 }

@@ -13,7 +13,8 @@ export const AssetCard = ({ asset, onAssign, onReturn, onEdit }: AssetCardProps)
   const currentAssignment = (asset.assignments ?? []).find((assignment) => !assignment.returnedDate)
 
   const getIcon = () => {
-    switch (asset.type.toLowerCase()) {
+    const type = typeof asset.type === 'string' ? asset.type : ''
+    switch (type.toLowerCase()) {
       case 'laptop':
         return <ComputerDesktopIcon className="h-8 w-8 text-blue-500" />
       case 'mobile':

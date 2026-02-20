@@ -5,8 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMyCourses, updateTrainingProgress } from '@/services/training/api'
 import type { EmployeeTraining } from '@/services/training/types'
-import Sidebar from '@/components/ui/Sidebar';
-import Header from '@/components/ui/Header';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
@@ -83,12 +81,8 @@ export default function CoursePlayerPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex">
-            <Sidebar />
-            <div className="flex-1 flex flex-col">
-                <Header />
-                <main className="flex-1 p-6">
-                    <div className="max-w-4xl mx-auto">
+        <div className="p-4 md:p-6">
+            <div className="max-w-4xl mx-auto">
                         {coursesQuery.isLoading ? (
                             <div className="space-y-6">
                                 <div className="flex items-center gap-3">
@@ -126,7 +120,7 @@ export default function CoursePlayerPage() {
                                 <div className="flex flex-col gap-6">
                                     <div>
                                         <h1 className="text-2xl font-bold text-gray-900 mb-2">{training.course.title}</h1>
-                                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
                                             <span>Duration: {training.course.duration || 60} mins</span>
                                             <span>•</span>
                                             <span>Status: {training.status}</span>
@@ -191,8 +185,6 @@ export default function CoursePlayerPage() {
                                 </div>
                             </>
                         )}
-                    </div>
-                </main>
             </div>
         </div>
     );

@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom'
 import { useAuthStore } from '@/store/useAuthStore'
 
 export function AuthTransitionOverlay() {
-  const { isAuthTransition, endAuthTransition } = useAuthStore()
+  const { isAuthTransition, isLoggingOut, endAuthTransition } = useAuthStore()
 
   useEffect(() => {
     if (!isAuthTransition) return
@@ -22,6 +22,8 @@ export function AuthTransitionOverlay() {
   const overlay = useMemo(() => {
     if (typeof document === 'undefined') return null
     if (!isAuthTransition) return null
+
+    const message = isLoggingOut ? 'Signing you out…' : 'Preparing your workspace…'
 
     return createPortal(
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-white via-sky-50 to-white backdrop-blur-2xl">
@@ -42,12 +44,12 @@ export function AuthTransitionOverlay() {
               <div className="absolute inset-0 bg-gradient-to-r from-sky-500 via-sky-400 to-blue-500 animate-workspace-slide" />
             </div>
           </div>
-          <p className="text-sm font-semibold text-slate-700 tracking-tight">Preparing your workspace…</p>
+          <p className="text-sm font-semibold text-slate-700 tracking-tight">{message}</p>
         </div>
       </div>,
       document.body
     )
-  }, [isAuthTransition])
+  }, [isAuthTransition, isLoggingOut])
 
   return overlay
 }

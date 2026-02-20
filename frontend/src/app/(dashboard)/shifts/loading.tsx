@@ -1,5 +1,10 @@
 import PageSkeleton from '@/components/ui/PageSkeleton'
+import { PageSkeletonGate } from '@/components/ui/PageSkeletonGate'
 
 export default function Loading() {
-    return <PageSkeleton variant="table" title="Shifts" itemCount={8} />
+    return (
+        <PageSkeletonGate>
+            <PageSkeleton />
+        </PageSkeletonGate>
+    )
 }

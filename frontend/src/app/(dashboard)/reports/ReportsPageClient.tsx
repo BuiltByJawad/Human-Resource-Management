@@ -1,6 +1,5 @@
 "use client"
 
-import DashboardShell from '@/components/ui/DashboardShell'
 import { ErrorState } from '@/components/features/reports/ReportStates'
 import { ReportsHeader } from '@/components/features/reports/ReportsHeader'
 import { ReportsTabs } from '@/components/features/reports/ReportsTabs'
@@ -104,9 +103,9 @@ export default function ReportsPageClient({ initialDashboardData, initialDepartm
   })
 
   return (
-    <DashboardShell>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+    <>
+      <div className="p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
           <ReportsHeader
             title="Reports & Analytics"
             subtitle="Monitor workforce metrics, export datasets, and manage scheduled deliveries."
@@ -161,6 +160,6 @@ export default function ReportsPageClient({ initialDashboardData, initialDepartm
           setScheduleHistorySchedule(null)
         }}
       />
-    </DashboardShell>
+    </>
   )
 }

@@ -3,10 +3,8 @@
 import { useMemo } from 'react'
 import { format } from 'date-fns'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
-import { DatePicker } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import type { ExpenseClaim } from '@/services/expenses/types'
 import { useExpensesPage } from '@/hooks/useExpensesPage'
 
@@ -34,16 +32,12 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
   }, [isError, error, showToast])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-5xl mx-auto space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">My Expenses</h1>
-              <p className="text-gray-600">Submit reimbursement requests and track their status.</p>
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Expenses</h1>
+          <p className="text-gray-600">Submit reimbursement requests and track their status.</p>
+        </div>
 
             {!hasEmployee ? (
               <div className="bg-white border border-amber-100 text-amber-700 rounded-lg p-4">
@@ -96,7 +90,7 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-700">Date</label>
-                      <DatePicker
+                      <LazyDatePicker
                         value={form.date}
                         onChange={(date) => setForm((prev) => ({ ...prev, date: date ? format(date, 'yyyy-MM-dd') : '' }))}
                         required
@@ -140,7 +134,7 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
                     <div className="space-y-3">
                       {claims.map((claim) => (
                         <div key={claim.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-center">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p className="font-semibold text-gray-900">
                                 ${claim.amount.toFixed(2)} · {claim.category}
@@ -184,8 +178,6 @@ export function ExpensesPageClient({ employeeId, initialClaims }: ExpensesPageCl
                 </div>
               </section>
             )}
-          </div>
-        </main>
       </div>
     </div>
   )

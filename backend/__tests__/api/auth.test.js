@@ -1,10 +1,17 @@
 const request = require('supertest')
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs')
 const { createApp } = require('../../src/app')
 const { PrismaClient } = require('@prisma/client')
 
-const { app } = createApp()
+const { app, httpServer } = createApp()
 const prisma = new PrismaClient()
+
+let didCloseServer = false
+const closeServerOnce = async () => {
+  if (didCloseServer) return
+  didCloseServer = true
+  await new Promise((resolve) => httpServer.close(resolve))
+}
 
 const clearTestData = async () => {
   await prisma.shiftSwapRequest.deleteMany({})
@@ -51,6 +58,15 @@ const EMP_PASSWORD = 'EmployeePassword123!'
 
 const uniqueEmpNumber = () => `EMP${Date.now()}${Math.floor(Math.random() * 1000)}`
 
+const getRefreshCookie = (setCookie) => {
+  const values = typeof setCookie === 'string' ? [setCookie] : setCookie
+  const cookieHeader = Array.isArray(values) ? values.find((value) => value.startsWith('refreshToken=')) : undefined
+  if (!cookieHeader) {
+    throw new Error('Expected refreshToken cookie to be set')
+  }
+  return cookieHeader.split(';')[0] || cookieHeader
+}
+
 describe('Authentication API', () => {
   beforeAll(async () => {
     await clearTestData()
@@ -60,14 +76,14 @@ describe('Authentication API', () => {
       data: [
         { name: SUPER_ADMIN_ROLE, description: 'Super administrator' },
         { name: EMPLOYEE_ROLE, description: 'Employee' }
-      ]
+      ],
+      skipDuplicates: true,
     })
   })
 
   afterAll(async () => {
     await clearTestData()
     await prisma.role.deleteMany({})
-    await prisma.$disconnect()
   })
 
   describe('POST /api/auth/register', () => {
@@ -108,6 +124,9 @@ describe('Authentication API', () => {
     beforeAll(async () => {
       // seed a user for login
       const role = await prisma.role.findFirst({ where: { name: EMPLOYEE_ROLE } })
+      if (!role) {
+        throw new Error(`Required role not found: ${EMPLOYEE_ROLE}`)
+      }
       const hashed = await bcrypt.hash('TestPassword123!', 10)
       await prisma.user.deleteMany({ where: { email: 'test@example.com' } })
       await prisma.user.create({
@@ -116,7 +135,7 @@ describe('Authentication API', () => {
           password: hashed,
           firstName: 'Test',
           lastName: 'User',
-          roleId: role?.id,
+          roleId: role.id,
           status: 'active'
         }
       })
@@ -127,15 +146,11 @@ describe('Authentication API', () => {
         email: 'test@example.com',
         password: 'TestPassword123!'
       })
-      expect([200, 401]).toContain(response.status)
-      if (response.status === 200) {
-        const token = response.body.data?.accessToken || response.body.token
-        const user = response.body.data?.user || response.body.user
-        expect(token).toBeTruthy()
-        expect(user?.email).toBe('test@example.com')
-      } else {
-        expect(response.body).toHaveProperty('error')
-      }
+      expect(response.status).toBe(200)
+      const token = response.body.data?.accessToken || response.body.token
+      const user = response.body.data?.user || response.body.user
+      expect(token).toBeTruthy()
+      expect(user?.email).toBe('test@example.com')
     })
   })
 
@@ -148,10 +163,13 @@ describe('Authentication API', () => {
   })
 
   describe('POST /api/auth/refresh', () => {
-    let refreshToken
+    let refreshCookie
 
     beforeAll(async () => {
       const role = await prisma.role.findFirst({ where: { name: EMPLOYEE_ROLE } })
+      if (!role) {
+        throw new Error(`Required role not found: ${EMPLOYEE_ROLE}`)
+      }
       const email = `refresh-${Date.now()}@example.com`
       const password = 'RefreshPassword123!'
       const hashed = await bcrypt.hash(password, 10)
@@ -161,28 +179,31 @@ describe('Authentication API', () => {
           password: hashed,
           firstName: 'Refresh',
           lastName: 'User',
-          roleId: role?.id,
+          roleId: role.id,
           status: 'active'
         }
       })
 
       const loginRes = await request(app).post('/api/auth/login').send({ email, password })
-      refreshToken = loginRes.body?.data?.refreshToken || loginRes.body?.refreshToken
+      refreshCookie = getRefreshCookie(loginRes.headers['set-cookie'])
     })
 
     it('should refresh token successfully', async () => {
-      const response = await request(app).post('/api/auth/refresh-token').send({ refreshToken })
+      const response = await request(app)
+        .post('/api/auth/refresh')
+        .set('Cookie', refreshCookie)
+        .send({})
 
-      expect([200, 401]).toContain(response.status)
-      if (response.status === 200) {
-        const data = response.body.data || response.body
-        expect(data.accessToken || data.data?.accessToken || data.token).toBeTruthy()
-        expect(data.refreshToken || data.data?.refreshToken).toBeTruthy()
-      } else {
-        expect(response.body).toHaveProperty('error')
-      }
+      expect(response.status).toBe(200)
+      const data = response.body.data || response.body
+      expect(data.accessToken || data.data?.accessToken || data.token).toBeTruthy()
     })
   })
+})
+
+afterAll(async () => {
+  await prisma.$disconnect()
+  await closeServerOnce()
 })
 
 describe('Employee API', () => {
@@ -243,8 +264,6 @@ describe('Employee API', () => {
 
   afterAll(async () => {
     await clearTestData()
-    await prisma.role.deleteMany({})
-    await prisma.$disconnect()
   })
 
   describe('GET /api/employees', () => {

@@ -6,7 +6,7 @@ import { CalendarIcon } from '@heroicons/react/24/outline'
 import { format, parseISO, isValid } from 'date-fns'
 import { createPortal } from 'react-dom'
 
-interface DatePickerProps {
+export interface DatePickerProps {
     label?: string
     value: string | Date | null
     onChange: (date: Date | null) => void

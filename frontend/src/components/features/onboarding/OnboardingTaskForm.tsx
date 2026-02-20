@@ -1,7 +1,8 @@
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { format } from 'date-fns'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button, DatePicker } from '@/components/ui/FormComponents'
+import { Button } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import type { OnboardingTaskPayload } from '@/services/onboarding/types'
 
 interface OnboardingTaskFormProps {
@@ -29,7 +30,7 @@ export function OnboardingTaskForm({ newTask, onChange, onSubmit, isSubmitting }
           <div className="space-y-2">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Step Title</label>
             <input
-              className="w-full border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 transition-all"
               placeholder="e.g. System Access Setup"
               value={newTask.title}
               onChange={(event) => onChange({ ...newTask, title: event.target.value })}
@@ -39,7 +40,7 @@ export function OnboardingTaskForm({ newTask, onChange, onSubmit, isSubmitting }
           <div className="space-y-2">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</label>
             <textarea
-              className="w-full border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 transition-all min-h-[100px]"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-blue-500 focus:border-blue-500 transition-all min-h-[100px]"
               placeholder="What needs to be done?"
               value={newTask.description ?? ''}
               onChange={(event) => onChange({ ...newTask, description: event.target.value })}
@@ -47,7 +48,7 @@ export function OnboardingTaskForm({ newTask, onChange, onSubmit, isSubmitting }
           </div>
           <div className="space-y-2">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Target Date</label>
-            <DatePicker
+            <LazyDatePicker
               value={newTask.dueDate || ''}
               onChange={(date) => onChange({ ...newTask, dueDate: date ? format(date, 'yyyy-MM-dd') : '' })}
             />

@@ -1,7 +1,9 @@
 "use client"
 
 import { useMemo, useState } from 'react'
-import { BellIcon } from '@heroicons/react/24/outline'
+import dynamic from 'next/dynamic'
+
+const BellIcon = dynamic(() => import('@heroicons/react/24/outline').then((mod) => mod.BellIcon), { ssr: false })
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
 import { NotificationItem } from '@/services/notifications/types'

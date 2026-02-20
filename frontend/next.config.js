@@ -3,8 +3,8 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
-  // Enable Turbopack for faster dev builds (Next.js 15 feature)
-  // Run with: npm run dev --turbo
+  productionBrowserSourceMaps: process.env.NEXT_PUBLIC_SOURCEMAPS === 'true',
+
   images: {
     remotePatterns: [
       {

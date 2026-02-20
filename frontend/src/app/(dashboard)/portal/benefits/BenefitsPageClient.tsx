@@ -3,8 +3,6 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { useToast } from '@/components/ui/ToastProvider'
 import { fetchEmployeeBenefits } from '@/services/benefits/api'
 import type { BenefitsResponse } from '@/services/benefits/types'
@@ -52,34 +50,28 @@ export function BenefitsPageClient({ employeeId, initialBenefits }: BenefitsPage
   const summary = benefitsData.summary
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-5xl mx-auto space-y-6">
-            <BenefitsHeader title="My Benefits" subtitle="View the benefits you are enrolled in." />
+    <div className="p-4 md:p-6">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <BenefitsHeader title="My Benefits" subtitle="View the benefits you are enrolled in." />
 
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[1, 2].map((i) => (
-                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : summary ? (
-              <BenefitsSummaryCards
-                totalCompanyCost={summary.totalCostToCompany}
-                totalEmployeeCost={summary.totalCostToEmployee}
-              />
-            ) : null}
-
-            <BenefitsEnrollmentsList
-              isLoading={isLoading}
-              isError={isError}
-              benefits={benefits}
-            />
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-lg" />
+            ))}
           </div>
-        </main>
+        ) : summary ? (
+          <BenefitsSummaryCards
+            totalCompanyCost={summary.totalCostToCompany}
+            totalEmployeeCost={summary.totalCostToEmployee}
+          />
+        ) : null}
+
+        <BenefitsEnrollmentsList
+          isLoading={isLoading}
+          isError={isError}
+          benefits={benefits}
+        />
       </div>
     </div>
   )

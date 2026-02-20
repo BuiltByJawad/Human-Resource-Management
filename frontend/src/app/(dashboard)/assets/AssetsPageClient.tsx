@@ -1,14 +1,20 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { FunnelIcon, MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/24/outline"
 
-import Sidebar from "@/components/ui/Sidebar"
-import Header from "@/components/ui/Header"
 import { Button } from "@/components/ui/FormComponents"
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { AssetCard } from "@/components/features/assets/AssetCard"
-import { AssetForm } from "@/components/features/assets/AssetForm"
-import { AssignmentModal } from "@/components/features/assets/AssignmentModal"
+const AssetForm = dynamic(() => import("@/components/features/assets/AssetForm").then((mod) => mod.AssetForm), {
+  ssr: false,
+})
+const AssignmentModal = dynamic(
+  () => import("@/components/features/assets/AssignmentModal").then((mod) => mod.AssignmentModal),
+  { ssr: false }
+)
+const ConfirmDialog = dynamic(() => import("@/components/ui/ConfirmDialog").then((mod) => mod.ConfirmDialog), {
+  ssr: false,
+})
 import type { Asset } from "@/services/assets/types"
 import { useAssetsPage } from "@/hooks/useAssetsPage"
 import type { Employee } from "@/services/employees/types"
@@ -50,28 +56,24 @@ export function AssetsPageClient({
   const employees = employeesQuery.data ?? []
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Asset Management</h1>
-                <p className="text-sm text-gray-500">Track hardware, software, and assignments.</p>
-              </div>
-              <Button
-                onClick={() => {
-                  setSelectedAsset(null)
-                  setIsFormOpen(true)
-                }}
-                className="flex items-center"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Add Asset
-              </Button>
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Asset Management</h1>
+            <p className="text-sm text-gray-500">Track hardware, software, and assignments.</p>
+          </div>
+          <Button
+            onClick={() => {
+              setSelectedAsset(null)
+              setIsFormOpen(true)
+            }}
+            className="flex items-center"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Add Asset
+          </Button>
+        </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
@@ -104,7 +106,7 @@ export function AssetsPageClient({
                 />
               </div>
               <div className="w-full md:w-48">
-                <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2 border border-gray-300 rounded-lg px-3 py-2">
                   <FunnelIcon className="h-5 w-5 text-gray-400" />
                   <select
                     className="w-full bg-transparent focus:outline-none text-sm text-gray-700"
@@ -148,47 +150,51 @@ export function AssetsPageClient({
                 ))}
               </div>
             )}
-          </div>
-
-          <AssetForm
-            isOpen={isFormOpen}
-            onClose={() => {
-              setIsFormOpen(false)
-              setSelectedAsset(null)
-            }}
-            onSubmit={handleSubmitAsset}
-            initialData={selectedAsset || undefined}
-          />
-
-          <AssignmentModal
-            isOpen={isAssignModalOpen}
-            onClose={() => {
-              setIsAssignModalOpen(false)
-              setSelectedAsset(null)
-            }}
-            onAssign={handleAssignAsset}
-            employees={employees}
-          />
-          <ConfirmDialog
-            isOpen={isReturnDialogOpen}
-            onClose={() => {
-              setIsReturnDialogOpen(false)
-              setAssetPendingReturn(null)
-            }}
-            onConfirm={confirmReturnAsset}
-            title="Return asset"
-            message={
-              assetPendingReturn
-                ? `Mark ${assetPendingReturn.name} as returned? This will make it available for reassignment.`
-                : 'Mark this asset as returned?'
-            }
-            confirmText={returnAssetMutation.isPending ? "Returning..." : "Return"}
-            cancelText="Keep assigned"
-            loading={returnAssetMutation.isPending}
-            type="warning"
-          />
-        </main>
       </div>
+
+      {isFormOpen && (
+        <AssetForm
+          isOpen={isFormOpen}
+          onClose={() => {
+            setIsFormOpen(false)
+            setSelectedAsset(null)
+          }}
+          onSubmit={handleSubmitAsset}
+          initialData={selectedAsset || undefined}
+        />
+      )}
+
+      {isAssignModalOpen && (
+        <AssignmentModal
+          isOpen={isAssignModalOpen}
+          onClose={() => {
+            setIsAssignModalOpen(false)
+            setSelectedAsset(null)
+          }}
+          onAssign={handleAssignAsset}
+          employees={employees}
+        />
+      )}
+      {isReturnDialogOpen && (
+        <ConfirmDialog
+          isOpen={isReturnDialogOpen}
+          onClose={() => {
+            setIsReturnDialogOpen(false)
+            setAssetPendingReturn(null)
+          }}
+          onConfirm={confirmReturnAsset}
+          title="Return asset"
+          message={
+            assetPendingReturn
+              ? `Mark ${assetPendingReturn.name} as returned? This will make it available for reassignment.`
+              : 'Mark this asset as returned?'
+          }
+          confirmText={returnAssetMutation.isPending ? "Returning..." : "Return"}
+          cancelText="Keep assigned"
+          loading={returnAssetMutation.isPending}
+          type="warning"
+        />
+      )}
     </div>
   )
 }

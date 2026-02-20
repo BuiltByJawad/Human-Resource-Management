@@ -69,6 +69,7 @@ const navigation: { label: string; items: NavItem[] }[] = [
         label: 'System',
         items: [
             { name: 'Roles & Permissions', href: '/roles', icon: KeyIcon, permissions: [PERMISSIONS.MANAGE_ROLES] },
+            { name: 'Document Categories', href: '/document-categories', icon: KeyIcon, permissions: [PERMISSIONS.MANAGE_DOCUMENT_CATEGORIES] },
             { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
         ],
     },

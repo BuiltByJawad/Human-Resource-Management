@@ -103,6 +103,11 @@ const storeRefreshJti = async (userId: string, jti: string) => {
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const { email, password, firstName, lastName } = req.body
 
+  const passwordError = validatePasswordStrength(password)
+  if (passwordError) {
+    throw new BadRequestError(passwordError)
+  }
+
   const existingUser = await prisma.user.findUnique({ where: { email } })
   if (existingUser) {
     throw new BadRequestError('Email already in use')
@@ -508,7 +513,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     }
   })
 
-  if (!user || user.status !== 'active') {
+  const isActive = user?.status ? String(user.status).toLowerCase() === 'active' : false
+  if (!user || !isActive) {
     if (redisOk) {
       await recordLoginFailure(failKey, blockKey)
     }
@@ -578,7 +584,7 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
   const result = await authService.refreshAccessToken(req.body as any)
   res.json({
     success: true,
-    data: result
+    data: result,
   })
 })
 
@@ -595,7 +601,7 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response) =
     }
   })
 
-  if (!user || user.status !== 'active') {
+  if (!user || String(user.status).toLowerCase() !== 'active') {
     throw new UnauthorizedError('User not found or inactive')
   }
 

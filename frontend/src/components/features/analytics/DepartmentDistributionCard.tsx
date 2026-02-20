@@ -28,8 +28,8 @@ export function DepartmentDistributionCard({ deptStats, totalEmployees }: Depart
               const percentage = totalEmployees > 0 ? (dept._count.employees / totalEmployees) * 100 : 0
               return (
                 <div key={dept.id}>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-sm font-semibold text-gray-700">{dept.name}</span>
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-1.5">
+                    <span className="text-sm font-semibold text-gray-700 break-words">{dept.name}</span>
                     <span className="text-xs font-bold text-gray-500">
                       {dept._count.employees} employees ({percentage.toFixed(1)}%)
                     </span>

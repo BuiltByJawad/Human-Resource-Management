@@ -6,8 +6,8 @@ import { useToast } from '@/components/ui/ToastProvider'
 import { handleCrudError } from '@/lib/apiError'
 import type { CompanyDocument } from '@/services/documents/types'
 import { fetchDocuments } from '@/services/documents/api'
-
-const categories = ['All', 'HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other']
+import { fetchDocumentCategories } from '@/services/documentCategories/api'
+import type { DocumentCategory } from '@/services/documentCategories/types'
 
 interface UseDocumentsPortalOptions {
   initialDocuments: CompanyDocument[]
@@ -36,6 +36,13 @@ export function useDocumentsPortal({ initialDocuments, initialCategory }: UseDoc
     refetchOnWindowFocus: false,
   })
 
+  const categoriesQuery = useQuery<DocumentCategory[]>({
+    queryKey: ['document-categories', 'active'],
+    queryFn: () => fetchDocumentCategories({ includeInactive: false }),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
   useEffect(() => {
     if (isError && error) {
       handleCrudError({
@@ -57,6 +64,16 @@ export function useDocumentsPortal({ initialDocuments, initialCategory }: UseDoc
 
   const skeletonCount = filteredDocs.length || documents.length || initialDocuments.length || 0
   const showSkeletons = (isLoading || isFetching) && skeletonCount > 0
+
+  const categories = useMemo(() => {
+    const active = (categoriesQuery.data ?? []).filter((c) => c.isActive)
+    if (active.length > 0) {
+      return ['All', ...active.map((c) => c.name)]
+    }
+
+    const inferred = Array.from(new Set((documents ?? []).map((doc) => doc.category).filter(Boolean))).sort()
+    return ['All', ...inferred]
+  }, [categoriesQuery.data, documents])
 
   return {
     categories,

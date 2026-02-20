@@ -2,7 +2,8 @@ import { Fragment, useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { Dialog, Transition } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import { Button, DatePicker, Input } from '@/components/ui/FormComponents'
+import { Button, Input } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import { CreatableSelect } from '@/components/ui/CreatableSelect'
 import type { Resolver } from 'react-hook-form'
 import { Controller, useForm } from 'react-hook-form'
@@ -94,6 +95,8 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
     try {
       await onSubmit(data)
       onClose()
+    } catch {
+      // Errors are handled by the caller (toast, field errors). Keep modal open.
     } finally {
       setLoading(false)
     }
@@ -166,7 +169,13 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
                       type="number"
                       placeholder="0.00"
                       error={errors.purchasePrice?.message}
-                      {...register('purchasePrice')}
+                      {...register('purchasePrice', {
+                        setValueAs: (value) => {
+                          if (value === '' || value === null || value === undefined) return null
+                          const parsed = Number(value)
+                          return Number.isFinite(parsed) ? parsed : null
+                        },
+                      })}
                     />
                   </div>
                 </div>
@@ -175,7 +184,7 @@ export const AssetForm = ({ isOpen, onClose, onSubmit, initialData }: AssetFormP
                     control={control}
                     name="purchaseDate"
                     render={({ field }) => (
-                      <DatePicker
+                      <LazyDatePicker
                         label="Purchase Date"
                         required
                         value={field.value}

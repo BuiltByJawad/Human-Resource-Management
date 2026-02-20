@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ToastProvider } from "@/components/ui/ToastProvider";
 
 const DEFAULT_TITLE = "HRM Platform";
 
@@ -16,9 +15,7 @@ export default function PublicLayout({
 }>) {
   return (
     <div className="min-h-screen">
-      <ToastProvider>
-        <main className="min-h-screen">{children}</main>
-      </ToastProvider>
+      <main className="min-h-screen">{children}</main>
     </div>
   );
 }

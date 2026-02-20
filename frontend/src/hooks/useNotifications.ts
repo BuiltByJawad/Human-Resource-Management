@@ -164,6 +164,21 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => markNotificationRead(id, token),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: notificationsQueryKey })
+
+      const previous = queryClient.getQueryData<NotificationItem[]>(notificationsQueryKey) ?? []
+
+      const next = previous.map((item) => (item.id === id ? { ...item, read: true } : item))
+      const nextUnread = next.filter((item) => !item.read).length
+
+      queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, next)
+      setServerUnreadCount(nextUnread)
+      setCachedUnreadCount(nextUnread)
+      writeUnreadCount(nextUnread)
+
+      return { previous }
+    },
     onSuccess: (_data, id) => {
       let nextUnread = 0
       queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, (current) => {
@@ -176,7 +191,17 @@ export function useNotifications({ token, isAuthenticated, hasInitialAuth, onMut
       writeUnreadCount(nextUnread)
       queryClient.invalidateQueries({ queryKey: notificationsQueryKey })
     },
-    onError: (err) => onMutationError?.(err, 'one'),
+    onError: (err, _id, context) => {
+      const previous = context?.previous
+      if (previous) {
+        queryClient.setQueryData<NotificationItem[]>(notificationsQueryKey, previous)
+        const nextUnread = previous.filter((item) => !item.read).length
+        setServerUnreadCount(nextUnread)
+        setCachedUnreadCount(nextUnread)
+        writeUnreadCount(nextUnread)
+      }
+      onMutationError?.(err, 'one')
+    },
   })
 
   const notificationData = (notificationsQuery.data ?? []) as NotificationItem[]

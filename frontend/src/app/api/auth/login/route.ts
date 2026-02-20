@@ -37,6 +37,25 @@ const getRecord = (value: unknown): Record<string, unknown> | null => {
   return value as Record<string, unknown>
 }
 
+const splitSetCookieHeader = (raw: string): string[] => {
+  // Best-effort split for multiple cookies in one header value.
+  return raw.split(/,(?=\s*[^\s;,]+=)/g).map((part) => part.trim()).filter(Boolean)
+}
+
+const extractCookieValue = (setCookieHeaders: string[], name: string): string | null => {
+  const prefix = `${name}=`
+  for (const header of setCookieHeaders) {
+    if (typeof header !== 'string') continue
+    const trimmed = header.trim()
+    if (!trimmed.toLowerCase().startsWith(prefix.toLowerCase())) continue
+    const valuePart = trimmed.slice(prefix.length)
+    const endIdx = valuePart.indexOf(';')
+    const value = (endIdx === -1 ? valuePart : valuePart.slice(0, endIdx)).trim()
+    return value || null
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password, rememberMe } = await request.json()
@@ -94,6 +113,18 @@ export async function POST(request: NextRequest) {
         nextResponse.headers.set('set-cookie', rawSetCookie)
       }
     }
+
+    const refreshTokenFromBody = typeof (payload as Record<string, unknown>)?.refreshToken === 'string'
+      ? ((payload as Record<string, unknown>).refreshToken as string)
+      : null
+    const rawSetCookie = response.headers.get('set-cookie')
+    const cookieCandidates = setCookies.length
+      ? setCookies
+      : (rawSetCookie ? splitSetCookieHeader(rawSetCookie) : [])
+    const refreshTokenFromSetCookie =
+      extractCookieValue(cookieCandidates, 'refreshToken') ??
+      extractCookieValue(cookieCandidates, 'refresh_token')
+    const refreshToken = refreshTokenFromBody || refreshTokenFromSetCookie
     
     nextResponse.cookies.delete('accessToken')
 
@@ -114,8 +145,16 @@ export async function POST(request: NextRequest) {
         ...(shouldRemember ? { maxAge: 60 * 15 } : {}),
       })
     }
-    
-    // refreshToken cookie is managed by the backend and forwarded above.
+
+    if (refreshToken) {
+      nextResponse.cookies.set('refreshToken', refreshToken, {
+        httpOnly: true,
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        ...(shouldRemember ? { maxAge: 60 * 60 * 24 * 7 } : {}),
+      })
+    }
     
     return nextResponse
   } catch (error) {

@@ -1,6 +1,14 @@
 'use client'
 
-import { ArrowLeftIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import dynamic from 'next/dynamic'
+
+const ArrowLeftIcon = dynamic(() => import('@heroicons/react/24/outline').then((mod) => mod.ArrowLeftIcon), {
+  ssr: false,
+})
+const MagnifyingGlassIcon = dynamic(
+  () => import('@heroicons/react/24/outline').then((mod) => mod.MagnifyingGlassIcon),
+  { ssr: false }
+)
 
 type HeaderMobileSearchProps = {
   searchQuery: string

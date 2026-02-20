@@ -104,4 +104,24 @@ export const checkPermission = (resource: string, action: string) => {
   }
 }
 
+export const checkAnyPermission = (permissions: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new UnauthorizedError('User not authenticated'))
+    }
+
+    // Super Admin bypass
+    if (req.user.role === 'Super Admin') {
+      return next()
+    }
+
+    const hasAny = permissions.some((p) => req.user?.permissions.includes(p))
+    if (!hasAny) {
+      return next(new ForbiddenError(`Missing permission: ${permissions.join(' OR ')}`))
+    }
+
+    next()
+  }
+}
+
 export const protect = authenticate

@@ -6,7 +6,7 @@ import { XMarkIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { Controller, useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import { DatePicker } from '../ui/FormComponents'
+import { LazyDatePicker } from '../ui/LazyDatePicker'
 import { format } from 'date-fns'
 
 interface ExportPayrollModalProps {
@@ -107,7 +107,7 @@ export default function ExportPayrollModal({ isOpen, onClose, onExport }: Export
                           name="payPeriod"
                           control={control}
                           render={({ field }) => (
-                            <DatePicker
+                            <LazyDatePicker
                               label="Pay Period"
                               value={field.value}
                               onChange={(date) => {

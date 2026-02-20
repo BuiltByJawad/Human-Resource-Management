@@ -1,6 +1,6 @@
 "use client"
 
-import { DatePicker } from '@/components/ui/DatePicker'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import { Select } from '@/components/ui/CustomSelect'
 
 interface ReportFiltersBarProps {
@@ -37,13 +37,13 @@ export function ReportFiltersBar({
         </button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <DatePicker
+        <LazyDatePicker
           label="Start Date"
           value={startDate}
           onChange={onStartDateChange}
           maxDate={endDate || new Date()}
         />
-        <DatePicker
+        <LazyDatePicker
           label="End Date"
           value={endDate}
           onChange={onEndDateChange}

@@ -6,7 +6,8 @@ import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 
-import { Button, Select, Input, DatePicker } from '@/components/ui/FormComponents'
+import { Button, Select, Input } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import type { Employee as EmployeeType } from '@/types/hrm'
 
 interface EmployeeFormProps {
@@ -122,7 +123,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel, departments, roles 
           control={control}
           name="hireDate"
           render={({ field }) => (
-            <DatePicker
+            <LazyDatePicker
               label="Hire Date"
               required
               value={field.value}

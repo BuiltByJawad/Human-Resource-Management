@@ -105,3 +105,23 @@ export function useToast() {
 
   return { ...context, showToast };
 }
+
+export function useOptionalToast() {
+  const context = useContext(ToastContext);
+  const showToast = useCallback(
+    (title: string, type: ToastType = "info", description?: string) => {
+      if (!context) return;
+      context.addToast({ title, type, description });
+    },
+    [context]
+  );
+
+  if (!context) {
+    return {
+      addToast: () => {},
+      showToast,
+    } as const;
+  }
+
+  return { ...context, showToast };
+}

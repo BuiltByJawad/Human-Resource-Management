@@ -121,6 +121,8 @@ model User {
   lastLogin    DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+  mfaEnabled   Boolean    @default(false)
+  mfaSecret    String?
 
   role                    Role                 @relation(fields: [roleId], references: [id])
   department              Department?          @relation(fields: [departmentId], references: [id])
@@ -852,6 +854,20 @@ model CompanyDocument {
   uploadedBy  String // Admin User ID
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model DocumentCategory {
+  id                 String   @id @default(uuid())
+  name               String   @unique
+  description        String?
+  allowEmployeeUpload Boolean @default(false)
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
 }
 
 model TrainingCourse {
