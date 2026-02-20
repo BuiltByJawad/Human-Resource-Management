@@ -28,7 +28,7 @@ export function DepartmentFilters({ searchTerm, onSearchChange, onCreate }: Depa
         </div>
         <button
           onClick={onCreate}
-          className="inline-flex items-center px-4 py-2.5 border border-transparent rounded-xl shadow-lg shadow-blue-600/20 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="inline-flex w-full sm:w-auto items-center justify-center px-4 py-2.5 border border-transparent rounded-xl shadow-lg shadow-blue-600/20 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           Add Department
         </button>

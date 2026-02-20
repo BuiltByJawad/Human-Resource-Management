@@ -6,8 +6,6 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchMyCourses } from '@/services/training/api'
 import type { EmployeeTraining } from '@/services/training/types'
 import { CourseCard } from '@/components/modules/training/CourseCard'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { handleCrudError } from '@/lib/apiError'
 import { useToast } from '@/components/ui/ToastProvider'
 
@@ -48,16 +46,12 @@ export function TrainingPageClient({ initialCourses = [] }: TrainingPageClientPr
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-gray-900">Learning Center</h1>
-              <p className="text-gray-600">Access your assigned training courses and track your progress.</p>
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Learning Center</h1>
+          <p className="text-gray-600">Access your assigned training courses and track your progress.</p>
+        </div>
 
             {coursesQuery.isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -97,8 +91,6 @@ export function TrainingPageClient({ initialCourses = [] }: TrainingPageClientPr
                 )}
               </div>
             )}
-          </div>
-        </main>
       </div>
     </div>
   )

@@ -1,6 +1,5 @@
 "use client"
 
-import DashboardShell from '@/components/ui/DashboardShell'
 import { TrainingHeader } from '@/components/features/training/TrainingHeader'
 import { CoursesGrid } from '@/components/features/training/CoursesGrid'
 import { CreateCourseModal } from '@/components/features/training/CreateCourseModal'
@@ -33,8 +32,8 @@ export function TrainingPageClient({ initialCourses, employees }: TrainingPageCl
   } = useTrainingPage({ initialCourses, employees })
 
   return (
-    <DashboardShell>
-      <div className="p-6">
+    <>
+      <div className="p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <TrainingHeader title="Training Management" subtitle="Create and manage training courses" />
 
@@ -68,6 +67,6 @@ export function TrainingPageClient({ initialCourses, employees }: TrainingPageCl
         isSubmitting={isSubmitting}
         courseTitle={selectedCourse?.title}
       />
-    </DashboardShell>
+    </>
   )
 }

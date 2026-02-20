@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button, Select, TextArea, Input, DatePicker } from '../ui/FormComponents'
+import { Button, Select, TextArea, Input } from '../ui/FormComponents'
+import { LazyDatePicker } from '../ui/LazyDatePicker'
 import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline'
 import { format, parseISO, isValid, startOfDay } from 'date-fns'
 import { useForm, Controller } from 'react-hook-form'
@@ -79,7 +80,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
                     control={control}
                     name="startDate"
                     render={({ field }) => (
-                        <DatePicker
+                        <LazyDatePicker
                             label="Start Date"
                             required
                             value={field.value}
@@ -93,7 +94,7 @@ export function LeaveRequestForm({ onSubmit, onCancel, loading }: LeaveRequestFo
                     control={control}
                     name="endDate"
                     render={({ field }) => (
-                        <DatePicker
+                        <LazyDatePicker
                             label="End Date"
                             required
                             value={field.value}

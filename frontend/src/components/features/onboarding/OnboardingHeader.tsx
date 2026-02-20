@@ -50,7 +50,7 @@ export function OnboardingHeader({ employee, isLoading, onBack, totalTasks, comp
               {completedTasks}/{totalTasks} done
             </span>
           </div>
-          <div className="mt-2 h-2 w-40 rounded-full bg-slate-100">
+          <div className="mt-2 h-2 w-full max-w-[10rem] rounded-full bg-slate-100">
             <div
               className="h-2 rounded-full bg-blue-600 transition-all"
               style={{ width: `${progress}%` }}

@@ -3,7 +3,22 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import config from '../config/config'
 
-export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MIN_LENGTH = 12
+
+const COMMON_PASSWORDS = new Set([
+  'password',
+  'password123',
+  '12345678',
+  '123456789',
+  '1234567890',
+  'qwerty',
+  'qwerty123',
+  'admin',
+  'admin123',
+  'welcome',
+  'letmein',
+  'iloveyou',
+])
 
 export interface GeneratedTokens {
   accessToken: string
@@ -14,6 +29,11 @@ export interface GeneratedTokens {
 export const validatePasswordStrength = (password: string): string | null => {
   if (!password || password.length < PASSWORD_MIN_LENGTH) {
     return `Password must be at least ${PASSWORD_MIN_LENGTH} characters long`
+  }
+
+  const normalized = password.trim().toLowerCase()
+  if (COMMON_PASSWORDS.has(normalized)) {
+    return 'Password is too common. Please choose a more unique password.'
   }
 
   const hasUpper = /[A-Z]/.test(password)

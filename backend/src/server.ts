@@ -1,7 +1,7 @@
 import './module-alias';
 import 'reflect-metadata';
 import { createApp } from './app';
-import { prisma } from './app';
+import { prisma } from '@/shared/config/database';
 import { logger } from '@/shared/config/logger';
 import { PORT, NODE_ENV } from '@/shared/config/config';
 

@@ -7,9 +7,7 @@ import { startOfMonth, endOfMonth, format } from 'date-fns'
 import { shiftService } from '@/services/shiftService'
 import type { Shift } from '@/services/shifts/types'
 import { ShiftCard } from '@/components/modules/shift/ShiftCard'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
-import { DatePicker } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import { handleCrudError } from '@/lib/apiError'
 import { useToast } from '@/components/ui/ToastProvider'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -63,28 +61,24 @@ export function ShiftsPageClient({ initialShifts = [], initialDateISO }: ShiftsP
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-gray-900">My Shifts</h1>
-              <p className="text-gray-600">Manage your schedule and swap requests.</p>
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">My Shifts</h1>
+          <p className="text-gray-600">Manage your schedule and swap requests.</p>
+        </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
               <div className="md:col-span-4 lg:col-span-3">
                 <div className="border rounded-lg p-4 bg-white shadow-sm">
                   <h3 className="font-medium text-gray-900 mb-4">Select Date</h3>
-                  <DatePicker value={selectedDate} onChange={(date) => date && setSelectedDate(date)} placeholder="Select a date" />
+                  <LazyDatePicker value={selectedDate} onChange={(date) => date && setSelectedDate(date)} placeholder="Select a date" />
                 </div>
               </div>
 
               <div className="md:col-span-8 lg:col-span-9">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">{format(selectedDate, 'EEEE, MMMM do, yyyy')}</h2>
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-xl font-semibold text-gray-900 break-words">{format(selectedDate, 'EEEE, MMMM do, yyyy')}</h2>
                 </div>
 
                 {isLoading ? (
@@ -113,8 +107,6 @@ export function ShiftsPageClient({ initialShifts = [], initialDateISO }: ShiftsP
                 )}
               </div>
             </div>
-          </div>
-        </main>
       </div>
     </div>
   )

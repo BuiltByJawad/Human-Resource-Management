@@ -20,7 +20,7 @@ export interface UpdateDocumentDto {
 export const createDocumentSchema = Joi.object({
     title: Joi.string().required(),
     description: Joi.string().optional(),
-    category: Joi.string().valid('HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other').required(),
+    category: Joi.string().trim().required(),
     fileUrl: Joi.string().uri().required(),
     type: Joi.string().required(),
     isVisible: Joi.boolean().default(true),
@@ -29,6 +29,6 @@ export const createDocumentSchema = Joi.object({
 export const updateDocumentSchema = Joi.object({
     title: Joi.string().optional(),
     description: Joi.string().optional(),
-    category: Joi.string().valid('HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other').optional(),
+    category: Joi.string().trim().optional(),
     isVisible: Joi.boolean().optional(),
 });

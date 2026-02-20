@@ -12,7 +12,7 @@ interface BurnoutHeaderProps {
 export function BurnoutHeader({ period, onPeriodChange, onBack }: BurnoutHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-      <div className="flex items-start space-x-4">
+      <div className="flex items-start gap-4">
         <button
           onClick={onBack}
           className="mt-1 p-2 rounded-full hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-900"
@@ -25,7 +25,7 @@ export function BurnoutHeader({ period, onPeriodChange, onBack }: BurnoutHeaderP
           <p className="mt-1 text-sm text-gray-500">Monitor employee wellbeing and identify at-risk team members.</p>
         </div>
       </div>
-      <div className="mt-4 md:mt-0 w-48">
+      <div className="mt-4 md:mt-0 w-full md:w-48">
         <Select
           value={period.toString()}
           onChange={onPeriodChange}

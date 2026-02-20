@@ -1,0 +1,5 @@
+export * from './document-category.controller'
+export * from './document-category.service'
+export * from './document-category.repository'
+export * from './dto'
+export { default as documentCategoryRoutes } from './document-category.routes'

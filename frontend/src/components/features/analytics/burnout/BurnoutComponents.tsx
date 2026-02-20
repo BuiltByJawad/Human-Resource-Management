@@ -27,7 +27,7 @@ export function RiskScoreCard({ summary }: { summary: BurnoutSummary }) {
             <div className="space-y-4">
                 {riskData.map((risk) => (
                     <div key={risk.label}>
-                        <div className="flex justify-between items-center mb-1">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-1">
                             <span className="text-sm font-medium text-gray-700">{risk.label}</span>
                             <span className={`text-sm font-semibold ${risk.color}`}>
                                 {risk.value} ({total > 0 ? ((risk.value / total) * 100).toFixed(0) : 0}%)

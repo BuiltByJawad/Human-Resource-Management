@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Bars3Icon } from '@heroicons/react/24/outline'
+const Bars3Icon = dynamic(() => import('@heroicons/react/24/outline').then((mod) => mod.Bars3Icon), { ssr: false })
 import { useBranding } from '@/components/providers/BrandingProvider'
 import { useBrandingStore } from '@/store/useBrandingStore'
 import { useAuthStore } from '@/store/useAuthStore'
@@ -15,13 +16,44 @@ import { HeaderBranding } from './HeaderBranding'
 import { HeaderSearchControls } from './HeaderSearchControls'
 import { HeaderMobileSearch } from './HeaderMobileSearch'
 import { HeaderShell } from './HeaderShell'
+import { HeaderSkeleton } from './HeaderSkeleton'
 import { useToast } from '@/components/ui/ToastProvider'
+
+type HeaderCache = {
+  siteName: string
+  tagline: string
+  userFullName: string
+  userRole: string
+  email: string | null
+  initials: string
+  avatarUrl: string | null
+}
+
+const HEADER_CACHE_KEY = 'header-cache-v1'
+
+const readHeaderCache = (): HeaderCache | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(HEADER_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as HeaderCache
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
 
 export default function Header() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isMounted, setIsMounted] = useState(false)
+  // Important: start with no cached header on SSR/first client render so
+  // server and client markup match. We hydrate from localStorage only
+  // after mount.
+  const [cachedHeader, setCachedHeader] = useState<HeaderCache | null>(null)
 
   const { user, token, logout, hasPermission, isAuthenticated, isAuthTransition, endAuthTransition } = useAuthStore()
   const { initialAuth, displayUser } = useDisplayUser()
@@ -72,41 +104,78 @@ export default function Header() {
     setSearchQuery(urlSearchQuery)
   }, [pathname, urlSearchQuery])
 
-  const siteName = branding?.siteName || storeSiteName
-  const tagline = branding?.tagline || storeTagline
+  const siteName = branding?.siteName || storeSiteName || (isMounted ? cachedHeader?.siteName : '') || ''
+  const tagline = branding?.tagline || storeTagline || (isMounted ? cachedHeader?.tagline : '') || ''
 
   const avatarUrl = useMemo(() => {
-    const raw = displayUser?.avatarUrl
+    // To avoid hydration mismatch, ignore cachedHeader on SSR/first client render.
+    // We only use cachedHeader for avatar after the component has mounted.
+    const raw = displayUser?.avatarUrl || (isMounted ? cachedHeader?.avatarUrl : null)
     if (!raw) return null
     if (/ui-avatars\.com\/api\//i.test(raw)) {
       return raw.includes('format=') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}format=png`
     }
     return raw
-  }, [displayUser?.avatarUrl])
+  }, [displayUser?.avatarUrl, cachedHeader?.avatarUrl, isMounted])
 
   const initials = displayUser?.firstName && displayUser?.lastName
     ? `${displayUser.firstName[0]}${displayUser.lastName[0]}`
-    : (displayUser?.email?.[0]?.toUpperCase() ?? 'U')
+    : (
+        displayUser?.email?.[0]?.toUpperCase() ??
+        (isMounted ? cachedHeader?.initials : undefined) ??
+        'U'
+      )
 
-  const userFullName = `${displayUser?.firstName ?? ''} ${displayUser?.lastName ?? ''}`.trim() || (displayUser?.email ?? '')
-  const userRole = displayUser?.role ?? ''
+  const userFullName =
+    `${displayUser?.firstName ?? ''} ${displayUser?.lastName ?? ''}`.trim() ||
+    displayUser?.email ||
+    (isMounted ? cachedHeader?.userFullName : '') ||
+    ''
+
+  const userRole = displayUser?.role ?? (isMounted ? cachedHeader?.userRole : '') ?? ''
+  const email = displayUser?.email ?? (isMounted ? cachedHeader?.email : null) ?? null
   const shouldShowNotificationControls = Boolean(effectiveToken || isAuthenticated)
+  const hasHeaderData = Boolean(displayUser || siteName || tagline)
+  const shouldShowHeaderSkeleton = isMounted && !cachedHeader && !hasHeaderData
+
+  useEffect(() => {
+    setIsMounted(true)
+    setCachedHeader(readHeaderCache())
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!siteName && !tagline && !userFullName) return
+    const snapshot: HeaderCache = {
+      siteName,
+      tagline,
+      userFullName,
+      userRole,
+      email,
+      initials,
+      avatarUrl,
+    }
+    try {
+      window.localStorage.setItem(HEADER_CACHE_KEY, JSON.stringify(snapshot))
+    } catch {
+      // ignore storage errors
+    }
+  }, [siteName, tagline, userFullName, userRole, email, initials, avatarUrl])
 
   const handleLogout = async () => {
-    await logout()
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login'
-    } else {
-      router.replace('/login')
-    }
+    router.push('/logout')
   }
 
   const handleNotificationClick = async (notification: NotificationItem) => {
-    await markOneRead(notification.id)
+    setIsNotificationsOpen(false)
     if (notification.link) {
       router.push(notification.link)
     }
-    setIsNotificationsOpen(false)
+    void markOneRead(notification.id)
+  }
+
+  if (shouldShowHeaderSkeleton) {
+    return <HeaderSkeleton />
   }
 
   return (
@@ -159,7 +228,7 @@ export default function Header() {
               hasPermission={hasPermission}
               userFullName={userFullName}
               userRole={userRole}
-              email={displayUser?.email}
+              email={email ?? undefined}
               initials={initials}
               avatarUrl={avatarUrl}
               onLogout={handleLogout}

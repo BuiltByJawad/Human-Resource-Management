@@ -1,5 +1,5 @@
 const request = require('supertest')
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs')
 const { PrismaClient } = require('@prisma/client')
 const jwt = require('jsonwebtoken')
 const { createApp } = require('../../src/app')
@@ -8,7 +8,14 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret'
 
 const prisma = new PrismaClient()
-const { app } = createApp()
+const { app, httpServer } = createApp()
+
+let didCloseServer = false
+const closeServerOnce = async () => {
+  if (didCloseServer) return
+  didCloseServer = true
+  await new Promise((resolve) => httpServer.close(resolve))
+}
 
 describe('Onboarding API', () => {
   let adminToken
@@ -108,6 +115,7 @@ describe('Onboarding API', () => {
 
   afterAll(async () => {
     await prisma.$disconnect()
+    await closeServerOnce()
   })
 
   it('should start onboarding process for an employee', async () => {

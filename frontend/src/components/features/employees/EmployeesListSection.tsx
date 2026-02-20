@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { RocketLaunchIcon } from '@heroicons/react/24/outline'
 
 import { Button } from '@/components/ui/FormComponents'
@@ -36,6 +38,21 @@ export function EmployeesListSection({
   onDeleteEmployee,
   onSendInvite,
 }: EmployeesListSectionProps) {
+  const router = useRouter()
+
+  // Prefetch onboarding pages for employees on the current page so navigation feels instant.
+  useEffect(() => {
+    employees.forEach((employee) => {
+      // Guard against missing IDs just in case
+      if (!employee.id) return
+      try {
+        router.prefetch(`/onboarding/${employee.id}`)
+      } catch {
+        // Best-effort prefetch only; ignore failures
+      }
+    })
+  }, [employees, router])
+
   const employeeColumns: Column<Employee>[] = [
     {
       key: 'name',

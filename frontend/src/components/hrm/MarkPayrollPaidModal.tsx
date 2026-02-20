@@ -7,7 +7,8 @@ import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import { Controller, useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import { DatePicker, Input } from '@/components/ui/FormComponents'
+import { Input } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 
 type PaymentMethod = 'bank_transfer' | 'cash' | 'cheque' | 'mobile_money' | 'other'
 
@@ -126,7 +127,7 @@ export default function MarkPayrollPaidModal({ isOpen, onClose, onConfirm }: Mar
                           name="paidAt"
                           control={control}
                           render={({ field }) => (
-                            <DatePicker
+                            <LazyDatePicker
                               label="Paid Date"
                               value={field.value}
                               onChange={(date) => {

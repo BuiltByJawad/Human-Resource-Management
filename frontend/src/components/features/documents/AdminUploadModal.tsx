@@ -2,8 +2,6 @@ import { DocumentTextIcon } from '@heroicons/react/24/outline'
 import { Modal } from '@/components/ui/Modal'
 import { Input, TextArea } from '@/components/ui/FormComponents'
 
-const categories = ['HR Policy', 'IT Policy', 'Handbook', 'Form', 'Other']
-
 interface AdminUploadModalProps {
   isOpen: boolean
   onClose: () => void
@@ -14,6 +12,7 @@ interface AdminUploadModalProps {
   uploadForm: { title: string; description?: string; category: string }
   onFormChange: (next: { title: string; description?: string; category: string }) => void
   fileInputRef: React.RefObject<HTMLInputElement>
+  categories: string[]
 }
 
 export function AdminUploadModal({
@@ -26,6 +25,7 @@ export function AdminUploadModal({
   uploadForm,
   onFormChange,
   fileInputRef,
+  categories,
 }: AdminUploadModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Upload Company Document">

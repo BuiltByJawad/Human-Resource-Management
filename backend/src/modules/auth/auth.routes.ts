@@ -10,6 +10,7 @@ const router = Router();
 router.post('/register', authRateLimiter, authController.register);
 router.post('/login', authRateLimiter, authController.login);
 router.post('/refresh', authRateLimiter, authController.refreshToken);
+router.post('/mfa/verify', authRateLimiter, authController.verifyMfa);
 router.post('/password/request-reset', authRateLimiter, authController.requestPasswordReset);
 router.post('/password/reset', authRateLimiter, authController.resetPassword);
 router.post('/invite/complete', authRateLimiter, authController.completeInvite);
@@ -24,5 +25,8 @@ router.put('/profile', adminRateLimiter, authController.updateProfile);
 router.post('/avatar', upload.single('avatar'), authController.uploadAvatar);
 router.post('/password/change', adminRateLimiter, authController.changePassword);
 router.post('/invite', authController.inviteUser);
+router.post('/mfa/enroll/start', authController.startMfaEnrollment);
+router.post('/mfa/enroll/confirm', authController.confirmMfaEnrollment);
+router.post('/mfa/disable', authController.disableMfa);
 
 export default router;

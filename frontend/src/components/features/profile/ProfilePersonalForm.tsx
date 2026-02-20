@@ -1,7 +1,7 @@
 import { Controller, type UseFormReturn } from 'react-hook-form'
 import { format } from 'date-fns'
 
-import { DatePicker } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import type { ProfileFormValues } from '@/services/profile/types'
 
 interface ProfilePersonalFormProps {
@@ -30,12 +30,12 @@ export const ProfilePersonalForm = ({
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-xl font-bold text-gray-900">Personal Information</h2>
         {!isEditing && (
           <button
             onClick={onEdit}
-            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            className="w-full sm:w-auto px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
             Edit Profile
           </button>
@@ -94,7 +94,7 @@ export const ProfilePersonalForm = ({
               control={control}
               name="dateOfBirth"
               render={({ field }) => (
-                <DatePicker
+                <LazyDatePicker
                   value={field.value || ''}
                   onChange={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                   disabled={!isEditing}
@@ -195,18 +195,18 @@ export const ProfilePersonalForm = ({
         </div>
 
         {isEditing && (
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end sm:items-center">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="w-full sm:w-auto px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
               {isLoading ? 'Saving...' : 'Save Changes'}
             </button>

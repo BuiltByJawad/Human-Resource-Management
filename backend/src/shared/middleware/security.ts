@@ -20,10 +20,29 @@ export const rateLimiter = rateLimit({
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: authRateLimitMax ?? (process.env.NODE_ENV === 'production' ? 5 : 100), // 5 in prod, 100 in dev for testing
+  max: authRateLimitMax ?? (process.env.NODE_ENV === 'production' ? 15 : 100),
   skip: () => isLoadTestMode,
-  message: 'Too many authentication attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
   skipSuccessfulRequests: true,
+  handler: (req: Request, res: Response) => {
+    const rateLimitInfo = (req as Request & { rateLimit?: { limit: number; remaining: number } }).rateLimit
+
+    const limit = rateLimitInfo?.limit ?? 0
+    const remaining = rateLimitInfo?.remaining ?? 0
+    const attemptsOverLimit = limit > 0 ? Math.max(limit - remaining, 0) : 0
+
+    const backoffSteps = Math.min(attemptsOverLimit, 5)
+    const retryAfterSeconds = Math.pow(2, backoffSteps)
+
+    res.setHeader('Retry-After', String(retryAfterSeconds))
+
+    return res.status(429).json({
+      status: 'error',
+      message: 'Too many authentication attempts, please try again later',
+      retryAfterSeconds,
+    })
+  },
 })
 
 export const adminRateLimiter = rateLimit({

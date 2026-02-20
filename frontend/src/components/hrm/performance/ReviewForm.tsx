@@ -192,12 +192,12 @@ export function ReviewForm({ isOpen, onClose, onSubmit, cycleTitle, readOnly = f
                                         </div>
                                     </div>
 
-                                    <div className="mt-8 flex justify-end space-x-3 pt-4 border-t border-gray-100">
-                                        <Button variant="secondary" onClick={onClose}>
+                                    <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end sm:items-center pt-4 border-t border-gray-100">
+                                        <Button variant="secondary" onClick={onClose} className="w-full sm:w-auto">
                                             {readOnly ? 'Close' : 'Cancel'}
                                         </Button>
                                         {!readOnly && (
-                                            <Button type="submit">
+                                            <Button type="submit" className="w-full sm:w-auto">
                                                 Submit Evaluation
                                             </Button>
                                         )}

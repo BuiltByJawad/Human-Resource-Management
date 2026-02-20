@@ -27,6 +27,7 @@ import timeTrackingRoutes from './modules/time-tracking/time-tracking.routes';
 import documentsRoutes from './modules/documents/documents.routes';
 import goalsRoutes from './modules/goals/goals.routes';
 import settingsRoutes from './routes/settingsRoutes';
+import documentCategoryRoutes from './modules/document-category/document-category.routes';
 
 const router = Router();
 
@@ -55,6 +56,7 @@ router.use('/training', trainingRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/time-tracking', timeTrackingRoutes);
 router.use('/documents', documentsRoutes);
+router.use('/document-categories', documentCategoryRoutes);
 router.use('/goals', goalsRoutes);
 router.use('/settings', settingsRoutes);
 

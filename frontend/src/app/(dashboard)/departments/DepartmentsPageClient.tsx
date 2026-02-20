@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 
-import DashboardShell from '@/components/ui/DashboardShell'
 import {
   DepartmentForm,
   DepartmentList,
@@ -62,9 +61,9 @@ export function DepartmentsPageClient({
   const actionLoading = saveDepartment.isPending || deleteDepartmentMutation.isPending
 
   return (
-    <DashboardShell>
-      <div className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+    <>
+      <div className="p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
           <div className="space-y-6">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-gray-100 shadow-sm">
@@ -123,6 +122,6 @@ export function DepartmentsPageClient({
         type="danger"
         loading={deleteDepartmentMutation.isPending}
       />
-    </DashboardShell>
+    </>
   )
 }

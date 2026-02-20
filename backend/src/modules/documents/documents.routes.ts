@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { authenticate, checkPermission } from '../../shared/middleware/auth';
+import { authenticate, checkAnyPermission, checkPermission } from '../../shared/middleware/auth';
 import { uploadDocument } from '../../shared/middleware/uploadMiddleware';
 import * as documentsController from './documents.controller';
 
@@ -23,7 +23,7 @@ router.get(
 router.post(
     '/',
     authenticate,
-    checkPermission('documents', 'manage'),
+    checkAnyPermission(['documents.manage', 'documents.upload']),
     uploadDocument.single('file'),
     documentsController.uploadDocument
 );

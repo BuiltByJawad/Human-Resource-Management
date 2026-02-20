@@ -97,6 +97,7 @@ export interface User {
     emergencyContact?: any
     employee?: any
     status?: string
+    mfaEnabled?: boolean
     permissions: Permission[]
 }
 
@@ -275,24 +276,82 @@ export const useAuthStore = create<AuthState>()(
                 refreshSession: async ({ silent }: { silent?: boolean } = {}) => {
                     const { token, user, rememberMe, refreshToken } = get()
                     try {
-                        const response = await fetch('/api/auth/refresh', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            credentials: 'include',
-                            body: JSON.stringify({ rememberMe, refreshToken }),
-                        })
-                        const json = await response.json()
-                        if (!response.ok) {
-                            throw new Error(json?.error || json?.message || 'Token refresh failed')
+                        const runRefresh = async () => {
+                            const response = await fetch('/api/auth/refresh', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                credentials: 'include',
+                                body: JSON.stringify({ rememberMe, refreshToken }),
+                            })
+                            const json: unknown = await response.json().catch(() => null)
+                            return { response, json }
                         }
-                        const payload = json?.data ?? json
-                        const newAccessToken = payload?.accessToken || payload?.token || token
-                        const newRefreshToken = payload?.refreshToken ?? refreshToken ?? null
-                        const nextUser = payload?.user
-                            ? { ...(payload.user || {}), permissions: payload.permissions ?? payload.user?.permissions ?? user?.permissions ?? [] }
-                            : user
+
+                        let { response, json } = await runRefresh()
+
+                        const messageFromJson =
+                            json && typeof json === 'object'
+                                ? (((json as Record<string, unknown>).error as string) ||
+                                    ((json as Record<string, unknown>).message as string) ||
+                                    '')
+                                : ''
+
+                        const isMissingRefreshToken =
+                            response.status === 401 &&
+                            typeof messageFromJson === 'string' &&
+                            messageFromJson.toLowerCase().includes('refresh token is required')
+
+                        if (!response.ok && isMissingRefreshToken) {
+                            await new Promise<void>((resolve) => setTimeout(resolve, 50))
+                            ;({ response, json } = await runRefresh())
+                        }
+
+                        if (!response.ok) {
+                            const nextMessage =
+                                json && typeof json === 'object'
+                                    ? (((json as Record<string, unknown>).error as string) ||
+                                        ((json as Record<string, unknown>).message as string) ||
+                                        'Token refresh failed')
+                                    : 'Token refresh failed'
+
+                            const finalMessage = typeof nextMessage === 'string' && nextMessage ? nextMessage : 'Token refresh failed'
+                            throw new Error(finalMessage)
+                        }
+
+                        const root = (json && typeof json === 'object' ? (json as Record<string, unknown>) : {})
+                        const dataNode = root.data
+                        const payload =
+                            dataNode && typeof dataNode === 'object' && !Array.isArray(dataNode)
+                                ? (dataNode as Record<string, unknown>)
+                                : root
+
+                        const accessTokenCandidate = payload.accessToken
+                        const tokenCandidate = payload.token
+                        const refreshTokenCandidate = payload.refreshToken
+
+                        const newAccessToken =
+                            (typeof accessTokenCandidate === 'string' && accessTokenCandidate) ||
+                            (typeof tokenCandidate === 'string' && tokenCandidate) ||
+                            token
+
+                        const newRefreshToken =
+                            (typeof refreshTokenCandidate === 'string' ? refreshTokenCandidate : null) ?? refreshToken ?? null
+
+                        const payloadUser = payload.user
+                        const permissionsCandidate = payload.permissions
+                        const resolvedPermissions =
+                            Array.isArray(permissionsCandidate) ? (permissionsCandidate as Permission[]) : (payloadUser && typeof payloadUser === 'object'
+                                ? (Array.isArray((payloadUser as Record<string, unknown>).permissions)
+                                    ? ((payloadUser as Record<string, unknown>).permissions as Permission[])
+                                    : user?.permissions ?? [])
+                                : user?.permissions ?? [])
+
+                        const nextUser =
+                            payloadUser && typeof payloadUser === 'object' && !Array.isArray(payloadUser)
+                                ? { ...(payloadUser as Record<string, unknown>), permissions: resolvedPermissions } as unknown as User
+                                : user
 
                         set({
                             token: newAccessToken,
@@ -311,7 +370,13 @@ export const useAuthStore = create<AuthState>()(
                                 console.warn('Session refresh failed', error)
                             }
                         }
-                        get().logout()
+                        const message = error instanceof Error ? error.message : ''
+                        const isMissingRefreshToken =
+                            typeof message === 'string' && message.toLowerCase().includes('refresh token is required')
+
+                        if (!isMissingRefreshToken) {
+                            get().logout()
+                        }
                         return false
                     }
                 },

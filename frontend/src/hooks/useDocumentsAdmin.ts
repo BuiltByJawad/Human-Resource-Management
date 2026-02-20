@@ -10,11 +10,12 @@ import {
   toggleDocumentVisibility,
   uploadCompanyDocument,
 } from '@/services/documents/api'
+import { fetchDocumentCategories } from '@/services/documentCategories/api'
 
 const DEFAULT_FORM: CompanyDocumentUploadPayload = {
   title: '',
   description: '',
-  category: 'HR Policy',
+  category: '',
 }
 
 interface UseDocumentsAdminOptions {
@@ -30,6 +31,18 @@ export function useDocumentsAdmin({ initialDocuments }: UseDocumentsAdminOptions
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadForm, setUploadForm] = useState(DEFAULT_FORM)
   const [filterCategory, setFilterCategory] = useState<string>('')
+
+  const categoriesQuery = useQuery<string[]>({
+    queryKey: ['document-categories', 'company', 'active'],
+    queryFn: async () => {
+      const categories = await fetchDocumentCategories({ includeInactive: false })
+      return categories.filter((c) => c.isActive).map((c) => c.name)
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const categories = categoriesQuery.data ?? []
 
   const documentsQuery = useQuery<CompanyDocument[]>({
     queryKey: ['documents', 'company'],
@@ -102,6 +115,16 @@ export function useDocumentsAdmin({ initialDocuments }: UseDocumentsAdminOptions
       return
     }
 
+    if (!uploadForm.category) {
+      const fallback = categories[0]
+      if (fallback) {
+        setUploadForm((prev) => ({ ...prev, category: fallback }))
+      } else {
+        showToast('Please select a category', 'error')
+        return
+      }
+    }
+
     await uploadMutation.mutateAsync({ file: selectedFile, payload: uploadForm })
   }
 
@@ -118,6 +141,7 @@ export function useDocumentsAdmin({ initialDocuments }: UseDocumentsAdminOptions
     filteredDocuments,
     filterCategory,
     setFilterCategory,
+    categories,
     showUploadModal,
     setShowUploadModal,
     selectedFile,

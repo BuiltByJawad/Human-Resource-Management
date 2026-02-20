@@ -11,6 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/FormComponents'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { uploadDocument } from '@/services/documents/api'
+import { fetchDocumentCategories } from '@/services/documentCategories/api'
+import { useQuery } from '@tanstack/react-query'
+import { useAuthStore } from '@/store/useAuthStore'
+import { PERMISSIONS } from '@/constants/permissions'
 
 interface UploadDocumentDialogProps {
   onSuccess?: () => void
@@ -40,6 +44,21 @@ const FieldLabel = ({ htmlFor, children, required }: { htmlFor?: string; childre
 export function UploadDocumentDialog({ onSuccess }: UploadDocumentDialogProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const hasPermission = useAuthStore((state) => state.hasPermission)
+  const canManageDocuments = hasPermission(PERMISSIONS.MANAGE_DOCUMENTS)
+
+  const categoriesQuery = useQuery({
+    queryKey: ['document-categories', canManageDocuments ? 'all' : 'employee'],
+    queryFn: async () => {
+      const categories = await fetchDocumentCategories({ includeInactive: false })
+      const active = categories.filter((c) => c.isActive)
+      return canManageDocuments ? active : active.filter((c) => c.allowEmployeeUpload)
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+
+  const categoryOptions = categoriesQuery.data ?? []
 
   const {
     register,
@@ -52,7 +71,7 @@ export function UploadDocumentDialog({ onSuccess }: UploadDocumentDialogProps) {
     defaultValues: {
       title: '',
       description: '',
-      category: 'HR Policy',
+      category: '',
       fileUrl: '',
     },
   })
@@ -125,11 +144,11 @@ export function UploadDocumentDialog({ onSuccess }: UploadDocumentDialogProps) {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="HR Policy">HR Policy</SelectItem>
-                      <SelectItem value="IT Policy">IT Policy</SelectItem>
-                      <SelectItem value="Handbook">Handbook</SelectItem>
-                      <SelectItem value="Form">Form</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
+                      {categoryOptions.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>}

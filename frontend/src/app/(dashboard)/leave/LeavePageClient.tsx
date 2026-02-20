@@ -4,8 +4,6 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PlusIcon, FunnelIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { LeaveRequestCard, LeaveRequestForm, type LeaveRequest, type LeaveRequestFormData } from '@/components/hrm/LeaveComponents'
 import { Modal } from '@/components/ui/Modal'
 import { Button, Select } from '@/components/ui/FormComponents'
@@ -108,83 +106,81 @@ export function LeavePageClient({ initialRequests }: LeavePageClientProps) {
   }, [leaveQuery.data, filterStatus])
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
-                <p className="text-sm text-gray-500">Track and manage employee leave requests</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center space-x-2">
-                  <FunnelIcon className="h-5 w-5 text-gray-400" />
-                  <div className="w-48">
-                    <Select
-                      value={filterStatus}
-                      onChange={(value) => setFilterStatus(value as typeof filterStatus)}
-                      options={[
-                        { value: 'all', label: 'All Status' },
-                        { value: 'pending', label: 'Pending' },
-                        { value: 'history', label: 'History' },
-                        { value: 'approved', label: 'Approved' },
-                        { value: 'rejected', label: 'Rejected' }
-                      ]}
-                    />
-                  </div>
-                </div>
-                <Button variant="primary" onClick={() => setIsModalOpen(true)} className="flex items-center space-x-2">
-                  <PlusIcon className="h-4 w-4" />
-                  <span>Request Leave</span>
-                </Button>
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
+            <p className="text-sm text-gray-500">Track and manage employee leave requests</p>
+          </div>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
+              <FunnelIcon className="h-5 w-5 text-gray-400" />
+              <div className="w-full sm:w-48">
+                <Select
+                  value={filterStatus}
+                  onChange={(value) => setFilterStatus(value as typeof filterStatus)}
+                  options={[
+                    { value: 'all', label: 'All Status' },
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'history', label: 'History' },
+                    { value: 'approved', label: 'Approved' },
+                    { value: 'rejected', label: 'Rejected' },
+                  ]}
+                />
               </div>
             </div>
-
-            {leaveQuery.isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-2/3" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ))}
-              </div>
-            ) : leaveQuery.isError ? (
-              <div className="text-red-600 text-sm">Failed to load leave requests. Please try again.</div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {requests.map((request) => (
-                    <LeaveRequestCard
-                      key={request.id}
-                      request={request}
-                      onApprove={handleApprove}
-                      onReject={handleReject}
-                      canApprove={false}
-                      canManageLeave={false}
-                    />
-                  ))}
-                </div>
-
-                {requests.length === 0 && (
-                  <div className="text-center py-12">
-                    <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No leave requests found</h3>
-                    <p className="text-gray-500 mb-6">
-                      {filterStatus !== 'all' ? 'Try adjusting your filters.' : 'Create a new request to get started.'}
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
+            <Button
+              variant="primary"
+              onClick={() => setIsModalOpen(true)}
+              className="flex w-full items-center justify-center space-x-2 sm:w-auto"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span>Request Leave</span>
+            </Button>
           </div>
-        </main>
+        </div>
+
+        {leaveQuery.isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-2/3" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </div>
+        ) : leaveQuery.isError ? (
+          <div className="text-red-600 text-sm">Failed to load leave requests. Please try again.</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {requests.map((request) => (
+                <LeaveRequestCard
+                  key={request.id}
+                  request={request}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  canApprove={false}
+                  canManageLeave={false}
+                />
+              ))}
+            </div>
+
+            {requests.length === 0 && (
+              <div className="text-center py-12">
+                <ClipboardDocumentListIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No leave requests found</h3>
+                <p className="text-gray-500 mb-6">
+                  {filterStatus !== 'all' ? 'Try adjusting your filters.' : 'Create a new request to get started.'}
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Request Leave">

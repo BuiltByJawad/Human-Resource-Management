@@ -2,7 +2,6 @@
 
 import React, { forwardRef, useMemo, useState } from 'react'
 export { Select } from './CustomSelect'
-export { DatePicker } from './DatePicker'
 
 interface ButtonProps {
   children: React.ReactNode

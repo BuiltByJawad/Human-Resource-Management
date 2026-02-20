@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../../shared/middleware/errorHandler';
 import { documentsService } from './documents.service';
 import { createDocumentSchema, updateDocumentSchema } from './dto';
+import { prisma } from '../../shared/config/database';
 
 export const uploadDocument = asyncHandler(async (req: Request, res: Response) => {
     const file = (req as any).file as any;
@@ -32,6 +33,18 @@ export const uploadDocument = asyncHandler(async (req: Request, res: Response) =
 
     const { error, value } = createDocumentSchema.validate(payload);
     if (error) throw new Error(error.details[0].message);
+
+    const categoryName = typeof value.category === 'string' ? value.category : '';
+    const category = await prisma.documentCategory.findUnique({ where: { name: categoryName } });
+    if (!category || !category.isActive) {
+        throw new Error('Invalid document category');
+    }
+
+    const userPermissions = Array.isArray((req as any).user?.permissions) ? ((req as any).user.permissions as string[]) : [];
+    const canManageDocuments = userPermissions.includes('documents.manage') || (req as any).user?.role === 'Super Admin';
+    if (!canManageDocuments && !category.allowEmployeeUpload) {
+        throw new Error('You are not allowed to upload documents to this category');
+    }
 
     const uploadedBy = (req as any).user?.id;
     if (!uploadedBy) throw new Error('User not authenticated');

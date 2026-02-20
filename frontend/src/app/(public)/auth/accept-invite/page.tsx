@@ -16,7 +16,7 @@ const inviteSchema = yup.object().shape({
   password: yup
     .string()
     .required('Password is required')
-    .min(8, 'Password must be at least 8 characters long')
+    .min(12, 'Password must be at least 12 characters long')
     .test(
       'complexity',
       'Password must include at least three of the following: uppercase letter, lowercase letter, number, special character',

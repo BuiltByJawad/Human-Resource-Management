@@ -1,4 +1,4 @@
-import { DatePicker } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import { format } from 'date-fns'
 import type { OffboardingEmployeeOption } from '@/services/offboarding/api'
 
@@ -50,7 +50,7 @@ export function OffboardingInitiateForm({
           {errors.employeeId && <p className="mt-1 text-sm text-red-600">{errors.employeeId}</p>}
         </div>
         <div>
-          <DatePicker
+          <LazyDatePicker
             label="Exit Date"
             required
             value={form.exitDate}

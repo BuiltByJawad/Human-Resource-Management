@@ -113,12 +113,21 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         ...(req.body as any),
     } as any);
 
-    res.cookie('refreshToken', result.refreshToken, getRefreshCookieOptions());
+    // MFA-enabled accounts return a special shape that does not yet include tokens.
+    if ((result as any)?.requiresMfa) {
+        res.json({
+            success: true,
+            data: result,
+        });
+        return;
+    }
+
+    res.cookie('refreshToken', (result as any).refreshToken, getRefreshCookieOptions());
 
     res.json({
         success: true,
         data: {
-            ...result,
+            ...(result as any),
             refreshToken: undefined,
         },
     });
@@ -206,6 +215,92 @@ export const logout = asyncHandler(async (req: AuthRequest, res: Response) => {
     res.json({
         success: true,
         message: SUCCESS_MESSAGES.LOGOUT_SUCCESS,
+    });
+});
+
+/**
+ * Verify MFA code (step 2) and issue full auth tokens
+ */
+export const verifyMfa = asyncHandler(async (req: Request, res: Response) => {
+    const { mfaToken, code } = req.body as { mfaToken?: string; code?: string };
+
+    if (!mfaToken || typeof mfaToken !== 'string') {
+        throw new BadRequestError('mfaToken is required');
+    }
+
+    if (!code || typeof code !== 'string') {
+        throw new BadRequestError('MFA code is required');
+    }
+
+    const result = await authService.verifyMfa(mfaToken, code);
+
+    res.cookie('refreshToken', result.refreshToken, getRefreshCookieOptions());
+
+    res.json({
+        success: true,
+        data: {
+            ...result,
+            refreshToken: undefined,
+        },
+    });
+});
+
+/**
+ * Start MFA enrollment for the authenticated user
+ */
+export const startMfaEnrollment = asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+    }
+
+    const result = await authService.startMfaEnrollment(req.user.id);
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        data: result,
+    });
+});
+
+/**
+ * Confirm MFA enrollment by verifying the first TOTP code
+ */
+export const confirmMfaEnrollment = asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+    }
+
+    const { code, enrollmentToken } = req.body as { code?: string; enrollmentToken?: string };
+    if (!code || typeof code !== 'string') {
+        throw new BadRequestError('MFA code is required');
+    }
+
+    if (!enrollmentToken || typeof enrollmentToken !== 'string') {
+        throw new BadRequestError('enrollmentToken is required');
+    }
+
+    await authService.confirmMfaEnrollment(req.user.id, code, enrollmentToken);
+
+    res.json({
+        success: true,
+        message: 'Multi-factor authentication enabled successfully',
+    });
+});
+
+/**
+ * Disable MFA for the current user
+ */
+export const disableMfa = asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+    }
+
+    const { code } = (req.body || {}) as { code?: string };
+
+    await authService.disableMfa(req.user.id, typeof code === 'string' ? code : undefined);
+
+    res.json({
+        success: true,
+        message: 'Multi-factor authentication disabled successfully',
     });
 });
 

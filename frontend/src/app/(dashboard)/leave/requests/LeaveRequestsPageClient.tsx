@@ -4,8 +4,6 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FunnelIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline'
 
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { LeaveRequestCard, type LeaveRequest } from '@/components/hrm/LeaveComponents'
 import { Button, Select } from '@/components/ui/FormComponents'
 import { useToast } from '@/components/ui/ToastProvider'
@@ -112,22 +110,18 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
   }, [leaveQuery.data, filterStatus])
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Leave Requests</h1>
                 <p className="text-sm text-gray-500">Approve or reject employee leave requests</p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex items-center space-x-2">
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
                   <FunnelIcon className="h-5 w-5 text-gray-400" />
-                  <div className="w-48">
+                  <div className="w-full sm:w-48">
                     <Select
                       value={filterStatus}
                       onChange={(value) => setFilterStatus(value as typeof filterStatus)}
@@ -145,6 +139,7 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
                   onClick={() => {
                     queryClient.invalidateQueries({ queryKey: ['leave-requests'] })
                   }}
+                  className="w-full sm:w-auto"
                 >
                   Refresh
                 </Button>
@@ -203,8 +198,6 @@ export function LeaveRequestsPageClient({ initialRequests, initialHasToken = fal
                 )}
               </>
             )}
-          </div>
-        </main>
       </div>
     </div>
   )

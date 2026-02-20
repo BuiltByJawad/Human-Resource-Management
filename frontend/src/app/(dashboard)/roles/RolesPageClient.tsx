@@ -2,7 +2,6 @@
 
 import { PlusIcon } from "@heroicons/react/24/outline"
 
-import DashboardShell from "@/components/ui/DashboardShell"
 import { Button } from "@/components/ui/FormComponents"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import { Skeleton } from "@/components/ui/Skeleton"
@@ -44,7 +43,7 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
   } = useRolesPage({ initialRoles, initialPermissionsPayload })
 
   return (
-    <DashboardShell>
+    <>
       <div className="p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {showSkeleton ? (
@@ -64,7 +63,7 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
             </div>
           ) : (
             <>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Roles &amp; Permissions</h1>
                   <p className="text-sm text-gray-500">Manage user roles and access control</p>
@@ -111,6 +110,6 @@ export function RolesPageClient({ initialRoles, initialPermissionsPayload }: Rol
         type="danger"
         loading={deleteRole.isPending}
       />
-    </DashboardShell>
+    </>
   )
 }

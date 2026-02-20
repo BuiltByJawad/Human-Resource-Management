@@ -22,7 +22,15 @@ export const fetchNotifications = async (token?: string | null): Promise<Notific
   })
 
   const text = await res.text()
-  const parsed = text ? (JSON.parse(text) as unknown) : null
+  const trimmed = typeof text === 'string' ? text.trim() : ''
+  let parsed: unknown = null
+  if (trimmed) {
+    try {
+      parsed = JSON.parse(trimmed) as unknown
+    } catch {
+      parsed = null
+    }
+  }
 
   if (!res.ok) {
     const error: any = new Error('Failed to load notifications')

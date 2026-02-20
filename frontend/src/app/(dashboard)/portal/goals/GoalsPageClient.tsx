@@ -8,8 +8,6 @@ import { goalsService } from '@/services/goalsService'
 import type { PerformanceGoal } from '@/services/goals/types'
 import { CreateGoalDialog } from '@/components/modules/goals/CreateGoalDialog'
 import { KeyResultList } from '@/components/modules/goals/KeyResultList'
-import Sidebar from '@/components/ui/Sidebar'
-import Header from '@/components/ui/Header'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -56,19 +54,15 @@ export function GoalsPageClient({ initialGoals = [] }: GoalsPageClientProps) {
   }, [isError, error, showToast])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">My Goals &amp; OKRs</h1>
-                <p className="text-gray-600">Track your performance objectives and key results.</p>
-              </div>
-              <CreateGoalDialog onSuccess={() => refetch()} />
-            </div>
+    <div className="p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">My Goals &amp; OKRs</h1>
+            <p className="text-gray-600">Track your performance objectives and key results.</p>
+          </div>
+          <CreateGoalDialog onSuccess={() => refetch()} />
+        </div>
 
             {isLoading ? (
               <div className="grid gap-6 md:grid-cols-2">
@@ -136,8 +130,6 @@ export function GoalsPageClient({ initialGoals = [] }: GoalsPageClientProps) {
                 </p>
               </div>
             )}
-          </div>
-        </main>
       </div>
     </div>
   )

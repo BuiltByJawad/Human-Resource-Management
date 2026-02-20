@@ -1,10 +1,16 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useParams, useRouter } from 'next/navigation'
-import DashboardShell from '@/components/ui/DashboardShell'
 import { useToast } from '@/components/ui/ToastProvider'
-import { AssignmentModal } from '@/components/features/assets/AssignmentModal'
-import { MaintenanceModal } from '@/components/features/assets/MaintenanceModal'
+const AssignmentModal = dynamic(
+  () => import('@/components/features/assets/AssignmentModal').then((mod) => mod.AssignmentModal),
+  { ssr: false }
+)
+const MaintenanceModal = dynamic(
+  () => import('@/components/features/assets/MaintenanceModal').then((mod) => mod.MaintenanceModal),
+  { ssr: false }
+)
 import {
   AssetDetailsHeader,
   AssetDetailsSkeleton,
@@ -15,7 +21,9 @@ import type { Asset } from '@/services/assets/types'
 import type { Employee } from '@/services/employees/types'
 import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { handleCrudError } from '@/lib/apiError'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+const ConfirmDialog = dynamic(() => import('@/components/ui/ConfirmDialog').then((mod) => mod.ConfirmDialog), {
+  ssr: false,
+})
 import { useAssetDetails } from '@/hooks/useAssetDetails'
 
 interface AssetDetailsPageClientProps {
@@ -55,10 +63,27 @@ export function AssetDetailsPageClient({ initialAsset, initialEmployees }: Asset
   if (assetQuery.isError) {
     handleCrudError({ error: assetQuery.error, resourceLabel: 'Asset details', showToast })
     return (
-      <DashboardShell>
-        <div className="flex items-center justify-center p-6">
-          <div className="text-center space-y-3">
-            <p className="text-gray-700 font-medium">Unable to load asset details.</p>
+      <div className="flex items-center justify-center p-6">
+        <div className="text-center space-y-3">
+          <p className="text-gray-700 font-medium">Unable to load asset details.</p>
+          <button
+            onClick={() => router.push('/assets')}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Back to Assets
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const asset = assetQuery.data
+  if (!asset) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <div className="text-center text-gray-600">
+          Asset not found.
+          <div className="mt-3">
             <button
               onClick={() => router.push('/assets')}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -67,33 +92,12 @@ export function AssetDetailsPageClient({ initialAsset, initialEmployees }: Asset
             </button>
           </div>
         </div>
-      </DashboardShell>
-    )
-  }
-
-  const asset = assetQuery.data
-  if (!asset) {
-    return (
-      <DashboardShell>
-        <div className="flex items-center justify-center p-6">
-          <div className="text-center text-gray-600">
-            Asset not found.
-            <div className="mt-3">
-              <button
-                onClick={() => router.push('/assets')}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Back to Assets
-              </button>
-            </div>
-          </div>
-        </div>
-      </DashboardShell>
+      </div>
     )
   }
 
   return (
-    <DashboardShell>
+    <>
       <div className="p-4 md:p-6">
         <div className="max-w-5xl mx-auto space-y-6">
             <button
@@ -123,29 +127,35 @@ export function AssetDetailsPageClient({ initialAsset, initialEmployees }: Asset
         </div>
       </div>
 
-      <AssignmentModal
-        isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        onAssign={handleAssign}
-        employees={employeesQuery.data || []}
-      />
+      {isAssignModalOpen && (
+        <AssignmentModal
+          isOpen={isAssignModalOpen}
+          onClose={() => setIsAssignModalOpen(false)}
+          onAssign={handleAssign}
+          employees={employeesQuery.data || []}
+        />
+      )}
 
-      <MaintenanceModal
-        isOpen={isMaintenanceModalOpen}
-        onClose={() => setIsMaintenanceModalOpen(false)}
-        onSubmit={handleMaintenanceSubmit}
-      />
-      <ConfirmDialog
-        isOpen={isReturnDialogOpen}
-        onClose={() => setIsReturnDialogOpen(false)}
-        onConfirm={confirmReturn}
-        title="Return asset"
-        message="Mark this asset as returned? It will be available for reassignment."
-        confirmText={returnMutation.isPending ? 'Returning...' : 'Return'}
-        cancelText="Keep assigned"
-        loading={returnMutation.isPending}
-        type="warning"
-      />
-    </DashboardShell>
+      {isMaintenanceModalOpen && (
+        <MaintenanceModal
+          isOpen={isMaintenanceModalOpen}
+          onClose={() => setIsMaintenanceModalOpen(false)}
+          onSubmit={handleMaintenanceSubmit}
+        />
+      )}
+      {isReturnDialogOpen && (
+        <ConfirmDialog
+          isOpen={isReturnDialogOpen}
+          onClose={() => setIsReturnDialogOpen(false)}
+          onConfirm={confirmReturn}
+          title="Return asset"
+          message="Mark this asset as returned? It will be available for reassignment."
+          confirmText={returnMutation.isPending ? 'Returning...' : 'Return'}
+          cancelText="Keep assigned"
+          loading={returnMutation.isPending}
+          type="warning"
+        />
+      )}
+    </>
   )
 }

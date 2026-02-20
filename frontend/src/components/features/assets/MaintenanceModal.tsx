@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { Dialog, Transition } from '@headlessui/react'
-import { Button, DatePicker, Input, TextArea } from '@/components/ui/FormComponents'
+import { Button, Input, TextArea } from '@/components/ui/FormComponents'
+import { LazyDatePicker } from '@/components/ui/LazyDatePicker'
 import type { Resolver } from 'react-hook-form'
 import { Controller, useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -109,7 +110,7 @@ export const MaintenanceModal = ({ isOpen, onClose, onSubmit }: MaintenanceModal
                       control={control}
                       name="date"
                       render={({ field }) => (
-                        <DatePicker
+                        <LazyDatePicker
                           label="Date"
                           required
                           value={field.value}

@@ -6,65 +6,67 @@ import compression from 'compression';
 import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { errorHandler } from '@/shared/middleware/errorHandler';
 import { logger, stream } from '@/shared/config/logger';
 import { enforceHttps, rateLimiter } from '@/shared/middleware/security';
 import { requestIdMiddleware } from '@/shared/middleware/requestId';
+import { prisma } from '@/shared/config/database';
 import routes from './routes';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from '@/shared/config/swagger';
 import { cookieMiddleware } from '@/shared/middleware/cookies';
 
-export const prisma = new PrismaClient();
-
 export const createApp = (): { app: Application; httpServer: any } => {
   const app = express();
   const httpServer = createServer(app);
 
-  // Initialize Socket.IO
-  const io = new Server(httpServer, {
-    cors: {
-      origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001'],
-      methods: ['GET', 'POST'],
-      credentials: true,
-    },
-  });
+  const io =
+    process.env.NODE_ENV === 'test'
+      ? null
+      : new Server(httpServer, {
+          cors: {
+            origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'http://localhost:3001'],
+            methods: ['GET', 'POST'],
+            credentials: true,
+          },
+        });
 
-  io.use(async (socket, next) => {
-    try {
-      const token = typeof socket.handshake.auth?.token === 'string' ? socket.handshake.auth.token : '';
-      if (!token) {
+  if (io) {
+    io.use(async (socket, next) => {
+      try {
+        const token = typeof socket.handshake.auth?.token === 'string' ? socket.handshake.auth.token : '';
+        if (!token) {
+          return next(new Error('Unauthorized'));
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+          userId?: string;
+        };
+
+        if (!decoded?.userId) {
+          return next(new Error('Unauthorized'));
+        }
+
+        const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+        if (!user || user.status !== 'active') {
+          return next(new Error('Unauthorized'));
+        }
+
+        socket.data.userId = user.id;
+        return next();
+      } catch {
         return next(new Error('Unauthorized'));
       }
+    });
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-        userId?: string;
-      };
-
-      if (!decoded?.userId) {
-        return next(new Error('Unauthorized'));
+    io.on('connection', (socket) => {
+      const userId = socket.data.userId as string | undefined;
+      if (userId) {
+        socket.join(`user:${userId}`);
       }
-
-      const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-      if (!user || user.status !== 'active') {
-        return next(new Error('Unauthorized'));
-      }
-
-      socket.data.userId = user.id;
-      return next();
-    } catch {
-      return next(new Error('Unauthorized'));
-    }
-  });
-
-  io.on('connection', (socket) => {
-    const userId = socket.data.userId as string | undefined;
-    if (userId) {
-      socket.join(`user:${userId}`);
-    }
-  });
+    });
+  }
 
   // Set app variables
   app.set('trust proxy', 1);

@@ -83,6 +83,9 @@ async function main() {
     { resource: 'assets', action: 'view', description: 'View assets' },
     { resource: 'assets', action: 'manage', description: 'Manage assets' },
     { resource: 'assets', action: 'assign', description: 'Assign assets' },
+    { resource: 'documents', action: 'manage', description: 'Manage company documents' },
+    { resource: 'documents', action: 'upload', description: 'Upload documents' },
+    { resource: 'document_categories', action: 'manage', description: 'Manage document categories' },
     { resource: 'compliance', action: 'view', description: 'View compliance' },
     { resource: 'compliance', action: 'manage', description: 'Manage compliance' },
     { resource: 'settings', action: 'manage_system_settings', description: 'Manage system settings' },
@@ -145,6 +148,65 @@ async function main() {
       permissions: ['*']
     },
     {
+      name: 'Admin',
+      description: 'Administrative access to manage system configuration and core HR data.',
+      isSystem: true,
+      permissions: [
+        // Core HR
+        'employees.*', 'departments.manage',
+        'roles.manage', 'roles.assign',
+
+        // Operations (admin oversight)
+        'attendance.*', 'leave_requests.*', 'leave_policies.manage',
+        'payroll.*', 'benefits.*', 'expenses.*',
+
+        // Lifecycle
+        'onboarding.*', 'offboarding.*',
+
+        // System
+        'assets.*', 'compliance.*', 'settings.manage_system_settings',
+        'documents.manage', 'document_categories.manage',
+        'notifications.manage', 'notifications.manage_templates',
+
+        // Insights
+        'reports.*', 'analytics.view',
+
+        // Modules
+        'training.*', 'performance.*', 'recruitment.manage',
+      ]
+    },
+    {
+      name: 'HR',
+      description: 'Human Resources access to manage employees and HR operations.',
+      isSystem: true,
+      permissions: [
+        // Core HR
+        'employees.*', 'departments.manage',
+
+        // Operations
+        'attendance.view', 'attendance.manage',
+        'leave_requests.*', 'leave_policies.manage',
+        'payroll.view',
+        'benefits.*',
+        'expenses.*',
+
+        // Lifecycle
+        'onboarding.*', 'offboarding.*',
+
+        // Documents
+        'documents.manage', 'document_categories.manage',
+
+        // Reporting
+        'reports.view', 'reports.export',
+
+        // Training & performance
+        'training.*', 'performance.view', 'performance.review',
+
+        // Notifications
+        'notifications.manage',
+      ]
+    },
+    {
       name: 'HR Manager',
       description: 'Full access to human resource operations.',
       isSystem: false,
@@ -153,7 +215,8 @@ async function main() {
         'attendance.view', 'attendance.manage', 'leave_requests.*', 'leave_policies.manage',
         'payroll.*', 'benefits.*', 'expenses.*', 'onboarding.*', 'offboarding.*',
         'assets.*', 'compliance.*', 'reports.*', 'analytics.*', 'training.*',
-        'performance.*', 'recruitment.manage', 'notifications.manage'
+        'performance.*', 'recruitment.manage', 'notifications.manage',
+        'documents.manage', 'document_categories.manage'
       ]
     },
     {
@@ -185,7 +248,8 @@ async function main() {
         'auth.update_own_profile', 'auth.change_own_password',
         'notifications.update_own_notifications', 'employees.view',
         'leave_requests.view', 'leave_requests.manage',
-        'payroll.view', 'benefits.view', 'expenses.view', 'training.view', 'performance.review'
+        'payroll.view', 'benefits.view', 'expenses.view', 'training.view', 'performance.review',
+        'documents.upload'
       ]
     }
   ]
@@ -213,6 +277,27 @@ async function main() {
     }
   }
   console.log('✅ Roles & Permissions assigned')
+
+  // Seed Document Categories
+  const defaultCategories = [
+    { name: 'HR Policy', allowEmployeeUpload: false, sortOrder: 10 },
+    { name: 'IT Policy', allowEmployeeUpload: false, sortOrder: 20 },
+    { name: 'Handbook', allowEmployeeUpload: false, sortOrder: 30 },
+    { name: 'Form', allowEmployeeUpload: true, sortOrder: 40 },
+    { name: 'Other', allowEmployeeUpload: true, sortOrder: 50 },
+  ]
+
+  for (const cat of defaultCategories) {
+    await prisma.documentCategory.create({
+      data: {
+        name: cat.name,
+        allowEmployeeUpload: cat.allowEmployeeUpload,
+        sortOrder: cat.sortOrder,
+        isActive: true,
+      },
+    })
+  }
+  console.log('✅ Document categories created')
 
   // 3. Create Departments
   const deptConfigs = [
@@ -245,7 +330,23 @@ async function main() {
       empNo: 'EMP001'
     },
     {
+      email: 'sysadmin@novahr.com',
+      firstName: 'Nova',
+      lastName: 'Admin',
+      role: 'Admin',
+      dept: 'Executive',
+      empNo: 'EMP010'
+    },
+    {
       email: 'hr@novahr.com',
+      firstName: 'Sarah',
+      lastName: 'Jenkins',
+      role: 'HR',
+      dept: 'Human Resources',
+      empNo: 'EMP011'
+    },
+    {
+      email: 'hr-manager@novahr.com',
       firstName: 'Sarah',
       lastName: 'Jenkins',
       role: 'HR Manager',

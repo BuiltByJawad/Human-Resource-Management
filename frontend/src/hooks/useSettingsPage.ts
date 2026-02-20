@@ -7,11 +7,16 @@ import * as yup from 'yup'
 
 import { useToast } from '@/components/ui/ToastProvider'
 import { useBrandingStore } from '@/store/useBrandingStore'
+import { useAuthStore } from '@/store/useAuthStore'
+import { parseApiError } from '@/lib/apiError'
 import {
   changePassword,
   updateBrandingSettings,
   uploadBrandingFavicon,
   uploadBrandingLogo,
+  startMfaEnrollment,
+  confirmMfaEnrollment,
+  disableMfa,
 } from '@/services/settings/api'
 import type {
   ChangePasswordPayload,
@@ -29,7 +34,7 @@ const passwordSchema = yup.object({
   newPassword: yup
     .string()
     .required('New password is required')
-    .min(8, 'Password must be at least 8 characters long')
+    .min(12, 'Password must be at least 12 characters long')
     .test(
       'complexity',
       'Password must include at least three of the following: uppercase letter, lowercase letter, number, special character',
@@ -71,6 +76,7 @@ interface UseSettingsPageOptions {
 export const useSettingsPage = ({ initialBrandingSettings }: UseSettingsPageOptions) => {
   const { showToast } = useToast()
   const { updateBranding, setLoaded } = useBrandingStore()
+  const { user, updateUser } = useAuthStore()
 
   const normalizedInitialBranding = useMemo(
     () => ({
@@ -102,10 +108,19 @@ export const useSettingsPage = ({ initialBrandingSettings }: UseSettingsPageOpti
   >({})
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [isMfaEnabled, setIsMfaEnabled] = useState<boolean>(!!user?.mfaEnabled)
+  const [isStartingMfa, setIsStartingMfa] = useState(false)
+  const [isConfirmingMfa, setIsConfirmingMfa] = useState(false)
+  const [isDisablingMfa, setIsDisablingMfa] = useState(false)
+  const [showMfaEnrollment, setShowMfaEnrollment] = useState(false)
+  const [mfaEnrollmentToken, setMfaEnrollmentToken] = useState<string | null>(null)
+  const [mfaOtpauthUrl, setMfaOtpauthUrl] = useState<string | null>(null)
+  const [mfaSecretMasked, setMfaSecretMasked] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
+    watch,
     reset,
     formState: { errors },
   } = useForm<PasswordFormData>({
@@ -138,6 +153,10 @@ export const useSettingsPage = ({ initialBrandingSettings }: UseSettingsPageOpti
     })
     setLoaded(true)
   }, [normalizedInitialBranding, updateBranding, setLoaded])
+
+  useEffect(() => {
+    setIsMfaEnabled(!!user?.mfaEnabled)
+  }, [user?.mfaEnabled])
 
   useEffect(() => {
     setIsMounted(true)
@@ -206,6 +225,73 @@ export const useSettingsPage = ({ initialBrandingSettings }: UseSettingsPageOpti
     [showToast, updateBranding],
   )
 
+  const handleStartMfaEnrollment = useCallback(async () => {
+    setIsStartingMfa(true)
+    try {
+      const enrollment = await startMfaEnrollment()
+      setMfaEnrollmentToken(enrollment.enrollmentToken)
+      setMfaOtpauthUrl(enrollment.otpauthUrl)
+      setMfaSecretMasked(enrollment.secretMasked)
+      setShowMfaEnrollment(true)
+      showToast('Scan the QR code with your authenticator app, then enter the code to confirm.', 'info')
+    } catch (error: unknown) {
+      const message = parseApiError(error, 'Failed to start MFA enrollment').message
+      showToast(message, 'error')
+    } finally {
+      setIsStartingMfa(false)
+    }
+  }, [showToast])
+
+  const handleConfirmMfaEnrollment = useCallback(
+    async (code: string) => {
+      if (!mfaEnrollmentToken) {
+        showToast('Enrollment session has expired. Please start again.', 'error')
+        return
+      }
+
+      setIsConfirmingMfa(true)
+      try {
+        await confirmMfaEnrollment({ code, enrollmentToken: mfaEnrollmentToken })
+        setIsMfaEnabled(true)
+        setShowMfaEnrollment(false)
+        setMfaEnrollmentToken(null)
+        setMfaOtpauthUrl(null)
+        setMfaSecretMasked(null)
+        if (user?.id) {
+          updateUser({ mfaEnabled: true })
+        }
+        showToast('Two-factor authentication enabled', 'success')
+      } catch (error: unknown) {
+        const message = parseApiError(error, 'Failed to confirm MFA enrollment').message
+        showToast(message, 'error')
+      } finally {
+        setIsConfirmingMfa(false)
+      }
+    },
+    [confirmMfaEnrollment, mfaEnrollmentToken, showToast, updateUser, user?.id],
+  )
+
+  const handleDisableMfa = useCallback(async () => {
+    setIsDisablingMfa(true)
+    try {
+      await disableMfa()
+      setIsMfaEnabled(false)
+      setShowMfaEnrollment(false)
+      setMfaEnrollmentToken(null)
+      setMfaOtpauthUrl(null)
+      setMfaSecretMasked(null)
+      if (user?.id) {
+        updateUser({ mfaEnabled: false })
+      }
+      showToast('Two-factor authentication disabled', 'success')
+    } catch (error: unknown) {
+      const message = parseApiError(error, 'Failed to disable MFA').message
+      showToast(message, 'error')
+    } finally {
+      setIsDisablingMfa(false)
+    }
+  }, [disableMfa, showToast, updateUser, user?.id])
+
   const handleFaviconUpload = useCallback(
     async (file: File) => {
       try {
@@ -261,9 +347,21 @@ export const useSettingsPage = ({ initialBrandingSettings }: UseSettingsPageOpti
     handleSaveBrandingSettings,
     handleLogoUpload,
     handleFaviconUpload,
+    isMfaEnabled,
+    isStartingMfa,
+    isConfirmingMfa,
+    isDisablingMfa,
+    showMfaEnrollment,
+    mfaOtpauthUrl,
+    mfaSecretMasked,
+    setShowMfaEnrollment,
+    handleStartMfaEnrollment,
+    handleConfirmMfaEnrollment,
+    handleDisableMfa,
     onSubmit,
     register,
     handleSubmit,
+    watch,
     reset,
     errors,
   }

@@ -1,5 +1,25 @@
 import Joi from 'joi'
 
+const passwordSchema = Joi.string()
+  .min(12)
+  .custom((value, helpers) => {
+    if (typeof value !== 'string') {
+      return helpers.error('any.invalid')
+    }
+
+    const hasUpper = /[A-Z]/.test(value)
+    const hasLower = /[a-z]/.test(value)
+    const hasNumber = /\d/.test(value)
+    const hasSymbol = /[^A-Za-z0-9]/.test(value)
+    const categories = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length
+
+    if (categories < 3) {
+      return helpers.error('string.pattern.base')
+    }
+
+    return value
+  }, 'password complexity')
+
 export const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required(),
@@ -8,14 +28,14 @@ export const loginSchema = Joi.object({
 
 export const registerSchema = Joi.object({
   email: Joi.string().email().required(),
-  password: Joi.string().required(),
+  password: passwordSchema.required(),
   firstName: Joi.string().min(2).max(50).required(),
   lastName: Joi.string().min(2).max(50).required(),
 })
 
 export const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required(),
-  newPassword: Joi.string().required(),
+  newPassword: passwordSchema.required(),
 })
 
 export const updateProfileSchema = Joi.object({
@@ -41,7 +61,7 @@ export const inviteUserSchema = Joi.object({
 
 export const completeInviteSchema = Joi.object({
   token: Joi.string().required(),
-  password: Joi.string().required(),
+  password: passwordSchema.required(),
 })
 
 export const passwordResetRequestSchema = Joi.object({
@@ -50,7 +70,7 @@ export const passwordResetRequestSchema = Joi.object({
 
 export const resetPasswordSchema = Joi.object({
   token: Joi.string().required(),
-  password: Joi.string().required(),
+  password: passwordSchema.required(),
 })
 
 export const refreshTokenSchema = Joi.object({
